@@ -35,8 +35,15 @@ attached.**
                        │   │ exact match      │                │
                        │   └────────┬─────────┘                │
                        │            ▼                          │
+                       │   ╔══════════════════╗                │
+                       │   ║ Stage 5 · GATE   ║  can veto ─────┤
+                       │   ║ every value must ║                │
+                       │   ║ trace to a real  ║                │
+                       │   ║ span, or escalate║                │
+                       │   ╚════════┬═════════╝                │
+                       │            ▼                          │
                        ▼   ┌──────────────────────────────────────────────┐
-                           │  Stage 5 · Decide + Report                   │
+                           │  Stage 6 · Decide + Report                   │
                            │  OK · MISMATCH(fields) · NEEDS_REVIEW(reason)│
                            └───────────────┬──────────────────────────────┘
                                            ▼
@@ -108,6 +115,7 @@ backend/sdoc/
 │   ├── intent.py      "send me a draft" vs "check the docs I attached"
 │   └── llm.py         model fallback when the rule margin is thin
 ├── compare.py         field-by-field verdicts -> MATCH/MISMATCH/UNCOMPARABLE
+├── evidence_gate.py   no defect without traceable evidence; can veto a defect
 ├── pipeline.py        the orchestrator; produces CaseResult
 ├── llm/
 │   ├── client.py      provider wrapper (OpenAI), structured output
@@ -160,12 +168,47 @@ Both sides are canonicalised (`normalize.py`) and compared with **exact
 equality**. Three verdicts per field: `MATCH`, `MISMATCH`, `UNCOMPARABLE`.
 `UNCOMPARABLE` never becomes a defect — it escalates.
 
-### Stage 5 — Decide
+### Stage 5 — The evidence gate
+
+> **No discrepancy may be reported unless both sides of it trace back to a real
+> span in a real document.**
+
+The gate runs after the comparison and before the decision, and it can **veto**
+a defect the comparison believed in. It returns one of:
+
+| Status | Meaning | Becomes |
+|---|---|---|
+| `grounded` | everything the decision rests on is traceable | OK or MISMATCH |
+| `no_comparison_needed` | the sender asked us to *produce* a draft; nothing to compare | OK |
+| `missing_attachment` | fewer than two documents, and the sender expected a comparison | NEEDS_REVIEW |
+| `unreadable` | empty, corrupt, or an image-only scan | NEEDS_REVIEW |
+| `wrong_document` | the pair is not {SI, BL} | NEEDS_REVIEW |
+| `blank_value` | a required value is `???` / `____` / `TBA` | NEEDS_REVIEW |
+| `untraceable_value` | we produced a value we cannot find in the source | NEEDS_REVIEW |
+
+The last row is the one that earns the stage its place. A value that cannot be
+located in the document is a value the system **misread or invented**. Without
+the gate, that value flows into the comparison and is reported as a
+discrepancy — a confident false alarm. With the gate, it becomes a review case
+naming the field we could not read.
+
+The difference is not just a score. An operations team that receives one
+fabricated discrepancy stops trusting every flag after it, and a verification
+system nobody trusts is worth less than no system at all. This is also the
+distinction the problem statement asks for in as many words: *"the system must
+distinguish a real discrepancy from a reading or formatting issue."*
+
+Every gate decision also carries a **recovery** — what a human should actually
+do (`Ask the sender to re-send the draft BL`, `Open the scan and confirm the
+container count`) — so the review queue is a work list, not an error log.
+
+### Stage 6 — Decide
 
 ```
-any UNCOMPARABLE           -> NEEDS_REVIEW (missing_value)
-any MISMATCH               -> MISMATCH, defect_fields = the mismatched fields
-otherwise                  -> OK ("No mismatch detected")
+gate grounded / no_comparison_needed
+    -> MISMATCH when the comparison found differing fields, otherwise OK
+gate anything else
+    -> NEEDS_REVIEW with the gate's reason; never a defect
 ```
 
 ## 5. Deployment

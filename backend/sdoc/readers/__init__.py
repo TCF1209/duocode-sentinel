@@ -7,7 +7,13 @@ the pipeline turns that into a review case rather than a crash or a guess.
     empty_file      the file is 0 bytes, or decodes to nothing
     corrupt         the bytes are not a valid file of that type
     no_text_layer   a PDF that renders but carries no characters (a scan)
-    unsupported     an extension we have no reader for
+    unsupported     an extension no reader, not even the fallback, can open
+
+Four formats have precise readers that preserve label/value structure and a
+locator for every value. Everything else falls through to `fallback.py`, which
+converts via markitdown — less precise, but a real inbox contains more than four
+file types and refusing to open one is not an answer. See that module for why
+the fallback is second choice rather than the default.
 """
 from __future__ import annotations
 
@@ -16,7 +22,7 @@ from pathlib import Path
 from typing import Optional
 
 from ..schema import ParsedDoc
-from . import office, pdf, plain
+from . import fallback, office, pdf, plain
 
 # Guardrail: an attachment larger than this is a configuration problem, not a
 # document, and must not be loaded into memory during a batch run.
@@ -87,10 +93,9 @@ def read_attachment(root: str | os.PathLike, rel_path: str) -> ParsedDoc:
 
     reader = _READERS.get(ext)
     if reader is None:
-        doc.readable = False
-        doc.unreadable_reason = "unsupported"
-        doc.notes.append(f"no reader for '{ext}'")
-        return doc
+        # An unfamiliar format is not a dead end: try the generic converter.
+        reader = fallback.read
+        doc.notes.append(f"no precise reader for '{ext}'; using the fallback converter")
 
     try:
         data = full.read_bytes()

@@ -1,7 +1,7 @@
 # Sentinel — shipping document verification
 
 *From email inbox to discrepancy report.*
-Averis × Monash Hackathon 2026.
+Built by **DuoCode** for the Averis × Monash Hackathon 2026.
 
 A shipping operations team receives everything in one inbox: requests to check
 documents, requests for new shipping instructions, invoice queries,
@@ -75,6 +75,28 @@ data/             dataset + local grader — git-ignored, never committed
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | you are picking up the next task |
 | [`docs/STATUS.md`](docs/STATUS.md) | you just sat down |
 | [`docs/COLLABORATION.md`](docs/COLLABORATION.md) | you are joining the repo |
+
+## Third-party components
+
+Everything below is used as a dependency under a permissive licence. The
+domain judgement — which labels mean the same field, what counts as a
+discrepancy, and when a case must go to a human — is ours.
+
+| Component | Licence | Used for |
+|---|---|---|
+| [pdfplumber](https://github.com/jsvine/pdfplumber) | MIT | PDF word coordinates, for the two-column form reconstruction |
+| [python-docx](https://github.com/python-openxml/python-docx) | MIT | `.docx` tables |
+| [openpyxl](https://foss.heptapod.net/openpyxl/openpyxl) | MIT | `.xlsx` sheets |
+| [markitdown](https://github.com/microsoft/markitdown) | MIT | fallback reader for attachment formats we have no precise reader for |
+| [RapidFuzz](https://github.com/rapidfuzz/RapidFuzz) | MIT | fuzzy matching of document **labels** (never of values) |
+| [FastAPI](https://github.com/fastapi/fastapi) · [Uvicorn](https://github.com/encode/uvicorn) | MIT · BSD | the API surface |
+| [shadcn/ui](https://github.com/shadcn-ui/ui) · [TanStack Table](https://github.com/TanStack/table) · [Recharts](https://github.com/recharts/recharts) | MIT | dashboard components |
+| OpenAI API | commercial | classification fallback, assisted extraction, reading scans |
+
+Deliberately **not** used: Docling and Unstructured (they pull PyTorch and
+cannot be built on our deployment tier), PyMuPDF (AGPL), and agent frameworks
+such as LangChain (this is a deterministic extraction pipeline, not retrieval —
+the abstraction would cost clarity and buy nothing).
 
 ## On evaluation
 
