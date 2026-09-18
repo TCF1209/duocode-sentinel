@@ -1,0 +1,25 @@
+# --- data: never commit the dataset or (especially) the answer key ---
+data/
+*.zip
+ground_truth.json
+submission*.json
+runs/
+.cache/
+
+# --- python ---
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+.env.local
+
+# --- node / next ---
+node_modules/
+.next/
+out/
+.vercel/
+
+# --- os ---
+.DS_Store
+Thumbs.db

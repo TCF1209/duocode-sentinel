@@ -1,0 +1,135 @@
+# Scoring — how we are graded, and how we measure ourselves
+
+There are **two** scoreboards and they are not the same thing. Do not optimise
+one and forget the other.
+
+---
+
+## 1. The organisers' self-evaluation (accuracy)
+
+Formula, from the official scorer:
+
+```
+final_score = 0.50 × end_to_end_rate
+            + 0.30 × stage1_macro_f1
+            + 0.20 × stage3_defect_f1
+```
+
+with a fourth, **diagnostic** axis for reliability (escalation precision and
+recall) that is reported but not folded into the number.
+
+### What each axis actually measures
+
+| Axis | Weight | Population | Pass condition |
+|---|---:|---|---|
+| **end-to-end** | 50% | the **46** emails that carry a planted defect | routed to `BL_COMPARISON` **and** flagged **and** `defect_fields` is an **exact set match** |
+| **Stage 1** macro-F1 | 30% | all 520 | per-category F1, then unweighted mean over the 5 categories |
+| **Stage 3** defect-F1 | 20% | 200 comparison emails that are not `NEEDS_REVIEW` | email-level: did we say "defect" when there was one |
+| reliability | — | the 20 `NEEDS_REVIEW` emails | did we escalate instead of guessing |
+
+### The consequences worth internalising
+
+1. **Half the score rides on 46 emails.** Each is worth ~1.09% of the final
+   number, and it is all-or-nothing: flag 2 of 2 fields → full credit; flag
+   1 of 2, or 3 where there were 2 → zero for that email. Field-level
+   precision is the single highest-leverage thing in the project.
+2. **Macro-F1 punishes errors on small classes.** `SPAM` has 40 emails,
+   `GENERAL` 60, `BL_COMPARISON` 220 — but each category contributes exactly
+   1/5 of the Stage 1 number. One misfiled spam costs roughly what five
+   misfiled comparison requests cost.
+3. **False alarms are not free.** Stage 3 is an F1: inventing a discrepancy
+   on a clean pair lowers precision. "Flag everything" scores badly.
+4. **`NEEDS_REVIEW` is safe but not free.** It is excluded from Stage 3 and
+   from end-to-end, so escalating a case never *hurts* the headline number —
+   but escalating everything tanks escalation precision on the reliability
+   axis, which the judges read.
+5. **`decided_by` is read by the scorer.** It reports
+   `resolved by rules (cost)`. We emit `"rule"` or `"llm"` per email
+   deliberately — it is free evidence of an efficient design.
+
+---
+
+## 2. The judges' rubric (this is the one that picks the winner)
+
+Preliminary round, 100 points:
+
+| Criterion | Pts | Where we earn it |
+|---|---:|---|
+| Working Core Prototype | 25 | end-to-end run over all 520 emails, live deployed demo |
+| System Design & Architecture | 15 | `ARCHITECTURE.md`, clean stage boundaries, no web/db deps in the core |
+| Technology Integration | 15 | hybrid rules+LLM, vision model for scans, cloud deployment |
+| Technical Feasibility & Validation | 15 | **measured** scores + held-out seed validation (this document) |
+| Problem Statement Understanding | 10 | the `NEEDS_REVIEW` taxonomy, blank ≠ discrepancy, intent check |
+| Innovation & Solution Approach | 10 | evidence-linked extraction, human-in-the-loop with source, cost routing |
+| Practical Value & Potential | 10 | cost/latency numbers, review queue, retry, generated reply draft |
+
+Final round shifts weight to **End-to-End Functionality (25)** and adds
+**Engineering Quality & Robustness (15)** and **User Experience (10)**.
+
+Note the mandatory constraints from the rules document:
+* the solution **must** meaningfully use AI **and cloud infrastructure** —
+  "solutions that do not meaningfully integrate cloud infrastructure may
+  receive significantly reduced scores";
+* a **publicly accessible** deployed link must work during judging;
+* demo video ≤ 5 minutes, **1 mark deducted per 30 seconds over**.
+
+---
+
+## 3. How we measure — and the line we do not cross
+
+### The situation
+
+The organisers' Docker package (`sdoc-hackathon-docker.zip`) ships
+`data_v2/ground_truth.json` alongside the official `scoring.py` and
+`score_cli.py`. The problem statement tells participants to self-evaluate
+through `POST /submit`; that endpoint runs the *same* `scoring.py` against the
+*same* file. Running the CLI locally is therefore the sanctioned workflow
+without needing Docker installed.
+
+### Our rules
+
+1. `ground_truth.json` lives in `data/_grader/`, which is **git-ignored**. It
+   never enters the repository.
+2. Nothing under `backend/sdoc/` reads it, imports it, or knows it exists.
+3. No lookup tables, no `if email_id == ...`, ever. A rule must be justified by
+   the shipping domain, not by one labelled example.
+4. Generalisation is proven by **regenerating the dataset with an unseen
+   seed** and scoring against that — not by tuning against seed 42.
+5. The README states plainly that we used the provided self-evaluation.
+
+### Running the scorer
+
+```bash
+# 1. produce a submission over the full inbox
+.venv/Scripts/python.exe backend/run.py --data data/bundle --out runs/latest
+
+# 2. score it with the organisers' own scorer
+.venv/Scripts/python.exe data/_grader/score_cli.py runs/latest/submission.json \
+    --ground-truth data/_grader/ground_truth.json
+```
+
+### Held-out validation (the part that proves we did not overfit)
+
+The generator is deterministic given `--seed`. Regenerating with a seed we
+never developed against produces a fresh inbox with a fresh defect draw, and
+scoring on it tells us whether the pipeline learned the *domain* or the
+*sample*.
+
+```bash
+pip install openpyxl python-docx reportlab pillow
+python generate.py --seed 20260922 --n 500 --out ../holdout
+```
+
+Report both numbers in the slide deck. A small gap is the credibility of the
+whole submission.
+
+---
+
+## 4. Score log
+
+Keep this table updated every time the number moves — it is the evidence for
+"Technical Feasibility & Validation" and it makes regressions obvious.
+
+| Date | Commit | Stage1 macro-F1 | Stage3 defect-F1 | End-to-end | Final | Rules % | Note |
+|---|---|---|---|---|---|---|---|
+| | | | | | | | baseline pending |
