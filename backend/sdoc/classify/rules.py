@@ -52,7 +52,7 @@ from typing import Callable, Optional
 
 from .. import labels
 from ..normalize import is_blank
-from ..schema import CATEGORIES, EmailRecord
+from ..schema import CATEGORIES, DOC_BL, DOC_SI, EmailRecord
 
 BL = "BL_COMPARISON"
 SI = "SI_REQUEST"
@@ -563,8 +563,6 @@ def _attachment_evidence(doc_types: list[str]) -> tuple[float, Optional[str]]:
     is the behaviour the escalation stage depends on, since `wrong_doc_type`
     is a BL_COMPARISON outcome. Emails with no attachments are unaffected.
     """
-    from ..schema import DOC_BL, DOC_SI
-
     kinds = {str(t).upper() for t in doc_types}
     if DOC_SI in kinds and DOC_BL in kinds:
         return ATTACHMENT_PAIR_WEIGHT, "attachments.si-bl-pair"

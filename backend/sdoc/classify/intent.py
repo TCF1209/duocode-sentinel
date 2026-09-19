@@ -222,13 +222,10 @@ def detect_intent(email: EmailRecord) -> Intent:
     draft_score, draft_fired = _tally(DRAFT_SIGNALS, head, subject)
 
     if head != body:
-        # A claim made anywhere in the message still counts, at half weight:
-        # the head is where the ask belongs, not where it is guaranteed to be.
-        tail_attach, tail_fired = _tally(ATTACHED_SIGNALS, body, subject)
-        if tail_attach > attach_score:
-            attach_score = attach_score + 0.5 * (tail_attach - attach_score)
-            known = {n for _, n in attach_fired}
-            attach_fired += [(w * 0.5, n) for w, n in tail_fired if n not in known]
+        attach_score, attach_fired = _merge_tail(
+            ATTACHED_SIGNALS, attach_score, attach_fired, body, subject)
+        draft_score, draft_fired = _merge_tail(
+            DRAFT_SIGNALS, draft_score, draft_fired, body, subject)
 
     expects = attach_score >= ATTACH_MIN and attach_score > draft_score
     requests = draft_score >= DRAFT_MIN and draft_score >= attach_score

@@ -35,6 +35,14 @@ could not trace the consignee" on a document that never arrived. Blank is
 checked before traceability because a blank value has nothing to trace: it is
 uncertainty, not a misreading, and it carries a different review reason.
 
+What the gate can and cannot prove: it proves that a value we hold is *present*
+in the document we claim to have read it from. It cannot prove the value was
+read from the right *place* in that document — that is what `Evidence.locator`
+is for, and it is why a figure is the weakest thing to trace: a gross weight of
+21,577 is unmistakable, but a container count of 6 will also be found in a
+street address. Party and port values, which is where the expensive false
+alarms live, are distinctive enough for the check to bite.
+
 The module imports nothing outside `schema` and `normalize`: no network, no
 model, no reader. `intent` and `pair_problem` are passed in rather than
 imported so the gate has no opinion about how they were produced.
@@ -390,7 +398,9 @@ def evaluate(
             intent=intent,
             pair_problem=pair_problem,
         )
-    except Exception as exc:                     # pragma: no cover - safety net
+    except Exception as exc:
+        # A malformed comparison list or a half-built FieldValue is a bug, but
+        # it must cost one case, not the batch — and the case goes to a human.
         return GateDecision(
             status="unreadable",
             review_reason="unreadable",

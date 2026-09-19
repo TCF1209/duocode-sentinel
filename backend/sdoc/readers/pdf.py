@@ -85,10 +85,7 @@ def read(doc: ParsedDoc, data: bytes) -> ParsedDoc:
             continue
         value_x = _value_column_x(words)
         for row_no, row in enumerate(_rows(words), start=1):
-            left = [w for w in row if w["x0"] < value_x - COLUMN_TOLERANCE]
-            right = [w for w in row if w["x0"] >= value_x - COLUMN_TOLERANCE]
-            left_text = " ".join(w["text"] for w in left).strip()
-            right_text = " ".join(w["text"] for w in right).strip()
+            left_text, right_text = split_row(row, value_x)
             lines.append(" ".join(t for t in (left_text, right_text) if t))
             locator = f"p{page_no} r{row_no}"
 
@@ -130,10 +127,87 @@ def read(doc: ParsedDoc, data: bytes) -> ParsedDoc:
 # helpers
 # --------------------------------------------------------------------------
 def _page_words(page) -> list[dict]:
+    """Words with their font attached.
+
+    `fontname` is requested for two reasons. It lets a row be split by style
+    when the geometry alone is ambiguous (see `split_row`), and — more
+    importantly — asking for it stops pdfplumber merging characters of
+    different fonts into a single token, which is what a label/value collision
+    produces.
+    """
     try:
-        return page.extract_words(use_text_flow=False, keep_blank_chars=False) or []
+        return page.extract_words(
+            use_text_flow=False,
+            keep_blank_chars=False,
+            extra_attrs=["fontname", "size"],
+        ) or []
     except Exception:
-        return []
+        try:                                   # a PDF whose fonts cannot be read
+            return page.extract_words(use_text_flow=False, keep_blank_chars=False) or []
+        except Exception:
+            return []
+
+
+def _is_bold(word: dict) -> bool:
+    name = str(word.get("fontname", "")).lower()
+    return "bold" in name or "black" in name or "heavy" in name or ",b" in name
+
+
+def _join(words: list[dict]) -> str:
+    """Rebuild text from words in reading order, restoring spaces from gaps.
+
+    De-interleaving a collision leaves single characters, so the spacing has to
+    come from the geometry rather than from the tokens: a gap wider than a
+    quarter of the font size was a space on the page.
+    """
+    out: list[str] = []
+    previous: dict | None = None
+    for w in sorted(words, key=lambda w: w["x0"]):
+        if previous is not None:
+            gap = w["x0"] - previous["x1"]
+            if gap > max(1.0, 0.25 * float(previous.get("size") or 8.0)):
+                out.append(" ")
+        out.append(w["text"])
+        previous = w
+    return "".join(out).strip()
+
+
+def _spans_overlap(groups: dict[str, list[dict]]) -> bool:
+    spans = sorted(
+        (min(w["x0"] for w in ws), max(w["x1"] for w in ws)) for ws in groups.values()
+    )
+    return any(b[0] < a[1] - 0.5 for a, b in zip(spans, spans[1:]))
+
+
+def split_row(row: list[dict], value_x: float) -> tuple[str, str]:
+    """Separate a row's label from its value.
+
+    Geometry is the normal answer: the label column sits left of the value
+    column. But a label longer than the gap between the two columns is drawn
+    straight through the value, and the two strings then interleave character by
+    character — a real example from this dataset is
+
+        Notify Party/Intermediate Consignee  +  CERIEX
+            -> "Notify Party/Intermediate ConsCigEnReIEeX"
+
+    which swallows the value and leaves the address line behind as the notify
+    party: a confident false discrepancy, exactly what the system exists to
+    avoid. When a row's font groups physically overlap, the styling is the more
+    reliable separator, so bold becomes the label and the rest the value.
+    """
+    fonts: dict[str, list[dict]] = {}
+    for w in row:
+        fonts.setdefault(str(w.get("fontname", "")), []).append(w)
+
+    if len(fonts) > 1 and _spans_overlap(fonts):
+        bold = [w for w in row if _is_bold(w)]
+        rest = [w for w in row if not _is_bold(w)]
+        if bold and rest:
+            return _join(bold), _join(rest)
+
+    left = [w for w in row if w["x0"] < value_x - COLUMN_TOLERANCE]
+    right = [w for w in row if w["x0"] >= value_x - COLUMN_TOLERANCE]
+    return _join(left), _join(right)
 
 
 def _rows(words: list[dict]) -> list[list[dict]]:
@@ -167,6 +241,10 @@ def _value_column_x(words: list[dict]) -> float:
     if not words:
         return 1e9
 
+    from_rows = _value_column_from_labelled_rows(words)
+    if from_rows is not None:
+        return from_rows
+
     # Bin left edges into fixed buckets. Single-linkage clustering is wrong
     # here: word starts are dense enough that a chain of near-neighbours merges
     # the whole page into one cluster and the "column" lands in open space.
@@ -188,6 +266,47 @@ def _value_column_x(words: list[dict]) -> float:
     # it is by a distance the most populated edge on the page. Ties break left.
     best = max(candidates, key=lambda b: (len(candidates[b]), -b))
     return min(candidates[best])
+
+
+def _value_column_from_labelled_rows(words: list[dict]) -> float | None:
+    """Locate the value column from the rows that actually carry a label.
+
+    Counting every word's left edge sounds reasonable and is not: a container
+    table with fifteen rows casts fifteen votes for its own second column and
+    outvotes the form's value column, which then swallows the first words of
+    every value. Counting *rows* instead, and only rows shaped like
+    `bold label ... plain value`, measures the thing we are actually after.
+
+    Returns None when the document has no such rows — a single-font layout,
+    for instance — so the caller can fall back to the edge histogram.
+    """
+    label_margin = min(w["x0"] for w in words)
+    starts: list[float] = []
+    for row in _rows(words):
+        bold = [w for w in row if _is_bold(w)]
+        plain = [w for w in row if not _is_bold(w)]
+        if not bold or not plain:
+            continue                      # a heading, a table row: not a field
+        if min(w["x0"] for w in bold) > label_margin + 5:
+            continue                      # does not begin at the label margin
+        starts.append(min(w["x0"] for w in plain))
+
+    if not starts:
+        return None
+
+    bins: dict[int, int] = {}
+    for x in starts:
+        b = int(round(x / COLUMN_TOLERANCE))
+        bins[b] = bins.get(b, 0) + 1
+    strongest = max(bins.values())
+
+    # Among the columns that recur, the value column is the leftmost: every
+    # other aligned edge on a form lies further right, inside a value. A
+    # label/value collision can also drop a stray plain word inside the label's
+    # own span, so a bin needs more than one row behind it to count.
+    threshold = max(2, strongest * 0.6)
+    best = min(b for b, count in bins.items() if count >= threshold)
+    return min(x for x in starts if int(round(x / COLUMN_TOLERANCE)) == best)
 
 
 def dominant_left_edges(words: list[dict]) -> list[tuple[float, int]]:
