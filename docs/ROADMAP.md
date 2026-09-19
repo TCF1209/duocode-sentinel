@@ -75,22 +75,23 @@ The review also found a hole the harness structurally *cannot* see: short synony
 ("POL", "POD") fuzzy-matched inside long strings, so `NAPOLI CENTRALE` resolved to
 a port. Fixed in `labels.py` via `_MIN_FUZZY_SYNONYM_CHARS`.
 
-**Definition of done: half met, and the half that is missing is named here
-rather than rounded up.** `docs/ADVERSARIAL.md` states, with measurements, what
-breaks the deterministic path, what was fixed and what is still open; all four
-held-out scores are unchanged and every `submission.json` is byte-identical.
+- [x] **(C)** Measure what the model layer recovers, not just what the rules
+      lose — `adversarial.py --llm`, written up in `ADVERSARIAL.md` §7.
 
-But the stated bar was "what breaks the deterministic path **and what the LLM
-layer recovers**", and the second half is unmeasured. Both harness runs are
-`pipeline_mode: deterministic`, so every number on that page describes the
-rules alone. `unseen_labels` loses 1,100 of 1,281 fields — precisely the case
-`extract/llm.py` exists for — and `adversarial.run(..., llm=client)` is a code
-path that has never been executed.
+**Definition of done: met.** `docs/ADVERSARIAL.md` states, with measurements,
+what breaks the deterministic path, what the model layer recovers, what was
+fixed and what is still open; all four held-out scores are unchanged and every
+`submission.json` is byte-identical.
 
-- [ ] **(C)** Run the harness with the model on, at least for `unseen_labels`,
-      and add a recovery column. Estimated ~188 extraction calls, well inside
-      the $2.00 run budget. Until this exists, the claim "the model earns its
-      place on unfamiliar wording" is a design argument, not a measurement.
+The recovery number is the one worth carrying into the pitch: unfamiliar label
+wording forces **168 of 188** cases to a human on the rules alone and **2** with
+the model, while false discrepancies, silent wrong values and masked
+discrepancies all stay at **zero**. Recall bought by guessing would have shown
+up in that second clause; it did not. 178 calls, $0.2447.
+
+Say it carefully, though — §7 spells out why. The model does **no** work on the
+graded inbox (`decided_by` is `rule` for all 520), so this is "here is what
+happens when wording we have never seen arrives", never "our pipeline is 89% AI".
 
 ## Phase 3 — Product surface · target: 21 Sep · **THE CRITICAL PATH**
 

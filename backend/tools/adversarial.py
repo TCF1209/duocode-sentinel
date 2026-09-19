@@ -83,7 +83,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sdoc import labels                                        # noqa: E402
 from sdoc.extract import fields as extract_mod                 # noqa: E402
-from sdoc.pipeline import Pipeline, PipelineConfig             # noqa: E402
+from sdoc.pipeline import Pipeline, PipelineConfig, build_client   # noqa: E402
 from sdoc.readers import read_attachment, role_hint            # noqa: E402
 from sdoc.schema import (                                      # noqa: E402
     COMPARE_FIELDS,
@@ -996,30 +996,52 @@ def main() -> int:
                     help="use only the first N .txt pairs")
     ap.add_argument("--only", default=None,
                     help="comma-separated perturbation names (default: all)")
+    ap.add_argument("--llm", action="store_true",
+                    help="measure the ASSISTED pipeline: rules plus the model "
+                         "fallback. Costs money and needs a key. Off by "
+                         "default — see the note at the top of this file.")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
 
     data_root = Path(args.data).resolve()
     only = [n.strip() for n in args.only.split(",")] if args.only else None
 
+    # The assisted run measures a different system, so it is opt-in and it
+    # says so in the report. A file that does not record which pipeline it
+    # measured is a file whose numbers cannot be compared to anything.
+    client = build_client(enabled=True) if args.llm else None
+    if args.llm and client is None:
+        print("--llm was asked for but no usable client is configured "
+              "(no OPENAI_API_KEY, or the budget is spent). Refusing to "
+              "write a report labelled 'assisted' that measured the rules.",
+              file=sys.stderr)
+        return 2
+    mode = "assisted" if client else "deterministic"
+
     pairs = len(_txt_pairs(data_root, args.limit))
     progress = None if args.quiet else (lambda n: print(f"  perturbing: {n}"))
     if not args.quiet:
         print(f"Measuring {len(only or PERTURBATIONS)} perturbations over "
-              f"{pairs} .txt pairs from {data_root}")
-    reports = run(str(data_root), limit=args.limit, only=only,
+              f"{pairs} .txt pairs from {data_root}  [{mode}]")
+    reports = run(str(data_root), limit=args.limit, only=only, llm=client,
                   on_progress=progress)
 
     out_path = Path(args.out).resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = _payload(reports, data_root, pairs, pipeline_mode=mode)
+    if client is not None:
+        payload["llm"] = client.stats()
     out_path.write_text(
-        json.dumps(_payload(reports, data_root, pairs), indent=2,
-                   ensure_ascii=False),
+        json.dumps(payload, indent=2, ensure_ascii=False),
         encoding="utf-8")
 
     if not args.quiet:
         _say()
         _print_reports(reports, pairs)
+        if client is not None:
+            u = client.stats()["usage"]
+            _say(f"\nModel: {u['calls']} calls ({u['live_calls']} live), "
+                 f"${u['cost_usd']:.4f}")
         _say(f"\nWrote {out_path}")
     return 0
 
