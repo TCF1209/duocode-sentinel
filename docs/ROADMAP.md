@@ -21,39 +21,56 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · **(C)** = Claude sessio
 - [ ] **(T)** Read `DATA_NOTES.md` end to end — it is the shared mental model
 - [ ] **(T)** Decide the project name (placeholder: *Sentinel*) and lock it before the slides
 
-## Phase 1 — Measurable baseline · target: 19 Sep, end of day
+## Phase 1 — Measurable baseline · **COMPLETE** (19 Sep)
 
-The goal is a number, not a pretty one. Everything after this is improvement
-against a measured starting point.
+- [x] **(C)** `doctype.py` — SI / BL / invoice / packing list / COO classifier
+- [x] **(C)** `readers/__init__.py` — dispatch, readability checks, size guards
+- [x] **(C)** `extract/fields.py` — chunks → 7 fields with evidence
+- [x] **(C)** `compare.py` — verdicts per field
+- [x] **(C)** `classify/rules.py` — scored 5-category classifier
+- [x] **(C)** `classify/intent.py` — "send me a draft" vs "check what I attached"
+- [x] **(C)** `pipeline.py` + `run.py` — full inbox → `submission.json` + `report.json`
+- [x] **(C)** First official score; table filled in `SCORING.md`
+- [x] **(C)** `pytest` suite over the known traps in `DATA_NOTES.md` (240 tests)
+- [x] **(C)** `readers/fallback.py` — markitdown for unfamiliar formats
+- [x] **(C)** `scripts/evaluate.py` — pipeline + official scorer in one command
+- [x] **(C)** GitHub repository published (`TCF1209/duocode-sentinel`, private)
 
-- [ ] **(C)** `doctype.py` — SI / BL / invoice / packing list / COO classifier
-- [ ] **(C)** `readers/__init__.py` — dispatch, readability checks, size guards
-- [ ] **(C)** `extract/fields.py` — chunks → 7 fields with evidence
-- [ ] **(C)** `compare.py` — verdicts per field
-- [ ] **(C)** `classify/rules.py` — scored 5-category classifier
-- [ ] **(C)** `classify/intent.py` — "send me a draft" vs "check what I attached"
-- [ ] **(C)** `pipeline.py` + `run.py` — full inbox → `submission.json` + `report.json`
-- [ ] **(C)** First official score; fill the table in `SCORING.md`
-- [ ] **(C)** `pytest` suite over the known traps in `DATA_NOTES.md`
+**Result:** 520 emails, ~2.3 ms each, 100% resolved without a model call.
+Final score **1.0000** — and the same on three held-out seeds (`SCORING.md` §4.1).
 
-**Definition of done:** `run.py` processes all 520 emails with no crash, and
-`score_cli.py` prints a final score.
+## Phase 2 — Robustness beyond the generator · target: 20 Sep
 
-## Phase 2 — Accuracy & the LLM layer · target: 20 Sep
+**Read this framing before picking up a task.** The score is at its ceiling on
+everything this generator can produce, so "improve accuracy" is no longer a
+meaningful goal — there is nothing left to improve *against this data*. What is
+unproven is whether the pipeline survives a document the generator cannot make:
+unfamiliar label wording, an unseen layout, a real scan. That is Phase 2.
 
+- [ ] **(C)** Adversarial perturbation harness: mutate the documents ourselves —
+      invented label synonyms, reflowed layouts, OCR-style noise, values split
+      across lines — and measure where extraction actually breaks. **Do this
+      first**: it tells us what the LLM layer needs to cover, instead of us
+      guessing.
 - [ ] **(C)** `llm/client.py` — OpenAI wrapper, structured output, retries
-- [ ] **(C)** `llm/cache.py` — content-hash cache so runs are reproducible and cheap
-- [ ] **(C)** `classify/llm.py` — fallback for low-margin classifications
-- [ ] **(C)** `extract/llm.py` — model-assisted extraction for unread fields
-- [ ] **(C)** Vision path for image-only PDFs (transcript as reviewer evidence,
-      case still escalated)
-- [ ] **(C)** Error analysis: dump every disagreement, fix the *general* cause
-- [ ] **(T)** Spot-check 10 escalated cases by hand — is the reason right and
-      is the evidence enough to act on?
-- [ ] **(C)** Held-out seed run; record both numbers in `SCORING.md`
+- [ ] **(C)** `llm/cache.py` — content-hash cache so runs stay reproducible and cheap
+- [ ] **(C)** `classify/llm.py` — consume the `needs_llm` flag the rule
+      classifier already sets and nothing currently reads
+- [ ] **(C)** `extract/llm.py` — model-assisted extraction for fields the rules
+      could not read, with the evidence gate still holding the line on anything
+      the model produces that cannot be traced
+- [ ] **(C)** Vision path for image-only PDFs: produce a transcript as reviewer
+      evidence, while the case still escalates
+- [ ] **(C)** Cost + latency instrumentation: pinned rate card, real tokeniser
+      counts, projected cost at 10k emails/day
+- [ ] **(T)** Spot-check 10 escalated cases by hand — is the reason right, and
+      is the evidence enough for an operator to act on?
+- [ ] **(C)** Re-run all four datasets after the LLM layer lands; the numbers
+      must not move down
 
-**Definition of done:** end-to-end rate and macro-F1 both measured, on two
-different seeds, with the gap written down.
+**Definition of done:** we can state, with measurements, what kind of document
+breaks the deterministic path and what the LLM layer recovers — and the
+held-out scores are unchanged.
 
 ## Phase 3 — Product surface · target: 21 Sep
 

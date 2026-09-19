@@ -132,4 +132,61 @@ Keep this table updated every time the number moves — it is the evidence for
 
 | Date | Commit | Stage1 macro-F1 | Stage3 defect-F1 | End-to-end | Final | Rules % | Note |
 |---|---|---|---|---|---|---|---|
-| | | | | | | | baseline pending |
+| 2026-09-19 | `b613737` | 1.000 | 0.979 | 1.000 | 0.9957 | 100% | Phase 1 baseline, rules only |
+| 2026-09-19 | (wip) | 1.000 | 1.000 | 0.978 | 0.9891 | 100% | font-aware PDF split: false alarms gone, one field-set regression |
+| 2026-09-19 | `a6a09c2` | 1.000 | 1.000 | 1.000 | **1.0000** | 100% | row-based value column; regression fixed |
+
+The middle row is kept deliberately. It is what a real fix looks like: removing
+two false alarms moved Stage 3 precision to 1.00 and simultaneously broke one
+previously-correct field set, because the same change shifted the detected
+value column. Without the log we would have shipped the fix and called it an
+improvement while the headline metric had quietly dropped.
+
+### 4.1 Held-out validation
+
+The dataset generator is deterministic given `--seed`. Regenerating with seeds
+we never developed against, at three different scales, tests whether the
+pipeline learned the **domain** or the **sample**. Nothing was tuned between
+these runs — the same commit produced all four columns.
+
+| Dataset | Emails | Defect emails | Stage1 F1 | Defect F1 | End-to-end | Final |
+|---|---:|---:|---:|---:|---:|---:|
+| dev (seed 42) | 520 | 46 | 1.000 | 1.000 | 46/46 | **1.0000** |
+| held-out, seed 20260922 | 520 | 57 | 1.000 | 1.000 | 57/57 | **1.0000** |
+| held-out, seed 7 | 320 | 31 | 1.000 | 1.000 | 31/31 | **1.0000** |
+| held-out, seed 31337 | 820 | 91 | 1.000 | 1.000 | 91/91 | **1.0000** |
+
+225 defect emails across four independent draws, every one caught with the
+exact field set, no false alarms, and all 80 escalations correct.
+
+Reproduce:
+
+```bash
+pip install openpyxl python-docx reportlab pillow
+python generate.py --seed 20260922 --n 500 --out <somewhere>
+python backend/run.py --data <somewhere> --out runs/holdout
+python data/_grader/score_cli.py runs/holdout/submission.json \
+    --ground-truth <somewhere>/ground_truth.json
+```
+
+### 4.2 What this proves, and what it does not
+
+**It proves** we are not memorising a particular draw. Different entity
+samples, different planted defects, a different format mix and a different
+scale all score identically, on code that was never shown them.
+
+**It does not prove** robustness to documents from outside this generator. All
+four sets share one label vocabulary, one set of renderers and one entity pool.
+Real shipping documents will bring label wording we have never seen, layouts we
+have never parsed, and scans of varying quality.
+
+So the remaining engineering effort does not belong in chasing a score that is
+already at its ceiling. It belongs in **robustness beyond the generator**:
+
+* an LLM fallback for label wording and layouts the rules do not recognise —
+  the classifier already reports `needs_llm`, and nothing consumes it yet;
+* a vision path so a scanned document produces a readable transcript for the
+  reviewer rather than only an escalation;
+* adversarial testing: perturb the documents ourselves — invent new label
+  synonyms, reflow layouts, inject OCR-style noise — and find where it breaks
+  *before* a judge does.
