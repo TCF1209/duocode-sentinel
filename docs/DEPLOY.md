@@ -70,16 +70,23 @@ cannot read one. Do this now rather than on submission morning:
 **GitHub → the repository → Settings → General → scroll to Danger Zone →
 Change repository visibility → Make public.**
 
-### 0.3 · There is demo data committed — *there is not, yet*
+### 0.3 · There is demo data committed — *there is, now*
 
-This is the blocker. `/data/` is git-ignored, Render builds from git, and so
-**the deployed API currently has nothing to serve**:
+`/data/` is git-ignored and Render builds from git, so a container built from
+this repo would have nothing to serve. `demo_data/` is the answer and it is
+committed:
 
 ```bash
-git ls-files data/ | wc -l     # prints 0
+git ls-files demo_data/ | wc -l     # 62: 30 emails, 31 attachments, a README
 ```
 
-There are two ways this bites, and they fail at different moments:
+Thirty emails, 360 KB, chosen by `scripts/make_demo_data.py` to cover all five
+categories, all four escalation reasons, six defect emails across all four
+attachment formats, eighteen clean comparisons, and the zero-attachment pair
+from `DATA_NOTES.md` §5a whose two emails have opposite correct outcomes. Only
+the participant bundle is in there; `data/_grader/` never goes near it.
+
+If you ever replace it, note the two ways the shape bites, at different moments:
 
 > **If `demo_data/` is absent entirely**, the Dockerfile's
 > `COPY demo_data/ demo_data/` **fails the build**, with
@@ -88,46 +95,10 @@ There are two ways this bites, and they fail at different moments:
 >
 > **If `demo_data/` exists but the emails are nested wrongly** — anywhere other
 > than `demo_data/inbox/email_*.json` — the build succeeds, the service goes
-> green, `GET /` answers `{"status":"ok"}`, the dashboard loads and shows "No
-> runs yet", and then **Start a run** returns `400`. That is the dangerous one.
-> **A green Render dashboard does not mean the demo works**: `/` is a static
-> dict that never touches the pipeline, which is exactly why step 2 checks the
-> data with a second, separate call.
-
-The layout the loader requires (`backend/api/pipeline_runner.py` globs
-`data_root/inbox/email_*.json`):
-
-```
-demo_data/
-├── inbox/            <- email_*.json go here, not at the top level
-└── attachments/
-```
-
-`docs/ROADMAP.md` leaves the choice of *what* to commit open, and it is
-**(T)'s** decision, not this document's. Either option works; `render.yaml`
-assumes the first:
-
-| Option | Path | `SENTINEL_DATA_ROOT` | Notes |
-|---|---|---|---|
-| **Curated subset** (ROADMAP's preference, and what the deploy already assumes) | `demo_data/` | `/app/demo_data` — **already set** | ~30 emails covering all 5 categories, all 4 escalation reasons, several real defects. `demo_data/` is matched by no `.gitignore` pattern and is explicitly allowed by `.dockerignore` (`!demo_data/`), so it needs no exception anywhere. **Nothing to change.** |
-| Whole participant bundle | `data/bundle/` | change to `/app/data/bundle` | 3.3 MB, 520 emails, 251 attachments. Needs edits in **four** places: a `.gitignore` exception, a `.dockerignore` exception, the `COPY` in the `Dockerfile`, and this variable — and it works against `.dockerignore`'s deliberate final `data/` re-exclusion, which exists so that no later edit can ship the answer key. Prefer the first option. |
-
-If you take the second option, re-read the closing comment in `.dockerignore`
-before editing it. It re-excludes `data/` **last**, on purpose, because
-`.dockerignore` resolves by last match — an added `!data/bundle/` above it will
-appear to do nothing, and the right fix is not to move the re-exclusion up.
-
-Whichever you choose, **only the participant bundle may ship.**
-`data/_grader/` holds the answer key and the generator, it was mis-sent, and it
-may never enter the repository or the image — `CLAUDE.md` rule 1 and
-`docs/SCORING.md` §3. Before you commit anything under `demo_data/`, check:
-
-```bash
-git status --porcelain | grep -i "ground_truth\|_grader\|generate.py\|pools.py" \
-  && echo "STOP — grader material staged" || echo "clean"
-```
-
----
+> green, `GET /` answers `{"status":"ok"}`, and then **Start a run** returns
+> `400`. That is the dangerous one. **A green Render dashboard does not mean
+> the demo works**, which is why step 2 checks the data with a second call —
+> and why `GET /` now carries a `ready` field that does.
 
 ## Step 1 — deploy the backend to Render
 
@@ -274,26 +245,38 @@ not present at build time — go to [Troubleshooting](#b-the-page-loads-then-han
 
 The API stores runs **in memory** (`backend/api/store.py`: "a single process's
 memory, gone on restart"), and Render's free plan **spins the container down
-after roughly 15 minutes of inactivity**. Those two facts combine into a third
-that is easy to miss:
+after roughly 15 minutes of inactivity**. Every cold start therefore wipes
+every run.
 
-> **Every cold start wipes every run.** The dashboard does not create one for
-> you — `web/app/page.tsx` lists runs and, finding none, shows "No runs yet."
-> A judge opening a cold link lands on an empty page.
-
-This is not a bug to fix tonight; it is a demo ritual to remember. **Five
-minutes before any demo or recording**, do both of these:
+**The API now handles this itself.** A lifespan handler runs the demo inbox
+once at boot — deterministic, no key, under a second — so a judge opening a
+cold link lands on a dashboard with a completed run already on it rather than
+on "No runs yet". `GET /` reports it:
 
 ```bash
-# 1. wake the container — this request is the slow one, so spend it yourself
 curl -s https://sdoc-sentinel-api.onrender.com/
-
-# 2. leave a completed run on screen for them to walk into
-curl -s -X POST https://sdoc-sentinel-api.onrender.com/runs \
-  -H 'content-type: application/json' -d '{"use_llm": false}'
+# {"service":"sentinel-api","status":"ok","data_root":"/app/demo_data",
+#  "ready":true,"llm_runs_allowed":false}
 ```
 
-Then open the dashboard yourself and confirm a run is listed and reads **done**.
+`ready` is the field that matters. `status: ok` only says the container is
+listening; `ready: true` says a run completed, which means the data was found
+and the pipeline worked.
+
+**What is still a demo ritual.** Autorun removes the empty dashboard, not the
+cold start itself: the container still has to wake, and that first request is
+the slow one (see Troubleshooting A). So **five minutes before any demo or
+recording**, spend it yourself:
+
+```bash
+curl -s https://sdoc-sentinel-api.onrender.com/     # wakes it; expect ready:true
+```
+
+If `ready` comes back `false`, the container is up and the data is not — go to
+Troubleshooting F before you record anything.
+
+To disable autorun (for instance to demonstrate the button live), set
+`SENTINEL_AUTORUN=0` on the service.
 
 ---
 
