@@ -109,19 +109,27 @@ layer over data that already exists** — resist the urge to touch `backend/sdoc
 | `GET /metrics` | counts, rule share, cost, latency |
 | `GET /submission` | the graded artefact, for the "we scored 1.0000" claim |
 
-- [ ] **(C)** the endpoints above, Pydantic models at the boundary only
-- [ ] **(C)** job handling: visible failures, retry a single case
+- [x] **(C)** the endpoints above, Pydantic models at the boundary only — built
+      in `backend/api/`, all 8 live and tested (`backend/tests/test_api.py`,
+      7/7 passing). See `docs/STATUS.md` 2026-09-19 session 4.
+- [~] **(C)** job handling: visible failures, retry a single case — a failed
+      *run* is visible (`status`/`error` on `GET /runs/{id}`); retrying **one
+      case** without re-running the inbox is not built yet.
 
 ### 3b · `web/` — Next.js dashboard
 
-- [ ] **(C)** inbox triage — category, status, confidence, `rule`/`llm` badge
-- [ ] **(C)** discrepancy report — SI vs BL side by side, mismatched fields
+- [x] **(C)** inbox triage — category, status, confidence, `rule`/`llm` badge
+- [x] **(C)** discrepancy report — SI vs BL side by side, mismatched fields
       highlighted, **the evidence snippet under each value**. This is the
       screen the whole project exists to produce; build it first.
-- [ ] **(C)** review queue — reason, recovery text, source evidence, confirm /
-      correct, then the report updates
-- [ ] **(C)** metrics page — scores, confusion matrix, cost + latency, rules %
-- [ ] **(C)** generated reply draft to the counterparty listing the discrepancies
+- [x] **(C)** review queue — reason, recovery text, source evidence, confirm /
+      correct, then the report updates — built as part of the case-detail page
+      rather than a separate queue screen (see `docs/STATUS.md` session 5)
+- [x] **(C)** metrics page — cost + latency, rules % (**no confusion matrix or
+      accuracy score** — those need the organisers' ground truth, which
+      `backend/` must never read; this page shows operational metrics only)
+- [x] **(C)** generated reply draft to the counterparty listing the discrepancies
+      — built client-side from data already in the report, no extra API call
 
 ### 3c · Deploy — Render (backend Docker) + Vercel (frontend)
 
