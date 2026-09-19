@@ -2,11 +2,13 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* Utility classes written directly inside a Next.js dynamic route folder do
-   not reliably compile in this setup. Keep page files thin and put real
-   markup in the matching component under components dash page dash view. */
-@source "../app";
-@source "../components";
+/* Note on web/app/runs/[runId]/... history: those pages' Tailwind classes
+   once failed to compile. The cause was an unanchored `runs/` line in the
+   repo-root .gitignore silently excluding the whole folder from git — and
+   Tailwind's scanner correctly skips git-ignored files — not a Tailwind
+   limitation on bracket-named folders. Fixed by anchoring .gitignore
+   (`/runs/`). Real markup still lives in components/*-page-view.tsx, which
+   is a fine layout choice on its own merits; it just is not the fix.
 
 @custom-variant dark (&:is(.dark *));
 

@@ -54,6 +54,17 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
   cannot be `async`); all real markup moved to `components/*-page-view.tsx`,
   which compiles correctly. Keep this pattern for any new page added under a
   `[param]` segment, or the same silent failure comes back.
+- **Correction, same day, from `a01dd91` (main): the diagnosis two bullets up
+  was wrong.** The real cause was an unanchored `runs/` line in the
+  repo-root `.gitignore` matching `web/app/runs/` at any depth — the same
+  bug that had also swallowed three page files whole (`git status` never
+  mentioned them, `git add -A` staged nothing under that path, no error).
+  Tailwind was never broken; it correctly skips git-ignored files, and those
+  files were git-ignored. `.gitignore` is now anchored (`/data/`, `/runs/`,
+  `/.cache/`). The `components/*-page-view.tsx` split is kept as a plain
+  layout choice, not as a fix for anything — the false claim is removed from
+  `globals.css`'s comment. Left visible here rather than silently corrected,
+  same reason this file keeps its other wrong-turn rows.
 - **A second, sharper bug found while fixing the first one.** Documenting the
   fix above inside a CSS comment in `globals.css` — the comment's prose
   literally contained the word `@source` and a `[` character — crashed the
