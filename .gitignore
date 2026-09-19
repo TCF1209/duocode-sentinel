@@ -1,10 +1,14 @@
 # --- data: never commit the dataset or (especially) the answer key ---
-data/
+# Anchored with a leading slash on purpose. An unanchored `runs/` matches a
+# directory of that name at ANY depth, and it silently ate the dashboard's
+# whole `web/app/runs/` route tree — three page files that `git status` never
+# mentioned and `git add` refused without a word. Keep the slash.
+/data/
 *.zip
 ground_truth.json
 submission*.json
-runs/
-.cache/
+/runs/
+/.cache/
 
 # --- python ---
 .venv/
