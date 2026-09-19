@@ -109,6 +109,12 @@ class Pipeline:
     # -- the whole job, for one email ------------------------------------
     def process(self, email: EmailRecord) -> CaseResult:
         started = time.perf_counter()
+        # The client meters the whole run, so the only way to say what one
+        # email cost is to difference its counter around that email. A
+        # per-case count is what lets the dashboard show which emails actually
+        # used the model, instead of a run-wide total in which the handful of
+        # hard cases are indistinguishable from the hundreds of cheap ones.
+        calls_before = self._llm_calls_so_far()
         result = CaseResult(email_id=email.email_id, category="GENERAL")
         try:
             self._process(email, result)
@@ -122,9 +128,26 @@ class Pipeline:
             result.defect_fields = []
             result.errors.append(f"{type(exc).__name__}: {exc}")
             result.notes.append("Processing failed; case queued for retry.")
+        # Counted outside the `except` on purpose: an email that crashed may
+        # well have spent a call before it crashed, and that call is still
+        # attributable to it.
+        result.llm_calls = self._llm_calls_so_far() - calls_before
         result.duration_ms = (time.perf_counter() - started) * 1000
         self.stats.observe(result)
         return result
+
+    def _llm_calls_so_far(self) -> int:
+        """Calls the shared client has made so far, or 0 when there is none.
+
+        A run with no key has no client at all — `build_client` returns None —
+        and that is a supported mode rather than an edge case, so the count
+        answers for it here instead of making every caller guard. Cache hits
+        are counted, because a cached answer is still an answer this email
+        needed the model for; what the run actually spent is told by
+        `live_calls`, which the usage block reports separately.
+        """
+        llm = self.config.llm
+        return llm.usage.calls if llm is not None else 0
 
     # -- stages ----------------------------------------------------------
     def _process(self, email: EmailRecord, result: CaseResult) -> None:

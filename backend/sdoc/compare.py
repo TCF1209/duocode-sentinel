@@ -316,9 +316,95 @@ def compare_documents(si: DocFields, bl: DocFields) -> list[FieldComparison]:
     `UNCOMPARABLE/si_missing` row, not a silent absence.
     """
     return [
-        compare_field(field, _side_of(si, field), _side_of(bl, field))
+        compare_field(field, *_repaired(si, bl, field))
         for field in COMPARE_FIELDS
     ]
+
+
+# --------------------------------------------------------------------------
+# Truncation repair
+#
+# A party name too long for its column wraps onto the next line, and the reader
+# cannot tell that continuation apart from the address block that normally
+# follows a name. It keeps the first line, so
+#
+#     Consignee: APRIL FINE PAPER TRADING (MIDDLE
+#       EAST) FZE
+#
+# is read as "APRIL FINE PAPER TRADING (MIDDLE" — which differs from the other
+# document and is reported as a discrepancy that does not exist. The
+# adversarial harness measures this: wrapping long party names silently
+# produced 74 wrong values, and silent wrong values are the one failure mode
+# this system must not have.
+#
+# The repair is deliberately narrow. It fires only when one side's canonical
+# value is a strict prefix of the other's, and it completes the short side
+# using **that document's own next line**. The completion has to reproduce the
+# other side's canonical form exactly, so the repair can recognise that we cut
+# a value short — it cannot invent agreement. When the two documents genuinely
+# name different parties, the short side's next line is its address block, the
+# completion does not match, and the mismatch stands.
+# --------------------------------------------------------------------------
+_REPAIRABLE = PARTY_FIELDS + PORT_FIELDS
+_CONTINUATION_SEARCH = 200
+
+
+def _repaired(si: DocFields, bl: DocFields, field: str) -> tuple[FieldValue, FieldValue]:
+    si_value, bl_value = _side_of(si, field), _side_of(bl, field)
+    if field not in _REPAIRABLE:
+        return si_value, bl_value
+
+    si_key, bl_key = _RULES[field].key(_source(si_value)), _RULES[field].key(_source(bl_value))
+    if not si_key or not bl_key or si_key == bl_key:
+        return si_value, bl_value
+
+    if _is_token_prefix(si_key, bl_key):
+        return _extend(si, si_value, field, bl_key), bl_value
+    if _is_token_prefix(bl_key, si_key):
+        return si_value, _extend(bl, bl_value, field, si_key)
+    return si_value, bl_value
+
+
+def _is_token_prefix(short: str, long: str) -> bool:
+    """Is `short` the beginning of `long`, whole words only?
+
+    Whole words matter: "KLANG" must not count as a prefix of "KLANGER", or the
+    repair would start chasing coincidences.
+    """
+    a, b = short.split(), long.split()
+    return 0 < len(a) < len(b) and b[: len(a)] == a
+
+
+def _extend(fields: DocFields, value: FieldValue, field: str,
+            target_key: str) -> FieldValue:
+    """Complete a value from its own document, if that reproduces `target_key`."""
+    doc = getattr(fields, "doc", None)
+    text = getattr(doc, "text", "") or ""
+    if not value.raw or not text:
+        return value
+
+    start = text.find(value.raw)
+    if start < 0:
+        return value
+    tail = text[start + len(value.raw): start + len(value.raw) + _CONTINUATION_SEARCH]
+    if not tail[:1].isspace():
+        return value                       # the value did not end where we cut it
+
+    for line in tail.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        candidate = f"{value.raw} {line}"
+        if _RULES[field].key(candidate) == target_key:
+            note = "value was wrapped across two lines; completed from the document"
+            evidence = value.evidence
+            if evidence is not None:
+                evidence = replace(evidence, snippet=f"{evidence.snippet} / {line}")
+            key = _RULES[field].key(candidate)
+            return replace(value, raw=candidate, normalised=key, evidence=evidence,
+                           extractor=f"{value.extractor}+wrap")
+        break                              # only the immediately following line
+    return value
 
 
 def defect_fields(comparisons: list[FieldComparison]) -> list[str]:

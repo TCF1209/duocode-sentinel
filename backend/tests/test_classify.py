@@ -18,7 +18,7 @@ from typing import Callable, Optional
 
 import pytest
 
-from conftest import DATA
+from conftest import DATA, skip_without_bundle
 from sdoc.classify import intent as intent_mod
 from sdoc.classify import rules
 from sdoc.schema import CATEGORIES, DOC_BL, DOC_COO, DOC_INVOICE, DOC_SI, EmailRecord
@@ -31,6 +31,9 @@ INBOX = DATA / "inbox"
 # --------------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def inbox() -> list[EmailRecord]:
+    # Every test in this file that reads a real email asks for this fixture, so
+    # this is the one place a clean clone has to be recognised.
+    skip_without_bundle()
     emails = [
         EmailRecord.from_json(json.loads(p.read_text(encoding="utf-8")))
         for p in sorted(INBOX.glob("email_*.json"))

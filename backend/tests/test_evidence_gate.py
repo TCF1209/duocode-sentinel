@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import DATA
+from conftest import DATA, requires_bundle
 from sdoc import evidence_gate as gate
 from sdoc import labels, normalize, readers
 from sdoc.schema import (
@@ -42,9 +42,10 @@ from sdoc.schema import (
     ParsedDoc,
 )
 
-pytestmark = pytest.mark.skipif(
-    not (DATA / "inbox").is_dir(), reason="data/bundle is not present (it is git-ignored)"
-)
+# Every test in this module is against a real document, so the guard is the
+# whole file. It is the shared one from conftest, so the reason a judge reads
+# is worded once.
+pytestmark = requires_bundle
 
 
 # --------------------------------------------------------------------------

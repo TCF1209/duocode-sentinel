@@ -9,7 +9,7 @@ label/value pair. They describe a document *shape*, never a single email.
 from __future__ import annotations
 
 import pytest
-from conftest import DATA
+from conftest import DATA, requires_bundle, skip_without_bundle
 
 from sdoc import labels
 from sdoc.extract.fields import (
@@ -25,6 +25,7 @@ ATTACHMENTS = DATA / "attachments"
 
 def read_fields(rel: str, role: str):
     """Read one real attachment and extract its fields."""
+    skip_without_bundle()
     doc = read_attachment(DATA, rel)
     return doc, extract_fields(doc, role)
 
@@ -370,6 +371,7 @@ def test_unparseable_value_is_not_present_and_not_blank():
 # ==========================================================================
 # 6. Evidence invariants, over the whole bundle
 # ==========================================================================
+@requires_bundle
 def test_every_present_field_carries_evidence_across_the_bundle():
     checked = 0
     for path in sorted(ATTACHMENTS.iterdir()):
@@ -422,6 +424,7 @@ def test_long_value_is_trimmed_for_the_reviewer():
 # ==========================================================================
 # 7. The debug view
 # ==========================================================================
+@requires_bundle
 def test_field_candidates_explains_every_candidate():
     doc = read_attachment(DATA, "attachments/email_313_SI.pdf")
     cands = field_candidates(doc)

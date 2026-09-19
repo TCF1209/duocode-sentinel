@@ -135,6 +135,21 @@ Keep this table updated every time the number moves — it is the evidence for
 | 2026-09-19 | `b613737` | 1.000 | 0.979 | 1.000 | 0.9957 | 100% | Phase 1 baseline, rules only |
 | 2026-09-19 | (wip) | 1.000 | 1.000 | 0.978 | 0.9891 | 100% | font-aware PDF split: false alarms gone, one field-set regression |
 | 2026-09-19 | `a6a09c2` | 1.000 | 1.000 | 1.000 | **1.0000** | 100% | row-based value column; regression fixed |
+| 2026-09-19 | (Phase 2 close) | 1.000 | 1.000 | 1.000 | **1.0000** | 100% | robustness fixes: alt separators, wrap repair, short-synonym fuzzy guard |
+
+The last row is the other kind of entry worth keeping: behaviour changed in
+three places — `readers/rows.py`, `compare.py` and `labels.py` — and the number
+did not move at all. That is the expected result and not a disappointment. All
+three fixes address documents **this generator cannot produce**, so the dataset
+has no way to reward them; what they are measured against is
+`docs/ADVERSARIAL.md` and the unit tests. The score's job here was to prove the
+fixes cost nothing, and it did: every `submission.json` across all four datasets
+is byte-identical to the run before them.
+
+A corollary worth internalising before touching `labels.py` again: the fuzzy
+third pass fires on **zero** labels in all four datasets — every real label is
+answered by pass 1 or pass 2 (13,620 chunk labels were classified by pass to
+confirm). A regression there is therefore invisible to this table.
 
 The middle row is kept deliberately. It is what a real fix looks like: removing
 two false alarms moved Stage 3 precision to 1.00 and simultaneously broke one

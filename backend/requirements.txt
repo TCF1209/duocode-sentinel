@@ -1,8 +1,18 @@
 # --- document readers -------------------------------------------------
-pdfplumber==0.11.4        # PDF text + word coordinates (pure python)
+# 0.11.9 is the floor markitdown[pdf] imposes; pinning 0.11.4 under it made
+# `pip install -r` fail outright with ResolutionImpossible — so a judge
+# following the README could not install the project at all. 0.11.10 is the
+# version every measured score in docs/SCORING.md was produced with.
+pdfplumber==0.11.10       # PDF text + word coordinates (pure python)
 python-docx==1.1.2        # .docx tables
 openpyxl==3.1.5           # .xlsx sheets
 markitdown[pdf,docx,xlsx]>=0.1.7   # fallback reader for formats we have no precise reader for
+# Both are imported directly by `readers/scan.py` and were, until now,
+# installed only as pdfplumber's own dependencies. They are pinned here
+# because scan.py degrades to `None` when they are missing: a resolver that
+# dropped them would switch the vision path off silently, with no error.
+pypdfium2==5.13.0         # renders a scanned page to a bitmap
+pillow==12.3.0            # PNG encoding of that bitmap (pypdfium2 .to_pil())
 
 # --- llm --------------------------------------------------------------
 openai>=1.60              # structured outputs + vision (scanned PDFs)

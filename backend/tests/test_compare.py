@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import skip_without_bundle
 from sdoc import labels, normalize, readers
 from sdoc.compare import (
     NO_MISMATCH_TEXT,
@@ -61,6 +62,7 @@ def _read_fields(rel_path: str, role: str) -> DocFields:
     overwriting the `TOTAL GROSS WEIGHT:` line beneath them. The real extractor
     is exercised separately, at the bottom of this file.
     """
+    skip_without_bundle()
     doc = readers.read_attachment(DATA, rel_path)
     out = DocFields(doc=doc)
     for chunk in doc.chunks:
@@ -442,6 +444,7 @@ def test_summarise_shows_the_raw_party_name_a_reviewer_will_look_for():
 def _extracted_pair(email_id: str, ext: str) -> tuple[DocFields, DocFields]:
     from sdoc.extract.fields import extract_fields
 
+    skip_without_bundle()
     return (
         extract_fields(readers.read_attachment(DATA, f"attachments/{email_id}_SI.{ext}"), "SI"),
         extract_fields(readers.read_attachment(DATA, f"attachments/{email_id}_BL.{ext}"), "BL"),

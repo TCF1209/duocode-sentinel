@@ -24,7 +24,7 @@ from typing import Any, Optional
 import pytest
 from pydantic import ValidationError
 
-from conftest import DATA
+from conftest import DATA, skip_without_bundle
 from sdoc.classify import llm as classify_llm
 from sdoc.classify import rules
 from sdoc.llm import LLMUnavailable
@@ -485,6 +485,7 @@ def test_a_case_already_answered_by_a_model_is_not_asked_twice():
 # --------------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def inbox() -> list[EmailRecord]:
+    skip_without_bundle()
     emails = [EmailRecord.from_json(json.loads(p.read_text(encoding="utf-8")))
               for p in sorted(INBOX.glob("email_*.json"))]
     assert emails, f"no emails found under {INBOX}"

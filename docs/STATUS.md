@@ -4,6 +4,101 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-19 — Claude session 3 · Phase 2 closed
+
+**Done**
+- **Phase 2 is complete.** Both fixes the previous session left unverified are
+  now measured, tested and green; the adversarial evidence is regenerated; and
+  three real defects found along the way are fixed. `ROADMAP.md` Phase 2 is
+  ticked and `docs/ADVERSARIAL.md` is the write-up.
+- Finished the work session 2 died mid-edit on. It had written the truncation
+  repair in `compare.py` and hit its usage limit before running anything. The
+  repair is sound: wrapped-value false discrepancies **64 → 0**, and it is
+  provably inert on real data — over 520 emails the prefix relationship is hit
+  exactly once (`email_145` shipper) and the repair declines, so the genuine
+  defect survives. The separator fix in `readers/rows.py` recovers 3 × 1281
+  field reads that were being lost.
+- Wrote the tests neither fix had: `test_compare_wrap.py` (24) and
+  `test_rows_separators.py` (53). A mutation review then found two loosenings
+  of the repair's central promise — *it may recognise that we cut a value
+  short; it may never invent agreement* — that the whole suite missed. Both
+  now have killers: dropping the whitespace boundary guard fabricates
+  `NANTONG , CHINA`, text that appears in no document; relaxing `==` to
+  `startswith` silently rewrites a value and its evidence snippet.
+- **Closed a hole the harness structurally cannot see.** `WRatio` folds in a
+  partial-ratio component, so the three-character synonyms `POL`, `POD` and
+  `G.W.` scored 90 inside any longer string containing those letters:
+  `resolve("NAPOLI CENTRALE")` answered `port_of_loading`, `PODIUM TOWER`
+  answered `port_of_discharge`, and so did `43-45 METROPOLITAN ROAD`. The old
+  guard rejected a short *query*; nothing rejected a short *candidate*. Fixed
+  with `_MIN_FUZZY_SYNONYM_CHARS = 6` and pinned by `test_labels_fuzzy.py`.
+- **That fix then had a cost of its own, and the review caught it — worth
+  reading as a pattern, not an anecdote.** Pruning the pool dropped three
+  keys: `POL`, `POD` and `G.W.`. The code comment justified it by saying an
+  abbreviation is caught by pass 1 or pass 2 anyway. True for the two port
+  ones, which have their own alternatives in the pass-2 rules — and **false
+  for `G.W.`**, which had no rule at all, so the fuzzy pass was its only
+  resolver. Every decorated spelling (`G.W. (KGS)`, `TOTAL G.W.`,
+  `G.W. 毛重(KGS)`) silently began resolving to nothing while the bare form
+  kept working, and the test written to guard the invariant checked only that
+  bare form. `DATA_NOTES.md` §2b says every weight label in this set carries
+  exactly such a parenthetical, so the regressed spellings are the realistic
+  ones. Fixed by giving the abbreviation the rule the comment assumed it had
+  (`\bG\s*W\b`, matching nothing in any of the four datasets), and the tests
+  now pin the family a spelling at a time. **The score never moved through any
+  of this** — which is the point: it could not have told us.
+- Three real defects fixed: `llm_calls` was declared, aggregated and printed
+  but never incremented, so every run reported "0 model calls" while the usage
+  block said six — `Pipeline.process` now differences `client.usage.calls`
+  around each email, outside the `except`, because a crashed email may already
+  have paid for a call. `pypdfium2` and `pillow` are pinned: `readers/scan.py`
+  imports both directly and they were only ever present as pdfplumber's
+  dependencies, so a resolver change would have switched the vision path off
+  in silence. And `pip install -r backend/requirements.txt` **failed outright**
+  with `ResolutionImpossible` — `pdfplumber==0.11.4` under the `>=0.11.9` that
+  `markitdown[pdf]` demands — meaning no judge following the README could
+  install the project at all. The pin is now 0.11.10, the version every
+  measured score was actually produced with.
+- The suite no longer breaks on a fresh clone. 304 tests read git-ignored
+  `data/bundle/` with no guard and *errored* rather than skipped; with the
+  guard in `conftest.py` a clone with no data is 330 passed / 141 skipped /
+  **0 errors**.
+
+**Next**
+- **Phase 3, and it is the whole remaining risk.** See `ROADMAP.md` — it now
+  carries the endpoint list, the screen list and the deploy plan, so the next
+  session can start writing instead of re-deriving. Roughly 40 of the judges'
+  100 points ride on a live deployed demo and meaningful cloud use, and that
+  is currently zero lines of code. Do the deploy on the 20th, not the 21st.
+- The one Phase 2 box still open is **(T)**, not (C): hand-check ten escalated
+  cases. A score cannot tell us whether a reason reads sensibly to an operator.
+
+**Careful**
+- **No decision moved.** All four datasets still score **1.0000** and every
+  `submission.json` is byte-identical to the previous run. The no-key run is
+  byte-identical to the LLM-enabled run, which is the honest way to say that
+  the model changes nothing here — the 1.0000 is entirely the rules'.
+- **The fuzzy pass fires on zero labels in all four datasets.** Every real
+  label is answered by pass 1 or pass 2 — 13,620 chunk labels were classified
+  by pass to confirm it. So the score *cannot* detect a regression in
+  `labels.py`; measure that one on the unit tests and the harness instead.
+- One `xfail` remains and it is legitimate: `_extend` uses
+  `text.find(value.raw)`, taking the *first* occurrence rather than the one
+  the evidence locator points at. Consignee and notify party are frequently
+  the same company here, so a continuation can be read from the wrong block.
+  It has fired 0 times on real data. Anchoring `_extend` on the locator is the
+  fix, and `test_compare_wrap.py:601` goes green the day it lands.
+- `runs/adversarial.json` was previously a snapshot taken *between* two fixes
+  and understated the system. It is regenerated. If you change extraction,
+  regenerate it again — a table a judge cannot reproduce is worse than none.
+- OCR character confusion is **open** and stated plainly in `ADVERSARIAL.md`.
+  Do not let a judge discover it unprompted; the mitigation is real
+  (`readers/scan.py` keeps image-only scans unreadable, so our own OCR never
+  feeds a decision) and the caveat is honest (the perturbation really does
+  alter the document).
+
+---
+
 ## 2026-09-19 — Claude session 2
 
 **Done**

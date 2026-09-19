@@ -89,7 +89,40 @@ for _field, _variants in SYNONYMS.items():
     for _v in _variants:
         _EXACT[basic(_v)] = _field
 _IGNORE: set[str] = {basic(x) for x in IGNORE_LABELS}
-_FUZZY_KEYS: list[str] = list(_EXACT.keys())
+
+# Pass 3 fuzzy-matches against the synonyms, but only the ones long enough to
+# be a *phrase*. Below six characters a synonym is an abbreviation — "POL",
+# "POD", "G.W." are the only three we hold — and rapidfuzz's WRatio scores an
+# abbreviation sitting inside a longer string at ~90, because it folds in a
+# partial-ratio component whenever one side is at least 1.5x the other. With
+# those three in the pool, real lines out of this dataset resolved to a port:
+# "43-45 METROPOLITAN ROAD", "GDANSK, POLAND (PLGDN)" (a port *value* read as
+# a port *label*) and "MARCOPOLO 810 V.BS005" (a vessel name), plus every
+# NAPOLI / PODIUM / POLK / ACROPOLIS / SEVASTOPOL address line.
+#
+# Nothing is lost by dropping them, but only because each has another route:
+# all three are matched letter-for-letter by pass 1, POL and POD have their
+# own alternatives in the pass-2 port rules, and "G.W." now has a pass-2 rule
+# of its own — it did not, and a review caught that every decorated spelling
+# ("G.W. (KGS)", "TOTAL G.W.") had quietly stopped resolving. A query short
+# enough to *be* a damaged "POL" never reaches pass 3 anyway, so a three-
+# character key can only ever be hit by a query several times its length,
+# which is the bug and not a use.
+#
+# Be clear about what this does NOT do. It raises the price of the fragment
+# match; it does not end it. WRatio still scores any pool key at ~90 against a
+# query 1.5x its length that contains it, so "12 SHIPPERTON LANE" resolves to
+# shipper and "LOAD PORTLAND AVENUE" to port_of_loading today. Six is a
+# threshold on the same continuum as the cutoff, chosen because it is the
+# widest bar with zero measured collateral — a word-boundary guard would be
+# the principled fix, and it cannot be used here because the manglings this
+# pass exists for are exactly keys glued to other characters
+# ("Total No. of Containersm" scores 97.8). The residual class is recorded in
+# docs/ADVERSARIAL.md. The bar stays at six rather than four so a shorthand
+# added later — "CNEE", "SHPR" — is exact-matched instead of quietly
+# reintroducing the same fragment matching.
+_MIN_FUZZY_SYNONYM_CHARS = 6
+_FUZZY_KEYS: list[str] = [k for k in _EXACT if len(k) >= _MIN_FUZZY_SYNONYM_CHARS]
 
 
 # --------------------------------------------------------------------------
@@ -120,6 +153,18 @@ _RULES: list[tuple[Optional[str], re.Pattern[str]]] = [
                 r"|^CONTAINERS?$")),
 
     ("gross_weight_kg", re.compile(r"\bGROSS\b.*(WEIGHT|WT)")),
+    # "G.W." is a synonym the table already holds, and it is the one
+    # abbreviation with no other rule to catch it — the port abbreviations
+    # have POL/POD alternatives above, "G.W." had only the fuzzy pass. When
+    # that pass stopped matching short keys (see _MIN_FUZZY_SYNONYM_CHARS),
+    # every decorated spelling of it — "G.W. (KGS)", "TOTAL G.W.",
+    # "G.W. 毛重(KGS)" — silently resolved to nothing, while the bare form
+    # still matched exactly. `basic()` has already folded the punctuation by
+    # here, so this sees "G W". Checked against every label, value and text
+    # line the readers produce across all four datasets: it matches none of
+    # them, and it correctly declines "N.W. (KGS)", "NET WT", "TARE WT",
+    # "BUILDING G WEST" and "BLOCK G, WING 2".
+    ("gross_weight_kg", re.compile(r"\bG\s*W\b")),
 
     # ---- generic exclusions, last: they must not shadow a party label
     # (e.g. "To the Order of" contains ORDER but is the consignee) ---------
@@ -138,6 +183,7 @@ def resolve(label: str, *, fuzzy_cutoff: int = 88) -> Optional[str]:
     >>> resolve("TOTAL Gross Weightss(KGS)")
     'gross_weight_kg'
     >>> resolve("CONTAINER NO.")            # table header, not a field
+    >>> resolve("43-45 METROPOLITAN ROAD")  # an address, not a label
     """
     key = basic(label)
     if not key:
@@ -160,6 +206,19 @@ def resolve(label: str, *, fuzzy_cutoff: int = 88) -> Optional[str]:
     # being a fragment of something else entirely.
     if len(key) < 8 and len(key.split()) < 2:
         return None
+    # Both sides need that substance, which is why the pool is `_FUZZY_KEYS`
+    # and not every synonym: the guard above rejects a short *query*, and
+    # `_MIN_FUZZY_SYNONYM_CHARS` rejects a short *candidate*. Two alternatives
+    # were measured against the same battery and both cost real reads.
+    # Requiring the query and the hit to be comparable in length rejects
+    # "SHIPPERS NOTE", "NOTIFYING AGENT" and "RECEIVER GENERAL" at 1.5x and
+    # still rejects "NOTIFYING AGENT" at 2x, because a real label legitimately
+    # carries words our table does not; the ratio would then be tuned on the
+    # manglings we happen to have seen. Swapping WRatio for a scorer with no
+    # partial component loses "Final Destination Port", the unseen wording the
+    # adversarial harness perturbs to. Pruning the pool is decided once, off a
+    # property of our own table, and leaves every other query scored exactly
+    # as before.
     hit = process.extractOne(key, _FUZZY_KEYS, scorer=fuzz.WRatio,
                              score_cutoff=fuzzy_cutoff)
     if hit:

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import DATA
+from conftest import DATA, skip_without_bundle
 from sdoc.doctype import (
     CONFIDENT,
     NON_PAIR_TYPES,
@@ -40,6 +40,7 @@ ATTACHMENTS = DATA / "attachments"
 # --------------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def read_doc():
+    skip_without_bundle()
     cache: dict[str, ParsedDoc] = {}
 
     def _read(name: str) -> ParsedDoc:
@@ -55,6 +56,7 @@ def read_doc():
 @pytest.fixture(scope="module")
 def corpus():
     """Every attachment in the bundle, read and classified once."""
+    skip_without_bundle()
     docs: dict[str, ParsedDoc] = {}
     for path in sorted(ATTACHMENTS.iterdir()):
         if path.name.startswith("~$"):        # Office lock file, not a document
