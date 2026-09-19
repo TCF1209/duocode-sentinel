@@ -23,8 +23,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from sdoc.pipeline import Pipeline, PipelineConfig          # noqa: E402
-from sdoc.schema import EmailRecord                          # noqa: E402
+from sdoc.pipeline import Pipeline, PipelineConfig, build_client   # noqa: E402
+from sdoc.schema import EmailRecord                                # noqa: E402
 
 
 def load_emails(data_root: Path, limit: int | None = None) -> list[EmailRecord]:
@@ -50,6 +50,8 @@ def main() -> int:
     ap.add_argument("--data", default="data/bundle", help="folder holding inbox/ and attachments/")
     ap.add_argument("--out", default="runs/latest", help="where to write the three output files")
     ap.add_argument("--limit", type=int, default=None, help="process only the first N emails")
+    ap.add_argument("--no-llm", action="store_true",
+                    help="deterministic path only — no model calls, no network")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
 
@@ -58,10 +60,12 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     emails = load_emails(data_root, args.limit)
+    client = build_client(enabled=not args.no_llm)
     if not args.quiet:
-        print(f"Processing {len(emails)} emails from {data_root}")
+        mode = "rules + model fallback" if client else "rules only"
+        print(f"Processing {len(emails)} emails from {data_root}  [{mode}]")
 
-    pipeline = Pipeline(PipelineConfig(data_root=data_root))
+    pipeline = Pipeline(PipelineConfig(data_root=data_root, llm=client))
     submission: dict[str, dict] = {}
     report: dict[str, dict] = {}
 
@@ -77,6 +81,9 @@ def main() -> int:
     (out_dir / "report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     metrics = pipeline.stats.to_dict()
+    # What the model layer actually did and cost, at the pinned rates. Recorded
+    # even when it did nothing, so "0 model calls" is an evidenced claim.
+    metrics["llm"] = client.stats() if client else {"available": False}
     (out_dir / "metrics.json").write_text(
         json.dumps(metrics, indent=2), encoding="utf-8")
 
@@ -112,6 +119,22 @@ def _print_summary(metrics: dict, report: dict, out_dir: Path) -> None:
     unreadable = metrics["documents_unreadable"]
     print(f"\nDocuments read {metrics['documents_read']}"
           f"  ·  unreadable {unreadable}")
+
+    llm = metrics.get("llm") or {}
+    if llm.get("available"):
+        usage = llm["usage"]
+        cache = llm["cache"]
+        print(f"\nModel fallback ({llm['model']})")
+        print(f"  {usage['live_calls']} live calls, {usage['cached_calls']} from cache"
+              f"  ·  ${usage['cost_usd']:.4f}  ·  {llm['pricing_snapshot']}")
+        for purpose, d in usage["by_purpose"].items():
+            print(f"    {purpose:<14} {d['calls']:>4} calls   ${d['cost_usd']:.4f}")
+        if cache["hits"] or cache["misses"]:
+            print(f"  cache hit rate {cache['hit_rate']:.0%}")
+        if llm.get("budget_exhausted"):
+            print("  BUDGET REACHED — remaining cases were escalated, not charged")
+    else:
+        print("\nModel fallback: not configured (deterministic path only)")
     print(f"\nWrote {out_dir / 'submission.json'}")
     print(f"      {out_dir / 'report.json'}")
     print(f"      {out_dir / 'metrics.json'}")

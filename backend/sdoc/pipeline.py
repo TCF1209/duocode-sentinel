@@ -17,10 +17,14 @@ from typing import Optional
 
 from . import compare as compare_mod
 from . import doctype, evidence_gate
+from .classify import llm as classify_llm
 from .classify import intent as intent_mod
 from .classify import rules as rules_mod
 from .extract import fields as extract_mod
+from .extract import llm as extract_llm
+from .llm import LLMClient
 from .readers import read_attachment
+from .readers import scan as scan_mod
 from .schema import (
     DOC_BL,
     DOC_SI,
@@ -36,11 +40,10 @@ class PipelineConfig:
     """Knobs the CLI and the API share."""
 
     data_root: Path
-    # Below this confidence a classification is handed to the LLM layer. With no
-    # LLM configured the rule answer stands and is still reported as "rule", so
-    # the cost figure never overstates what the model did.
-    classification_confidence_floor: float = 0.45
-    use_llm: bool = False
+    # A shared client, so one budget and one cache cover the whole run. None
+    # means the deterministic path only — which is a supported mode, not a
+    # degraded one: every stage falls back to its rule answer or escalates.
+    llm: Optional[LLMClient] = None
 
 
 @dataclass
@@ -129,10 +132,18 @@ class Pipeline:
         for doc in docs:
             doctype.classify_document(doc)
 
-        classification = rules_mod.classify_email(
-            email,
-            attachment_doc_types=[d.doc_type for d in docs] or None,
-        )
+        doc_types = [d.doc_type for d in docs] or None
+        classification = rules_mod.classify_email(email, attachment_doc_types=doc_types)
+
+        # A second opinion only where the rules admit they are unsure. With no
+        # client this is a no-op and the rule answer stands, still reported as
+        # "rule" — so the cost figure never overstates what the model did.
+        if self.config.llm is not None and classify_llm.should_escalate(classification):
+            classification = classify_llm.classify_with_llm(
+                email, classification, client=self.config.llm,
+                attachment_doc_types=doc_types,
+            )
+
         result.category = classification.category
         result.category_confidence = classification.confidence
         result.decided_by = classification.decided_by
@@ -150,15 +161,22 @@ class Pipeline:
         intent = intent_mod.detect_intent(email)
         result.notes.extend(intent.rationale)
 
-        si_fields = extract_mod.extract_fields(si_doc, "SI") if si_doc else None
-        bl_fields = extract_mod.extract_fields(bl_doc, "BL") if bl_doc else None
+        # Settle the document-type question before extraction, because it can
+        # make the model fallback pointless. When the "BL" is really a
+        # Commercial Invoice the case escalates whatever we read off it, so
+        # paying a model to hunt for a port of discharge in an invoice buys
+        # nothing. Rule extraction still runs and still gives the reviewer
+        # whatever the document does contain.
+        pair_problem = doctype.pair_problem(si_doc, bl_doc) if (si_doc and bl_doc) else None
+        assisted = pair_problem is None
+
+        si_fields = self._extract(si_doc, "SI", assisted=assisted)
+        bl_fields = self._extract(bl_doc, "BL", assisted=assisted)
 
         comparisons: list = []
         if si_fields is not None and bl_fields is not None:
             comparisons = compare_mod.compare_documents(si_fields, bl_fields)
         result.comparisons = comparisons
-
-        pair_problem = doctype.pair_problem(si_doc, bl_doc) if (si_doc and bl_doc) else None
 
         decision = evidence_gate.evaluate(
             si_doc=si_doc,
@@ -177,8 +195,44 @@ class Pipeline:
             doc = read_attachment(self.config.data_root, rel_path)
             if not doc.readable:
                 result.notes.append(f"{rel_path}: {doc.unreadable_reason}")
+                self._transcribe_scan(doc, rel_path)
             docs.append(doc)
         return docs
+
+    def _transcribe_scan(self, doc: ParsedDoc, rel_path: str) -> None:
+        """Read a scan for the reviewer — without letting it decide anything.
+
+        A page with no text layer still escalates; that is the correct outcome
+        and the transcript does not change it. What it changes is what the
+        reviewer receives: the document already read, instead of a note saying
+        it could not be. `scan.transcribe` deliberately does not write
+        `doc.text`, so the transcript can never be traced by the evidence gate
+        as if it were the document itself.
+        """
+        if self.config.llm is None or doc.unreadable_reason != "no_text_layer":
+            return
+        try:
+            data = (Path(self.config.data_root) / rel_path).read_bytes()
+        except OSError:
+            return
+        scan_mod.transcribe(doc, data, client=self.config.llm)
+
+    def _extract(self, doc: Optional[ParsedDoc], role: str, *,
+                 assisted: bool = True) -> Optional[DocFields]:
+        """Rule extraction, then the model only for labels the rules missed.
+
+        `assisted=False` turns the model off for this document because its
+        outcome is already settled — see the caller. `fill_missing_fields`
+        returns its input untouched when there is nothing missing, nobody to
+        ask, or the model is unavailable, so a run with no key behaves exactly
+        as it did before this layer existed.
+        """
+        if doc is None:
+            return None
+        fields = extract_mod.extract_fields(doc, role)
+        if not assisted or self.config.llm is None:
+            return fields
+        return extract_llm.fill_missing_fields(doc, fields, role, client=self.config.llm)
 
     @staticmethod
     def _assign_roles(
@@ -248,6 +302,23 @@ class Pipeline:
         result.defect_fields = []
 
 
-def run_inbox(emails: list[EmailRecord], config: PipelineConfig) -> tuple[list[CaseResult], PipelineStats]:
+def build_client(enabled: bool = True) -> Optional[LLMClient]:
+    """A shared client for a run, or None when the model layer is off.
+
+    Returns None rather than an unusable client when no key is configured, so
+    every `if self.config.llm is not None` reads as "is the fallback layer
+    available" and the deterministic path is the plain, untouched default.
+    """
+    if not enabled:
+        return None
+    from .llm import load_dotenv_if_present
+
+    load_dotenv_if_present()
+    client = LLMClient()
+    return client if client.available else None
+
+
+def run_inbox(emails: list[EmailRecord],
+              config: PipelineConfig) -> tuple[list[CaseResult], PipelineStats]:
     pipeline = Pipeline(config)
     return [pipeline.process(e) for e in emails], pipeline.stats
