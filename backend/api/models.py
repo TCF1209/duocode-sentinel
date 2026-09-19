@@ -12,8 +12,23 @@ from pydantic import BaseModel, Field
 
 
 class RunCreateRequest(BaseModel):
-    limit: Optional[int] = Field(default=None, description="Process only the first N emails")
-    use_llm: bool = Field(default=True, description="Allow the model fallback when a key is configured")
+    # `gt=0` rather than a bare int: `limit: -5` used to reach
+    # `paths[:limit]` and silently drop the LAST five emails, returning a
+    # 515-email "submission" with HTTP 200. A partial submission that looks
+    # complete is worse than a rejected request.
+    limit: Optional[int] = Field(
+        default=None, gt=0, description="Process only the first N emails"
+    )
+    # Defaults to OFF. This endpoint is public and unauthenticated on the
+    # deployed demo, and an empty `POST /runs` body used to start a
+    # model-enabled run over the whole inbox — anyone who found the URL could
+    # spend the team's OpenAI key by holding down a button. Turning it on is
+    # now a deliberate act by the caller AND requires the server to allow it
+    # (SENTINEL_ALLOW_LLM_RUNS, see main.py). The deterministic path answers
+    # 100% of the graded inbox anyway, so the default costs the demo nothing.
+    use_llm: bool = Field(
+        default=False, description="Allow the model fallback when a key is configured"
+    )
 
 
 class RunCreateResponse(BaseModel):

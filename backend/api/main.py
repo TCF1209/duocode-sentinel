@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -43,10 +44,55 @@ DEFAULT_DATA_ROOT = Path(os.environ.get("SENTINEL_DATA_ROOT", str(BACKEND.parent
 _cors_env = os.environ.get("SENTINEL_CORS_ORIGINS", "*")
 CORS_ORIGINS = [o.strip() for o in _cors_env.split(",") if o.strip()]
 
+
+def _flag(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+# The deployed API is public and unauthenticated, so the two things a stranger
+# could do that cost us something are gated here rather than in the request
+# model: spending the OpenAI key, and queueing work without limit.
+ALLOW_LLM_RUNS = _flag("SENTINEL_ALLOW_LLM_RUNS", False)
+MAX_ACTIVE_RUNS = int(os.environ.get("SENTINEL_MAX_ACTIVE_RUNS", "2"))
+
+# A judge arriving at a cold free-tier container would otherwise land on an
+# empty dashboard and have to know to press a button. One deterministic run
+# over the demo inbox costs well under a second and no model call, so the
+# first screen has something on it. Off when there is no data to read.
+AUTORUN = _flag("SENTINEL_AUTORUN", True)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Have something to show before anyone asks.
+
+    `store.py` is a single process's memory, and Render's free plan sleeps an
+    idle container. So the first judge to open the link after a quiet spell
+    arrives at a process that has just booted with nothing in it — an empty
+    dashboard and a button they have to know to press. Since the deterministic
+    path needs no key, no network and under a second for the demo inbox, the
+    honest fix is to have already run it.
+
+    Failure here is not fatal on purpose: if the data root is missing the API
+    must still start and say so through `POST /runs`, rather than crash-loop on
+    boot and show Render's error page instead of ours.
+    """
+    if AUTORUN:
+        try:
+            start_run(store, data_root=DEFAULT_DATA_ROOT, limit=None, use_llm=False)
+        except Exception as exc:               # noqa: BLE001 - see docstring
+            print(f"[startup] no warm run: {type(exc).__name__}: {exc}", flush=True)
+    yield
+
+
 app = FastAPI(
     title="Sentinel API",
     description="Shipping document verification — Averis x Monash Hackathon 2026",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -86,13 +132,47 @@ def _record_to_status(rec) -> RunStatusResponse:
 
 @app.get("/")
 def root() -> dict:
-    return {"service": "sentinel-api", "status": "ok"}
+    """Render's health check target — there is no /health route.
+
+    It deliberately touches nothing: a green health check says the container
+    is listening, and says nothing about whether the demo data is readable.
+    `ready` is the field that answers the second question.
+    """
+    return {
+        "service": "sentinel-api",
+        "status": "ok",
+        "data_root": str(DEFAULT_DATA_ROOT),
+        "ready": store.latest_done_run() is not None,
+        "llm_runs_allowed": ALLOW_LLM_RUNS,
+    }
 
 
 @app.post("/runs", response_model=RunCreateResponse)
 def create_run(body: Optional[RunCreateRequest] = None) -> RunCreateResponse:
-    """Start a run over the bundled demo inbox at SENTINEL_DATA_ROOT."""
+    """Start a run over the bundled demo inbox at SENTINEL_DATA_ROOT.
+
+    Unauthenticated on purpose — a judge should not need an account to press
+    the button — which is exactly why the two expensive requests are refused
+    here rather than served: a model-enabled run on a server that has not
+    opted in, and a run queued behind two that are already going.
+    """
     body = body or RunCreateRequest()
+
+    if body.use_llm and not ALLOW_LLM_RUNS:
+        raise HTTPException(
+            status_code=403,
+            detail="this server does not allow model-enabled runs; "
+                   "set SENTINEL_ALLOW_LLM_RUNS=1 to permit them. The "
+                   "deterministic path runs either way.",
+        )
+
+    active = sum(1 for r in store.list_runs() if r.status == "running")
+    if active >= MAX_ACTIVE_RUNS:
+        raise HTTPException(
+            status_code=429,
+            detail=f"{active} runs already in progress; wait for one to finish.",
+        )
+
     try:
         run_id = start_run(store, data_root=DEFAULT_DATA_ROOT, limit=body.limit, use_llm=body.use_llm)
     except FileNotFoundError as exc:
@@ -190,9 +270,25 @@ def metrics(run_id: Optional[str] = None) -> dict:
 
 @app.get("/submission")
 def submission(run_id: Optional[str] = None) -> dict:
+    """The graded artefact — every email_id, in the scorer's shape.
+
+    Guarded the same way `/metrics` is, and for a sharper reason. Mid-run this
+    used to answer HTTP 200 with however many emails happened to be finished:
+    207 keys, then 407 on a refresh. The official scorer counts a missing
+    email_id as a wrong answer rather than skipping it, so a partial file that
+    looks complete does not score slightly lower — it scores wrong, and
+    nothing about the response says so.
+    """
     rec = _run_or_404(run_id) if run_id else store.latest_done_run()
     if rec is None:
         raise HTTPException(status_code=404, detail="no completed run yet")
+    if rec.status != "done":
+        raise HTTPException(
+            status_code=409,
+            detail=f"run '{rec.run_id}' is {rec.status} "
+                   f"({rec.processed}/{rec.total_emails}); a partial submission "
+                   f"would score as wrong answers, not as fewer answers.",
+        )
     return {c.email_id: c.to_submission() for c in store.list_cases(rec.run_id)}
 
 
