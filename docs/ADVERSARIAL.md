@@ -536,3 +536,59 @@ proof, not the reassurance: a measurement that cannot move when the bug is
 fixed could not have seen the bug. Generalised, and this outlives the fix: a
 clean row is evidence about the perturbation that produced it and nothing
 else.
+
+---
+
+## 7. What the model layer recovers
+
+Every number above is the **deterministic** pipeline. That was deliberate — a
+measuring instrument whose answer depends on a third party's model is not a
+measurement — but it left the more interesting half of Phase 2's own question
+unanswered: the rules break *here*, so what does the fallback buy?
+
+Measured, on the one row where the answer matters. `unseen_labels` is the case
+`extract/llm.py` was built for: the document is perfectly legible and says
+`Sender of Goods` where our table says `Shipper`.
+
+```bash
+.venv/Scripts/python.exe backend/tools/adversarial.py \
+    --only unseen_labels --llm --out runs/adversarial_assisted.json
+```
+
+| `unseen_labels`, dev bundle, 188 documents | rules only | rules + model |
+|---|---:|---:|
+| cases forced to a human (`escGain`) | **168** | **2** |
+| decisions changed from baseline | 168 | 2 |
+| false discrepancies | 0 | **0** |
+| silent wrong values | 0 | **0** |
+| masked discrepancies | 0 | **0** |
+
+**89% of the cases unfamiliar wording would have cost us come back, and the
+safety columns do not move.** That second clause is the point. Recall bought
+by guessing is not recall: if the model had invented values to fill the gap,
+`falseD` would have climbed and the trade would have been a bad one. It stays
+at zero because `extract/llm.py` re-locates every answer in the document
+before adopting it, and the evidence gate vetoes anything it cannot trace.
+
+Cost, at the pinned rate card: **178 calls, 172 of them live, $0.2447** —
+$0.0014 per document, against a deterministic path that costs nothing and
+still answers 100% of the graded inbox.
+
+### What this does and does not license us to say
+
+**It does** say the hybrid design works as argued: the rules carry the volume
+for free, and the model earns its place precisely where the rules admit they
+cannot read a label.
+
+**It does not** say the model is doing work on the graded data. It is not —
+`decided_by` is `rule` for all 520 emails, and the only live calls in a normal
+run are the six scan transcriptions. This row exists because we perturbed the
+documents ourselves to build the case the generator never emits. Quote it as
+"here is what happens when a document arrives with wording we have never
+seen", never as "our pipeline is 89% AI".
+
+**It is also one row.** The other fifteen modes were not re-run with the model
+on; the OCR row in §5.1 in particular is untouched by this, and there is no
+reason to expect the model to help there — a swapped glyph produces a legible
+value that is simply wrong, which is the one thing neither layer can catch
+without a second source.

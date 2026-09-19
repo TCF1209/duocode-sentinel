@@ -64,6 +64,20 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
   guard in `conftest.py` a clone with no data is 330 passed / 141 skipped /
   **0 errors**.
 
+- **Phase 2's definition of done is now actually met, not rounded up.** The
+  bar was "what breaks the deterministic path *and what the LLM layer
+  recovers*", and the second half had never been measured — both harness runs
+  were `pipeline_mode: deterministic`. Ran it with the model on
+  (`adversarial.py --only unseen_labels --llm`): unfamiliar label wording
+  forces **168 of 188** cases to a human on the rules alone and **2** with the
+  model, while false discrepancies, silent wrong values and masked
+  discrepancies all stay at **zero**. 178 calls, $0.2447. Written up as
+  `ADVERSARIAL.md` §7, which also spells out how to quote it honestly — the
+  model does no work on the graded inbox.
+- Added `--llm` to the harness CLI. It refuses to write a report labelled
+  `assisted` if no usable client is configured, because a file that misstates
+  which pipeline it measured is worse than no file.
+
 **Next**
 - **Phase 3, and it is the whole remaining risk.** See `ROADMAP.md` — it now
   carries the endpoint list, the screen list and the deploy plan, so the next
@@ -88,6 +102,11 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
   the same company here, so a continuation can be read from the wrong block.
   It has fired 0 times on real data. Anchoring `_extend` on the locator is the
   fix, and `test_compare_wrap.py:601` goes green the day it lands.
+- **`runs/` is git-ignored and agents write into it.** The full 94-pair
+  adversarial report was silently overwritten by a 40-pair partial run during
+  verification, so the file on disk stopped reproducing the numbers
+  `ADVERSARIAL.md` cites. Regenerated and checked cell by cell. If you script
+  anything against the harness, write it to the scratchpad, not to `runs/`.
 - `runs/adversarial.json` was previously a snapshot taken *between* two fixes
   and understated the system. It is regenerated. If you change extraction,
   regenerate it again — a table a judge cannot reproduce is worse than none.
