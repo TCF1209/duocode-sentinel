@@ -75,9 +75,22 @@ The review also found a hole the harness structurally *cannot* see: short synony
 ("POL", "POD") fuzzy-matched inside long strings, so `NAPOLI CENTRALE` resolved to
 a port. Fixed in `labels.py` via `_MIN_FUZZY_SYNONYM_CHARS`.
 
-**Definition of done:** met — `docs/ADVERSARIAL.md` states, with measurements, what
-breaks the deterministic path, what was fixed, and what is still open; all four
+**Definition of done: half met, and the half that is missing is named here
+rather than rounded up.** `docs/ADVERSARIAL.md` states, with measurements, what
+breaks the deterministic path, what was fixed and what is still open; all four
 held-out scores are unchanged and every `submission.json` is byte-identical.
+
+But the stated bar was "what breaks the deterministic path **and what the LLM
+layer recovers**", and the second half is unmeasured. Both harness runs are
+`pipeline_mode: deterministic`, so every number on that page describes the
+rules alone. `unseen_labels` loses 1,100 of 1,281 fields — precisely the case
+`extract/llm.py` exists for — and `adversarial.run(..., llm=client)` is a code
+path that has never been executed.
+
+- [ ] **(C)** Run the harness with the model on, at least for `unseen_labels`,
+      and add a recovery column. Estimated ~188 extraction calls, well inside
+      the $2.00 run budget. Until this exists, the claim "the model earns its
+      place on unfamiliar wording" is a design argument, not a measurement.
 
 ## Phase 3 — Product surface · target: 21 Sep · **THE CRITICAL PATH**
 
