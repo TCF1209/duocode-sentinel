@@ -1,0 +1,61 @@
+# What may enter the build context — an allow-list, not a deny-list.
+#
+# A deny-list is one forgotten line away from shipping the answer key. The team
+# holds both hackathon packages: the participant bundle, which the organisers
+# confirmed may be published, and the organisers' own package, which was
+# mis-sent and whose README says not to hand it to participants. The latter is
+# `data/_grader/` — ground_truth.json plus the dataset generator — and a
+# published container image is a handing-over as surely as a public repository
+# is (CLAUDE.md rule 1, docs/SCORING.md).
+#
+# So: exclude everything, then name back the two directories the API actually
+# needs. Anything added to the repository later is excluded by default, which
+# is the right default when the cost of one mistake is the whole dataset.
+
+*
+
+!backend/
+!demo_data/
+
+# --- re-excluded from inside the allow-list --------------------------------
+# `!backend/` takes the whole tree, including things the running API never
+# touches.
+
+# 525 tests, their fixtures and conftest. pytest and httpx are not installed in
+# the image (backend/requirements-api.txt), so these could not run there even
+# if something tried.
+backend/tests/
+
+# The adversarial harness and the reader smoke test. Both are developer tools
+# that read the git-ignored data/ to do anything at all, so in a container that
+# has no data/ they are dead weight with a misleading name.
+backend/tools/
+
+# Host bytecode is cp310-win_amd64 and the image is cp310-linux: stale, wrong
+# and silently shadowing the real source if the timestamps line up.
+**/__pycache__/
+**/*.py[cod]
+
+# --- belt and braces -------------------------------------------------------
+# Everything below is already excluded by `*` above. It is repeated last, and
+# deliberately last, because .dockerignore resolves by last match: if someone
+# later adds a `!data/...` line to get one file in, these lines still win and
+# the answer key still does not ship. Losing a needed file is a build error you
+# see immediately; leaking this one is not something you can take back.
+
+.git/
+.env
+.env.local
+data/
+runs/
+.cache/
+.venv/
+*.zip
+ground_truth.json
+submission*.json
+
+# Not secret, only useless in the image, and named here so the exclusion reads
+# as intentional rather than accidental: the Next.js dashboard deploys to
+# Vercel from the same repository (web/vercel.json), and node_modules/ or
+# .next/ in this context would add hundreds of megabytes to every upload.
+web/

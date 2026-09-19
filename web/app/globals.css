@@ -8,7 +8,7 @@
    Tailwind's scanner correctly skips git-ignored files — not a Tailwind
    limitation on bracket-named folders. Fixed by anchoring .gitignore
    (`/runs/`). Real markup still lives in components/*-page-view.tsx, which
-   is a fine layout choice on its own merits; it just is not the fix.
+   is a fine layout choice on its own merits; it just is not the fix. */
 
 @custom-variant dark (&:is(.dark *));
 

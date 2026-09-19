@@ -1,0 +1,80 @@
+# The deployed API's dependency set. `requirements.txt` beside this file is
+# still the one a developer installs, and it is unchanged; this is the subset
+# that goes into the container (see the Dockerfile at the repository root).
+#
+# WHY A SECOND FILE. `markitdown[pdf,docx,xlsx]` pulls `magika`, which pulls
+# `onnxruntime`. Measured against this project's own .venv by summing the
+# installed trees of everything that arrives for markitdown and nothing else:
+#
+#     pandas 110.1 MB · sympy 101.6 MB · onnxruntime 70.6 MB · numpy 59.8 MB
+#     mpmath 7.2 MB · magika 6.7 MB · protobuf 3.1 MB · markitdown itself 0.7 MB
+#     ------------------------------------------------------------------
+#     roughly 357 MB installed, none of which this image can ever use
+#
+# BE PRECISE ABOUT WHAT THAT FIGURE IS. It is the installed size in a Windows
+# virtualenv, not an image size. Docker is not installed on the machine this
+# was written on, so **the image has never been built and no image size,
+# layer size or build time here is a measurement**. Wheels differ between
+# Windows and linux/amd64 and layers compress, so treat 357 MB as the order of
+# magnitude of what is being dropped and nothing finer. If you build it, put
+# the real numbers here and delete this paragraph.
+#
+# What is not in doubt is the direction: this is a large, slow subtree that
+# Render's free builder downloads on every cold build, and it buys exactly one
+# capability — `sdoc/readers/fallback.py`, the reader of last resort for
+# formats we have no precise reader for (docs/DECISIONS.md D6). Every
+# attachment in the participant bundle is one of the four we *do* read
+# precisely (192 .txt, 28 .pdf, 22 .xlsx, 8 .docx, and nothing else), and the
+# committed demo_data/ inbox is the same four, so on the deployed demo the
+# fallback is never reached at all.
+#
+# WHAT IS LOST, precisely, and this part IS verified. In the deployed image a
+# `.pptx`, `.html`, `.msg` or image attachment uploaded to POST /compare comes
+# back unread. It does not crash. Checked by blocking the markitdown import
+# with a sys.meta_path hook and reading a .pptx through the real dispatch:
+#
+#     readable          False
+#     unreadable_reason "unsupported"
+#     notes             ["no precise reader for '.pptx'; using the fallback
+#                        converter", "markitdown is not installed; no reader
+#                        for this format"]
+#
+# The evidence gate turns an unreadable document into NEEDS_REVIEW carrying
+# that reason — never a MISMATCH (CLAUDE.md rule 4). That is the same outcome
+# as a corrupt file, which the system already handles as a first-class case.
+#
+# Nothing about the tested behaviour changes: `backend/tests` installs
+# requirements.txt, so the fallback stays covered by the suite.
+#
+# KEEP IN STEP. Two files means two files to edit. A version pinned here must
+# match requirements.txt; that file is the source of truth for the pins, this
+# one only decides membership.
+
+# --- document readers -------------------------------------------------
+# 0.11.10 is the version every measured score in docs/SCORING.md was produced
+# with. Note that without markitdown[pdf] its >=0.11.9 floor no longer applies,
+# so the pin here is the measurement's, not the resolver's — do not relax it.
+pdfplumber==0.11.10       # PDF text + word coordinates (pure python)
+python-docx==1.1.2        # .docx tables
+openpyxl==3.1.5           # .xlsx sheets
+pypdfium2==5.13.0         # renders a scanned page to a bitmap (readers/scan.py)
+pillow==12.3.0            # PNG encoding of that bitmap (pypdfium2 .to_pil())
+
+# --- llm --------------------------------------------------------------
+# Present even though the deploy may run with no key: the vision path for
+# scanned PDFs is part of the demo when a key is configured, and the pipeline
+# degrades to the deterministic path without one (CLAUDE.md rule 5).
+openai>=1.60              # structured outputs + vision (scanned PDFs)
+python-dotenv>=1.0
+
+# --- api --------------------------------------------------------------
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic>=2.9
+python-multipart>=0.0.12   # FastAPI UploadFile / File() for POST /compare
+
+# --- utils ------------------------------------------------------------
+rapidfuzz>=3.10           # fuzzy label matching (PDF mangles labels)
+
+# Deliberately absent: pytest and httpx (the test suite does not run in the
+# image) and markitdown (see the header).

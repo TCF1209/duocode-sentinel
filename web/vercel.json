@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "npm ci",
+  "buildCommand": "next build",
+  "build": {
+    "env": {
+      "NEXT_PUBLIC_SENTINEL_API_URL": "https://sdoc-sentinel-api.onrender.com"
+    }
+  }
+}

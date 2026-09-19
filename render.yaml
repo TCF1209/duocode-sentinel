@@ -1,0 +1,112 @@
+# Render Blueprint for the Sentinel backend (docs/ROADMAP.md 3c).
+#
+# This file exists so that the deploy is reproducible. Configuration typed into
+# the Render dashboard lives only in that dashboard: it cannot be reviewed in a
+# pull request, it cannot be rolled back alongside the code that depends on it,
+# and after a failed deploy nobody can reconstruct what was clicked. Everything
+# the service needs is read from this file on every deploy instead — which is
+# also part of what the rubric's Technology Integration axis is asking for.
+#
+# To apply it: Render Dashboard -> Add new -> Blueprint -> select this repo.
+# Render reads this file, creates the service, and prompts for the single value
+# that is deliberately absent from it (OPENAI_API_KEY, below).
+#
+# The full 2am walkthrough, and the failures worth predicting, are in
+# docs/DEPLOY.md. Read that first if anything here does not behave.
+
+services:
+  - type: web
+
+    # The service name is not cosmetic: Render derives the public hostname from
+    # it, so this name is what makes `https://sdoc-sentinel-api.onrender.com`
+    # predictable enough to commit into web/vercel.json before the service has
+    # ever been deployed. onrender.com subdomains are globally unique, so if
+    # Render reports a different hostname because this one is taken, that URL in
+    # vercel.json must be changed to match. docs/DEPLOY.md step 4 checks this.
+    name: sdoc-sentinel-api
+
+    runtime: docker
+    plan: free
+
+    # Singapore is the closest Render region to judges in Melbourne. The free
+    # plan's cold start dominates the first request either way (see the
+    # troubleshooting section of docs/DEPLOY.md), but every subsequent request
+    # pays this round trip, and a demo that feels sluggish reads as a demo that
+    # is broken. Switch to `oregon` only if Render refuses this region.
+    region: singapore
+
+    branch: main
+    autoDeploy: true
+
+    # Two things about the Dockerfile are load-bearing for this Blueprint, and
+    # both would fail the deploy silently rather than loudly if they drifted:
+    # it binds uvicorn to 0.0.0.0 on $PORT, which Render injects — a container
+    # hardcoded to 8000 passes its build, then fails its health check with no
+    # useful error — and it COPYs the directory SENTINEL_DATA_ROOT points at,
+    # below. Both hold as written; if you change the data path, change it here
+    # and in the Dockerfile's COPY together.
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+
+    # `GET /` is the only endpoint backend/api/main.py serves that does not
+    # touch the pipeline; there is no /health route, so do not "correct" this
+    # path to one. Note what that means: `/` returns a static dict, so a green
+    # health check proves the container is listening and proves nothing at all
+    # about whether the demo data is present. See docs/DEPLOY.md step 6, which
+    # checks the two separately for exactly this reason.
+    healthCheckPath: /
+
+    envVars:
+      # `sync: false` means Render prompts for this value when the Blueprint is
+      # applied and stores it encrypted, rather than reading it from this file.
+      # A key committed to a repository that Phase 3c makes public is a key that
+      # has to be rotated, so this must stay `sync: false` even though it makes
+      # the deploy one click longer. The pipeline runs without it — CLAUDE.md
+      # rule 5 — so an unset key degrades the demo rather than breaking it.
+      - key: OPENAI_API_KEY
+        sync: false
+
+      # Render builds from git, and `/data/` is git-ignored, so the deployed
+      # container has nothing to serve unless a dataset is committed under a
+      # path that is not ignored. `demo_data/` is that path, and the choice
+      # between a curated ~30-email subset and the whole participant bundle is
+      # still open in docs/ROADMAP.md ("the decision still open"). Whichever
+      # lands, it goes at the repository root as `demo_data/` and this line does
+      # not change — .dockerignore already allows that path through and the
+      # Dockerfile already COPYs it. Committing the whole bundle at data/bundle
+      # instead costs four edits, not one: this value, the .gitignore, the
+      # .dockerignore and the Dockerfile's COPY. See docs/DEPLOY.md step 0.3.
+      #
+      # Only the participant bundle may ship here. data/_grader/ holds the
+      # answer key and the generator and may never enter the image — see
+      # CLAUDE.md rule 1 and docs/SCORING.md section 3.
+      - key: SENTINEL_DATA_ROOT
+        value: /app/demo_data
+
+      # This is already the default in backend/api/main.py; it is stated here so
+      # that it is visible and changeable without a code edit. `*` is legal only
+      # because that file sets allow_credentials=False — narrowing this to the
+      # Vercel origin whilst credentials are off buys nothing and is one more
+      # thing to get wrong at 2am when a preview deploy gets a new hostname.
+      - key: SENTINEL_CORS_ORIGINS
+        value: "*"
+
+      # Caching model responses by content hash means a re-run during the demo
+      # costs nothing and, more importantly, answers identically — a judge who
+      # presses the button twice should not see two different results.
+      - key: SENTINEL_LLM_CACHE
+        value: "1"
+
+      # A hard ceiling on model spend per run. The free plan has no billing
+      # attached, but the OpenAI key does, and an unattended public URL is
+      # exactly where a runaway loop would be noticed last.
+      - key: SENTINEL_RUN_BUDGET_USD
+        value: "2.00"
+
+      # The Dockerfile sets this too. It is repeated here because the image is
+      # not the only way this service gets run — a Render shell session or a
+      # one-off job starts from this environment — and because a buffered
+      # stdout means Render's log viewer stays empty during a failing start-up,
+      # which is the one moment the logs are worth reading.
+      - key: PYTHONUNBUFFERED
+        value: "1"
