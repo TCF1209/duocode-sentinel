@@ -4,6 +4,223 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-19 — Claude session 5 · Phase 3b (`web/` dashboard) built and verified
+
+**Done**
+- Scaffolded `web/` (Next.js 16.3.5 App Router, Turbopack, shadcn/ui, Recharts)
+  and built all five items in this file's own 3b checklist: run list + create,
+  inbox triage, the discrepancy report (`components/case-report-view.tsx` —
+  "the screen the whole project exists to produce"), review confirm/correct,
+  a client-side generated reply draft, and a metrics page with three charts.
+  `POST /compare` (3d) has its own page too (`/compare`). `docs/ROADMAP.md`
+  3b is ticked.
+- Dropped `@tanstack/react-table` before writing a single row with it: the
+  installed version is 9.2.4, a ground-up API rewrite from the `useReactTable`
+  API this codebase's own training-era knowledge expected (confirmed by
+  `node -e "require('@tanstack/react-table')"` listing its real exports — no
+  `useReactTable`, no `getCoreRowModel`). A five-column table with manual
+  filters does not need it; uninstalled rather than fighting an unfamiliar v9
+  surface under a 3-day clock.
+- Checked Next's own bundled docs before writing App Router code — `next dev`
+  auto-generates a `web/AGENTS.md` warning that this Next version "has
+  breaking changes" from training data and pointing at
+  `node_modules/next/dist/docs/`. It was right to check: Next 16 ships a new
+  Cache Components model (`cacheComponents` in `next.config.ts`, `'use cache'`,
+  `<Suspense>`-gated runtime APIs). It is **off by default** and this
+  dashboard never turns it on — every page is a plain Client Component
+  fetching the FastAPI backend directly, which sidesteps that whole surface
+  on purpose; if a future session enables `cacheComponents`, re-read that doc
+  first, this dashboard was not written against it.
+- Added two small, honest gaps found while building, not before:
+  `GET /runs` (list all runs) — not in `backend/api/`'s original endpoint
+  table, needed for the dashboard's own run list, `Store.list_runs` already
+  existed for `latest_done_run` to build on; and `category_confidence` on
+  `GET /runs/{id}/cases` — this file's own 3b line says the inbox triage needs
+  a confidence column, and the API never exposed it until now. Both covered
+  by `backend/tests/test_api.py` (still synthetic fixtures, still not
+  `data/bundle`).
+- **Found and fixed a real, non-obvious build bug, not a preference.**
+  Utility classes written directly inside a Next.js dynamic-route folder
+  (`app/runs/[runId]/...`) silently do not compile under this project's
+  Tailwind v4 + Turbopack setup. Found by noticing a 4-column stat grid
+  rendered as one column, then proven by fetching the actual served CSS and
+  diffing it byte-for-byte (`md5sum`): `sm:grid-cols-2` (used in
+  `components/case-report-view.tsx`, outside any bracket folder) compiled;
+  `grid-cols-4` (used only in the metrics page, inside `[runId]/`) never did,
+  with or without an explicit `@source` pointed at that exact path, before or
+  after a full `rm -rf .next` restart. **Fix:** every `page.tsx` under a
+  dynamic route segment is now a thin shell that only unwraps `params` (React
+  `use()`, per Next's own file-conventions doc — a Client Component page
+  cannot be `async`); all real markup moved to `components/*-page-view.tsx`,
+  which compiles correctly. Keep this pattern for any new page added under a
+  `[param]` segment, or the same silent failure comes back.
+- **Correction, same day, from `a01dd91` (main): the diagnosis two bullets up
+  was wrong.** The real cause was an unanchored `runs/` line in the
+  repo-root `.gitignore` matching `web/app/runs/` at any depth — the same
+  bug that had also swallowed three page files whole (`git status` never
+  mentioned them, `git add -A` staged nothing under that path, no error).
+  Tailwind was never broken; it correctly skips git-ignored files, and those
+  files were git-ignored. `.gitignore` is now anchored (`/data/`, `/runs/`,
+  `/.cache/`). The `components/*-page-view.tsx` split is kept as a plain
+  layout choice, not as a fix for anything — the false claim is removed from
+  `globals.css`'s comment. Left visible here rather than silently corrected,
+  same reason this file keeps its other wrong-turn rows.
+- **A second, sharper bug found while fixing the first one.** Documenting the
+  fix above inside a CSS comment in `globals.css` — the comment's prose
+  literally contained the word `@source` and a `[` character — crashed the
+  Turbopack/PostCSS build outright: `CssSyntaxError: ... Unknown word [`, from
+  a line that was supposed to be inside `/* ... */`. Whatever preprocesses
+  `@source` in this pipeline is not respecting comment boundaries reliably.
+  Reworded the comment in plain prose with no `@`-directive-looking text and
+  no literal brackets; confirmed clean by watching the same error disappear
+  from the dev server log on restart.
+- Verified, not asserted: `npx tsc --noEmit` clean, `npm run lint` clean,
+  backend suite unchanged at **391 passed / 141 skipped / 1 xfailed** after
+  all of this (nothing under `backend/sdoc/` or `backend/api/`'s existing
+  routes changed behaviour). Then a full manual click-through in a real
+  running browser (not just curl) against a synthetic 3-email demo inbox
+  (`data/manual_check_bundle/` — scratch data for this session, **not** the
+  organisers' bundle and not a `demo_data/` proposal, see Careful below):
+  created a run, watched inbox triage show the right category/confidence
+  (100%)/status/`rule` badge for all three emails, opened all three case
+  outcomes (OK all-MATCH, MISMATCH on `consignee` with real evidence
+  snippets, NEEDS_REVIEW/`missing_attachment` with a recovery suggestion),
+  confirmed a review and watched it persist across reload, generated a reply
+  draft and read its text, and watched all three metrics charts render the
+  correct real numbers (3/3/3 category count, a 1/1/1 outcome pie, 1
+  `missing_attachment` bar).
+
+**Next**
+- **3c, deploy, is still zero lines** and is explicitly not something this
+  session did unattended — it needs Render/Vercel accounts and a decision
+  the team owns (which service account, what the public URL becomes), and it
+  touches shared/external state. `docs/ROADMAP.md` still says do this on the
+  20th.
+- The `/compare` page's actual file-picker interaction was not click-tested
+  in a live browser — this session's browser tool has no scriptable way to
+  drive a native OS file picker. The endpoint underneath it is proven
+  (3 pytest cases plus an earlier real `curl -F` multipart upload against a
+  running server), and the page typechecks and lints clean, but a human
+  should click through the literal upload flow once before demo day.
+- Retry-a-single-case (docs/ROADMAP.md 3a, still `[~]`) is still not built.
+- The metrics page deliberately does not show a confusion matrix or accuracy
+  score — `docs/SCORING.md` and `CLAUDE.md` rule 1 both say nothing under
+  `backend/` may read `data/_grader/ground_truth.json`, and the dashboard
+  only calls `backend/api/`, which only ever sees what `backend/sdoc/` sees.
+  If the team wants that number on-screen for the demo, it has to come from
+  a human pasting the `score_cli.py` output in, not from a new code path.
+
+**Careful**
+- `data/manual_check_bundle/` is scratch data this session wrote to disk to
+  have something real to click through — three emails, one clean, one with a
+  planted consignee mismatch, one missing its second attachment. It is
+  git-ignored like everything under `data/`. Do not confuse it with the real
+  participant bundle or with the curated `demo_data/` the team still needs to
+  decide on (`docs/ROADMAP.md`, "What the data problem is").
+- `backend/api/store.py` is in-memory and empty on every restart — this
+  session restarted the API once (to pick up `category_confidence`) and lost
+  the first demo run; had to click "Start a run" again. Anyone deploying to
+  Render should expect the same on every redeploy.
+- Both dev servers were left running for hands-on inspection: backend on
+  `:8000` (`SENTINEL_DATA_ROOT` pointed at `data/manual_check_bundle`),
+  frontend on `:3000` (`web/.env.local` points at `:8000`). Stop them with
+  whatever owns those ports before starting your own.
+- If you add a new page under any `app/**/[param]/...` folder, put its markup
+  in a `components/*-page-view.tsx` and keep the `page.tsx` to a two-line
+  `params` unwrap. This is not a style preference — skipping it reproduces
+  the silent Tailwind compile failure two sections up.
+
+---
+
+## 2026-09-19 — Claude session 4 · Phase 3a (`backend/api/`) built and verified
+
+**Done**
+- Built `backend/api/` end to end: `main.py` (FastAPI app + CORS), `store.py`
+  (in-memory run/case store — no Postgres yet, see `ARCHITECTURE.md` §5),
+  `pipeline_runner.py` (background-thread run over a bundled inbox),
+  `direct_compare.py` (`POST /compare` logic), `models.py` (Pydantic at the
+  boundary only, per `ARCHITECTURE.md`). All 8 endpoints from this file's own
+  table are live: `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/cases`,
+  `GET /cases/{id}`, `POST /cases/{id}/review`, `POST /compare`, `GET /metrics`,
+  `GET /submission`. Nothing under `backend/sdoc/` was touched — the API calls
+  the same `Pipeline`, `evidence_gate.evaluate` and `Pipeline._apply` the CLI
+  uses, so the decision rule is not duplicated.
+- `/compare` reuses the exact reader/doctype/extract/compare/gate stages
+  `Pipeline._process` runs for a `BL_COMPARISON` email, so a judge's own
+  upload gets the same evidence-gated decision the graded inbox does — no
+  separate, weaker code path for the demo case.
+- Found and fixed a real gap while building this, not before: `requirements.txt`
+  listed `fastapi`/`uvicorn`/`pydantic` but nothing had ever exercised
+  `UploadFile`, so the missing `python-multipart` dependency had never
+  surfaced. Added it, plus `httpx` under `# --- dev ---` for
+  `fastapi.testclient.TestClient`. Both installed clean in a fresh venv.
+- Wrote `backend/tests/test_api.py` — 7 tests against synthetic fixtures built
+  in the file itself, never `data/bundle` (`COLLABORATION.md` non-negotiable
+  #1). Covers: matching documents → `OK`; a planted consignee mismatch →
+  `MISMATCH` with a traceable evidence snippet on both sides; an empty upload
+  → `NEEDS_REVIEW`, not a crash; and the full run lifecycle — create, poll
+  status, list cases, fetch one, submit a review, confirm it persists, read
+  `/metrics` and `/submission` — against a 3-email synthetic inbox (clean
+  match / planted mismatch / missing second attachment), asserting the exact
+  `OK` / `MISMATCH` / `NEEDS_REVIEW` split. All 7 passed on the first real run.
+- Verified independently, not just asserted: fresh `.venv`, clean
+  `pip install -r backend/requirements.txt` (confirms the `pdfplumber==0.11.10`
+  pin from session 3 really does resolve), full suite **391 passed / 141
+  skipped / 1 xfailed** (up from 384 before this session's 7 new tests — exact
+  match, nothing else moved). Then booted a **real** `uvicorn` process (not
+  TestClient) and hit it with `curl`: `GET /` → 200, `GET /openapi.json` → 200,
+  a real multipart `POST /compare` → 200 with a traced, evidence-linked
+  response. Stopped the process afterward.
+- Note for whoever reads session 3's own numbers next to this one: this
+  session's from-scratch venv measured **384 passed**, not the 330 that
+  session 3's entry states for the same "no bundle" condition. Both agree on
+  141 skipped. Recorded rather than quietly using whichever number was
+  convenient — if it matters, `git log`/`git blame` on `docs/STATUS.md` and
+  the test files will show which count is stale.
+
+**Next**
+- **3b, `web/` — does not exist yet.** The dashboard is the actual point of
+  the project ("the discrepancy report... is the screen the whole project
+  exists to produce; build it first" — this file's own words below). The API
+  underneath it is now real, not a placeholder to build against.
+- **3c, deploy — does not exist yet.** Render + Vercel accounts, Dockerfile,
+  the public-vs-private repo flip: none of this is something a coding session
+  can do unattended — it needs the humans' accounts and a decision on what
+  goes in `demo_data/` (the open question two sections below, still open).
+- Job handling from this file's own checklist is **half done**: a failed run
+  is visible (`status: "failed"` + `error` on `GET /runs/{id}`, and a crashed
+  *email* already always became a `NEEDS_REVIEW` case rather than losing the
+  run — that part is `Pipeline.process`'s own existing behavior, not new).
+  Retrying **one case** without re-running the whole inbox is not built; there
+  is no endpoint for it. Small to add (`pipeline.process()` on one
+  `EmailRecord`, overwrite that case in the store) but it is untested and
+  unbuilt, not merely undocumented — do not assume it exists.
+- `POST /runs` cannot be exercised against the real inbox from this session:
+  `data/bundle` is git-ignored and was not present in the working copy this
+  session ran in. Every `/runs` assertion above is against a synthetic 3-email
+  inbox built in the test file. Point `SENTINEL_DATA_ROOT` at a real bundle
+  and re-run `docs/SCORING.md`'s commands through the API instead of the CLI
+  as the first thing the next session does, before trusting this further.
+
+**Careful**
+- `store.py` is one process's memory. It is fine for a single Render instance
+  and it is gone on every restart — no run history survives a redeploy. That
+  is an explicit, documented trade, not an oversight; swapping in the planned
+  Postgres touches that one file's internals, not the routes, because nothing
+  outside `store.py` reaches into its dict.
+- `direct_compare.py` calls `Pipeline._apply`, a name-mangled-looking internal
+  of `sdoc.pipeline`. Deliberate — the alternative was re-deriving the
+  grounded/`NEEDS_REVIEW` decision rule a second time, which is exactly the
+  kind of duplication `DECISIONS.md` warns against elsewhere. If `_apply`'s
+  signature ever changes, this file breaks loudly at import or at the first
+  test run, not silently.
+- Do not read the "391 passed" figure above as license to stop checking
+  numbers against `docs/SCORING.md`'s official scorer — this count is pytest
+  health, not accuracy. Nothing in `backend/sdoc/` changed this session, so
+  the score is still exactly what session 2/3 measured it at.
+
+---
+
 ## 2026-09-19 — Claude session 3 · Phase 2 closed
 
 **Done**
