@@ -147,10 +147,22 @@ layer over data that already exists** — resist the urge to touch `backend/sdoc
 
 ### 3c · Deploy — Render (backend Docker) + Vercel (frontend)
 
-- [ ] **(C)** Dockerfile + render config; **(T)** confirm the public URL works
-      from a phone on mobile data
-- [ ] **(T)** flip `TCF1209/duocode-sentinel` to public (planned all along — the
-      rules require a public link)
+- [x] **(C)** Dockerfile + render config
+- [x] **(T)** flip `TCF1209/duocode-sentinel` to public — done 21 Sep, and it
+      turned out to be load-bearing for more than the rules: Vercel's Hobby
+      plan refuses to build a commit pushed by anyone who is not the project
+      owner, so a teammate's push produced a deployment that never shipped.
+      A public repository is one of the three fixes Vercel itself offers.
+      The other, and the one to keep using: the teammate pushes a branch and
+      the owner merges it with `--no-ff`, so the tip of `main` is a commit the
+      owner pushed.
+- [x] **(C)/(T)** **DEPLOYED.** Dashboard
+      [duocode-sentinel.vercel.app](https://duocode-sentinel.vercel.app),
+      API [sdoc-sentinel-api.onrender.com](https://sdoc-sentinel-api.onrender.com).
+      Verified on the public URLs, not locally: the run list, the side-by-side
+      report with evidence, `POST /compare` on real uploads, and the guards
+      (`use_llm=true` → 403, `limit=-5` → 422, partial `/submission` → 409).
+- [ ] **(T)** confirm the public URL works from a phone on mobile data
 
 **Do this on the 20th, not the 21st.** Deployment always costs two hours more
 than planned, and a dead link on submission day is an incomplete entry.

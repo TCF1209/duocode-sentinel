@@ -3,12 +3,21 @@
 *From email inbox to discrepancy report.*
 Built by **DuoCode** for the Averis × Monash Hackathon 2026.
 
-> **Live demo:** `<<< PASTE THE PUBLIC URL HERE >>>`
-> Not deployed yet. The config is written and committed — `Dockerfile` and
-> `render.yaml` for the API, `web/vercel.json` for the dashboard — but the
-> deploy itself needs two accounts and a secret that only a human can create.
-> Step-by-step: [`docs/DEPLOY.md`](docs/DEPLOY.md). Until this line carries a
-> real link, [Quick start](#quick-start) is how to see the system work.
+> ### ▶ [duocode-sentinel.vercel.app](https://duocode-sentinel.vercel.app)
+>
+> The dashboard. Press **Start a run** to process the bundled demo inbox, then
+> open a `MISMATCH` case to see the two documents side by side with the line
+> each value was read from. **Compare (demo)** takes two files of your own.
+>
+> API: [sdoc-sentinel-api.onrender.com](https://sdoc-sentinel-api.onrender.com)
+> — `GET /` reports `ready: true` once it has a completed run.
+>
+> On a free tier the container sleeps after about 15 minutes, so **the first
+> request after a quiet spell takes 30–60 seconds** while it wakes. It runs the
+> demo inbox at boot, so you arrive at a finished run rather than an empty
+> screen. Both are deployed from this repository by the committed
+> `render.yaml` and `web/vercel.json`; the runbook is
+> [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 | | |
 |---|---|
@@ -236,11 +245,13 @@ data/                  full dataset + local grader — git-ignored, never commit
 runs/                  pipeline output — git-ignored
 ```
 
-What is **not** done: the deploy itself. The config above is written and the
-runbook is `docs/DEPLOY.md`, but no service is running, because creating the
-Render and Vercel accounts, pasting the API key and flipping the repository
-public are human steps (`docs/ROADMAP.md` §3c). That is why the link at the top
-of this page is still a placeholder.
+Deployed from this tree, not from a laptop: the API runs on Render from the
+root `Dockerfile` as `render.yaml` describes it, and the dashboard on Vercel
+from `web/` as `web/vercel.json` describes it. Both links are at the top of
+this page. The configuration is committed rather than clicked into a dashboard
+so that it can be reviewed here and redeployed without reconstructing what
+someone once typed; the runbook, including the failures worth predicting, is
+[`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ---
 
