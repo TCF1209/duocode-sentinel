@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { CaseReportView } from "@/components/case-report-view";
+import { BackLink } from "@/components/back-link";
+import { Card, CardContent } from "@/components/ui/card";
 import { getCase, reviewCase, type CaseReport } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -22,7 +23,7 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
   }, [refresh]);
 
   if (error) {
-    return <p className="text-sm text-red-600">{error}</p>;
+    return <p className="text-sm text-danger">{error}</p>;
   }
   if (!report) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -30,17 +31,19 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
 
   return (
     <div className="flex flex-col gap-4">
-      <Link href={`/runs/${runId}`} className="text-sm text-muted-foreground underline">
-        &larr; back to {runId}
-      </Link>
-      <CaseReportView
-        report={report}
-        onReview={async (body) => {
-          await reviewCase(runId, emailId, body);
-          toast.success("Review saved");
-          refresh();
-        }}
-      />
+      <BackLink href={`/runs/${runId}`} label={`Back to ${runId}`} />
+      <Card>
+        <CardContent className="p-6">
+          <CaseReportView
+            report={report}
+            onReview={async (body) => {
+              await reviewCase(runId, emailId, body);
+              toast.success("Review saved");
+              refresh();
+            }}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

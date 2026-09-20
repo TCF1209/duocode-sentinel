@@ -12,12 +12,19 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ---------------------------------------------------------------------
+ * "Deep Ink & Brass" — the Sentinel / DuoCode palette.
+ * Ink navy + brass carry the brand; ok/warn/danger are a separate,
+ * dedicated 3-way scale for OK / NEEDS_REVIEW / MISMATCH so the product's
+ * actual verdicts are never rendered in the same hue as a plain button.
+ * ai marks anything the LLM (not a rule) decided or touched.
+ * --------------------------------------------------------------------- */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-serif);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -35,6 +42,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -47,6 +55,19 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  /* verdict + AI-provenance scale */
+  --color-ok: var(--ok);
+  --color-ok-foreground: var(--ok-foreground);
+  --color-ok-bg: var(--ok-bg);
+  --color-warn: var(--warn);
+  --color-warn-foreground: var(--warn-foreground);
+  --color-warn-bg: var(--warn-bg);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-bg: var(--danger-bg);
+  --color-ai: var(--ai);
+  --color-ai-foreground: var(--ai-foreground);
+  --color-ai-bg: var(--ai-bg);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -57,72 +78,115 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --background: #faf7ef;
+  --foreground: #182335;
+  --card: #ffffff;
+  --card-foreground: #182335;
+  --popover: #ffffff;
+  --popover-foreground: #182335;
+  --primary: #8f5a20;
+  --primary-foreground: #faf3e6;
+  --secondary: #ede6d4;
+  --secondary-foreground: #182335;
+  --muted: #f1ecdf;
+  --muted-foreground: #5b6577;
+  --accent: #ede6d4;
+  --accent-foreground: #182335;
+  --destructive: #ac3327;
+  --destructive-foreground: #ffffff;
+  --border: #e3dac3;
+  --input: #e3dac3;
+  --ring: #8f5a20;
+  --ok: #1e7a4c;
+  --ok-foreground: #ffffff;
+  --ok-bg: #e1efe3;
+  --warn: #a9631b;
+  --warn-foreground: #ffffff;
+  --warn-bg: #f5e7ce;
+  --danger: #ac3327;
+  --danger-foreground: #ffffff;
+  --danger-bg: #f5dfdb;
+  --ai: #6e56a6;
+  --ai-foreground: #ffffff;
+  --ai-bg: #eae4f5;
+  --chart-1: #8f5a20;
+  --chart-2: #1e7a4c;
+  --chart-3: #4c6485;
+  --chart-4: #a9631b;
+  --chart-5: #ac3327;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #f1ecdf;
+  --sidebar-foreground: #182335;
+  --sidebar-primary: #8f5a20;
+  --sidebar-primary-foreground: #faf3e6;
+  --sidebar-accent: #ede6d4;
+  --sidebar-accent-foreground: #182335;
+  --sidebar-border: #e3dac3;
+  --sidebar-ring: #8f5a20;
+  /* A faint chart-contour swell, tiled behind every screen — the one place
+     the shipping domain shows up in the chrome itself, not just the copy.
+     Kept at ~5% stroke opacity on purpose: legible dense tables sit on top
+     of this on every page, so "texture" and "noise" are the same mistake. */
+  --bg-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120'%3E%3Cpath d='M0 20 Q30 5 60 20 T120 20 T180 20 T240 20' fill='none' stroke='%23182335' stroke-width='1' opacity='0.07'/%3E%3Cpath d='M0 60 Q30 45 60 60 T120 60 T180 60 T240 60' fill='none' stroke='%23182335' stroke-width='1' opacity='0.05'/%3E%3Cpath d='M-20 98 Q10 83 40 98 T100 98 T160 98 T220 98' fill='none' stroke='%23182335' stroke-width='1' opacity='0.04'/%3E%3C/svg%3E");
+  /* Cursor-glow strength, tuned per theme rather than shared: the same
+     color-mix percentage reads very differently depending on the theme.
+     Dark mode mixes a light gold into near-black, where even a little
+     brightness is an obvious jump — 8% is already clearly visible there.
+     Light mode mixes a medium-dark brown into a near-white background,
+     where the same small percentage barely nudges the luminance and reads
+     as invisible rather than subtle. Confirmed by testing both themes
+     side by side, not assumed from the numbers alone — light mode needs a
+     noticeably higher percentage to be visible at all, not a lower one. */
+  --cursor-glow: 14%;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #12181f;
+  --foreground: #ede7d6;
+  --card: #1b222c;
+  --card-foreground: #ede7d6;
+  --popover: #1b222c;
+  --popover-foreground: #ede7d6;
+  --primary: #e0ac5e;
+  --primary-foreground: #1b1305;
+  --secondary: #232c38;
+  --secondary-foreground: #ede7d6;
+  --muted: #1e2732;
+  --muted-foreground: #a8b3c2;
+  --accent: #232c38;
+  --accent-foreground: #ede7d6;
+  --destructive: #e8877a;
+  --destructive-foreground: #2a0d08;
+  --border: #313b48;
+  --input: #313b48;
+  --ring: #e0ac5e;
+  --ok: #67c793;
+  --ok-foreground: #0b1f15;
+  --ok-bg: #132a20;
+  --warn: #e7ae5b;
+  --warn-foreground: #241905;
+  --warn-bg: #3a2a11;
+  --danger: #e8877a;
+  --danger-foreground: #2a0d08;
+  --danger-bg: #3b1d18;
+  --ai: #b7a2e0;
+  --ai-foreground: #201a2e;
+  --ai-bg: #2a2440;
+  --chart-1: #e0ac5e;
+  --chart-2: #67c793;
+  --chart-3: #7c93ac;
+  --chart-4: #e7ae5b;
+  --chart-5: #e8877a;
+  --sidebar: #1b222c;
+  --sidebar-foreground: #ede7d6;
+  --sidebar-primary: #e0ac5e;
+  --sidebar-primary-foreground: #1b1305;
+  --sidebar-accent: #232c38;
+  --sidebar-accent-foreground: #ede7d6;
+  --sidebar-border: #313b48;
+  --sidebar-ring: #e0ac5e;
+  --bg-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120'%3E%3Cpath d='M0 20 Q30 5 60 20 T120 20 T180 20 T240 20' fill='none' stroke='%23ede7d6' stroke-width='1' opacity='0.055'/%3E%3Cpath d='M0 60 Q30 45 60 60 T120 60 T180 60 T240 60' fill='none' stroke='%23ede7d6' stroke-width='1' opacity='0.04'/%3E%3Cpath d='M-20 98 Q10 83 40 98 T100 98 T160 98 T220 98' fill='none' stroke='%23ede7d6' stroke-width='1' opacity='0.03'/%3E%3C/svg%3E");
+  --cursor-glow: 8%;
 }
 
 @layer base {
@@ -131,8 +195,15 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image: var(--bg-pattern);
+    background-repeat: repeat;
   }
   html {
     @apply font-sans;
+    /* Every text-* utility is rem-based, so this one line scales the whole
+       app's type up together instead of hunting down every text-sm/text-xs
+       call site — 16px -> 18px is a real, consistent bump, not a rounding
+       error you'd need a ruler to see. */
+    font-size: 18px;
   }
 }

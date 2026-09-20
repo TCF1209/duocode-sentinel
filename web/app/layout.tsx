@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Source_Serif_4 } from "next/font/google";
+import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import { Nav } from "@/components/nav";
 import { Toaster } from "@/components/ui/sonner";
+import { CursorGlow } from "@/components/cursor-glow";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,6 +16,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const sourceSerif = Source_Serif_4({
+  variable: "--font-serif",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+});
+
 export const metadata: Metadata = {
   title: "Sentinel — shipping document verification",
   description: "Averis x Monash Hackathon 2026 — DuoCode",
@@ -23,12 +31,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className={`${geistSans.variable} ${geistMono.variable} ${sourceSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <Nav />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
-        <Toaster />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <CursorGlow />
+          <Nav />
+          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );
