@@ -207,3 +207,13 @@ provided `/submit` endpoint runs the same `scoring.py` we run locally. Using it
 is the sanctioned workflow. Reading the labels to shape rules is not — and a
 held-out seed is the only honest way to tell the two apart. Details and the
 exact rules we hold ourselves to are in `SCORING.md` §3.
+
+**The context that makes this a decision rather than a routine.** The package
+we were sent contained the answer key and the dataset generator, and its own
+README says it must not be handed to participants. It was sent anyway. That is
+why this entry exists: with the key in reach, "we self-evaluated" is not
+self-evidently clean, so the rules in `SCORING.md` §3 are written to be
+checkable by someone who assumes the worst — `grep -rn ground_truth backend/
+--include=*.py` returns nothing, no file from the package is committed, and the
+held-out seeds are there so generalisation is a measurement rather than a
+claim.

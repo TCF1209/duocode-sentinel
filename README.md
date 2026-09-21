@@ -21,7 +21,7 @@ Built by **DuoCode** for the Averis × Monash Hackathon 2026.
 
 | | |
 |---|---|
-| **Accuracy** | **1.0000** final score on the dev set **and** on three held-out seeds we never developed against — 225 planted defects across four independent draws, every one caught with the **exact** field set, no false alarms, all 80 escalations correct. |
+| **Accuracy** | **1.0000** final score on the dev set **and** on three held-out seeds we never developed against — 225 planted defects across four draws of the organisers' generator — three from seeds we generated ourselves and never developed against — every one caught with the **exact** field set, no false alarms, all 80 escalations correct. |
 | **Tests** | **533** — 532 pass, and 1 strict `xfail` pinning a defect we have found and not yet fixed (`docs/ADVERSARIAL.md` §5.4). |
 | **Speed** | **~3 ms per email**, single-threaded on a laptop: 520 emails end to end in about 1.5 s. |
 | **Cost** | **100% of decisions are made by rules.** `decided_by` is `"rule"` for all 520 emails; no model call decides anything on the graded inbox. |
