@@ -11,6 +11,11 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 const LINKS = [
   { href: "/", label: "Home" },
+  // The pitch is four screens of who/why/how that used to live only in a slide
+  // file. It sits in the nav because the demo is recorded inside this app --
+  // one tab, no cutting to a deck -- and because a judge arriving cold gets
+  // the context before the dashboard rather than after it.
+  { href: "/pitch", label: "Pitch" },
   { href: "/runs", label: "Runs" },
   { href: "/compare", label: "Compare" },
 ];
