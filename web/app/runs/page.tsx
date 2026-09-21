@@ -13,10 +13,12 @@ import { DURATION, EASE_OUT, fadeUp, stagger, TAP, TAP_TRANSITION } from "@/lib/
 import { useHasHover } from "@/lib/use-has-hover";
 import { STATUS_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 export default function RunsPage() {
   const [runs, setRuns] = useState<RunStatus[] | null>(null);
+  const router = useRouter();
   const [starting, setStarting] = useState(false);
   // Empty string, not 0 — this is "no limit set" (process every email in the
   // inbox), which the backend already spells as `limit: null`
@@ -67,7 +69,13 @@ export default function RunsPage() {
     try {
       const { run_id } = await createRun({ use_llm: false, limit });
       toast.success(limit ? `Started ${run_id} (${limit} emails)` : `Started ${run_id}`);
-      refresh();
+      // Straight into the run rather than back to this list. The run page is
+      // where the work is visible -- the ring, the rate, the categories
+      // filling in -- and it is live for the ~13s a 520-email run takes on the
+      // deployed API. Leaving the starter on the index meant finding the new
+      // card and clicking it, which is a hunt during the only part of a demo
+      // where something is actually happening.
+      router.push(`/runs/${run_id}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {
