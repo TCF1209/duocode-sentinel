@@ -55,8 +55,11 @@ Sentinel
 ### 2. Project Description / Summary
 
 **The form caps this at 150 words** — a limit that is nowhere in the rules PDF,
-only in the field's own help text. The version below is **147**. Count again if
-you edit it.
+only in the field's own help text. The version below is **148 real words**, and **149** even by a counter naive
+enough to treat a spaced em dash as a word — under the cap either way. That
+second number is why the asides are in brackets rather than between dashes:
+the earlier draft was 148 words and 152 whitespace tokens, so whether it
+passed depended on whose counter was used. Count both if you edit it.
 
 That cap forces a decision about what 150 words are *for*, and the answer is
 in the judges' own rubric rather than in taste. The detailed criteria are a
@@ -90,11 +93,11 @@ Sentinel — every answer comes with its evidence.
 
 Shipping desks check each draft Bill of Lading against its Shipping Instruction, seven fields, before it is finalised; a missed error means corrections, delays and rework. Sentinel runs that inbox end-to-end, live on Render and Vercel: 520 emails triaged, 124 pairs compared, 13 seconds.
 
-Its rule: never report what it cannot prove. Every value carries the source line it came from; a gate after the comparison sends anything untraceable, blank or damaged to a person. The model tier — ambiguous emails, unseen labels, scanned PDFs — obeys it too: nothing it returns is adopted until found again in the document.
+Its rule: never report what it cannot prove. Every value carries the source line it came from; a gate after the comparison sends anything untraceable, blank or damaged to a person. The model tier (ambiguous emails, unseen labels, scanned PDFs) obeys it too, so nothing it returns is adopted until found again in the document.
 
-Then we attacked it: 16 kinds of damage, no answer key, 982 silently wrong values now zero. 574 tests. A maximum 1.0000 on the organisers' own scorer — their data, and three unseen draws.
+We attacked it: 16 kinds of damage, no answer key, 982 silently wrong values now zero. 574 tests. A maximum 1.0000 on the organisers' own scorer, on their data and three unseen draws.
 
-Next: per-desk rules, and pattern alerts across a carrier's inbox.
+Next: per-desk rules, pattern alerts across a carrier's inbox.
 ```
 
 ### What each sentence is there to score
@@ -109,7 +112,7 @@ Check this before editing a word out — the cost is usually a whole criterion.
 | Technical Feasibility & Validation | 15 | 16 kinds of damage with no answer key, 982 → 0, 574 tests, 1.0000 on the organisers' scorer over four draws |
 | Problem Statement Understanding | 10 | who (shipping desks), when (before the draft is finalised), why it matters (corrections, delays, rework) |
 | Innovation & Solution Approach | 10 | "never report what it cannot prove" — the rule, stated as a rule |
-| Practical Value & Potential | 10 | "Next: per-desk rules, and pattern alerts across a carrier's inbox" |
+| Practical Value & Potential | 10 | "Next: per-desk rules, pattern alerts across a carrier's inbox" |
 
 **Do not reorder it to put the problem first,** and do not cut the last line to
 save space. Problem Statement Understanding is 10 points and already has its
