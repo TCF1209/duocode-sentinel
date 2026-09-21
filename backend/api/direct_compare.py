@@ -23,7 +23,7 @@ from sdoc.extract import fields as extract_mod
 from sdoc.extract import llm as extract_llm
 from sdoc.llm import LLMClient
 from sdoc.pipeline import Pipeline
-from sdoc.readers import fallback, office, pdf, plain
+from sdoc.readers import fallback, office, pdf, plain, scan
 from sdoc.readers import role_hint
 from sdoc.schema import CaseResult, ParsedDoc
 
@@ -74,6 +74,23 @@ def read_upload(filename: str, data: bytes) -> ParsedDoc:
     return doc
 
 
+def _transcribe_if_scan(doc: ParsedDoc, data: bytes, llm: LLMClient) -> None:
+    """Read an image-only PDF for the reviewer; leave the decision alone.
+
+    `scan.transcribe` deliberately does not write `doc.text`, so the transcript
+    can never be traced by the evidence gate as though it were the document —
+    the case stays unreadable and still escalates. That is the point: a model
+    reading a photograph of a form is good enough to save a person opening the
+    file, and not good enough to decide a discrepancy on.
+    """
+    if doc.unreadable_reason != "no_text_layer":
+        return
+    try:
+        scan.transcribe(doc, data, client=llm)
+    except Exception as exc:               # a transcript is a nicety, never a crash
+        doc.notes.append(f"scan transcription unavailable: {type(exc).__name__}: {exc}")
+
+
 def compare_uploads(
     si_filename: str, si_bytes: bytes,
     bl_filename: str, bl_bytes: bytes,
@@ -81,6 +98,18 @@ def compare_uploads(
 ) -> CaseResult:
     si_doc = read_upload(si_filename, si_bytes)
     bl_doc = read_upload(bl_filename, bl_bytes)
+
+    # Same treatment a scan gets in the inbox (`Pipeline._transcribe_scan`):
+    # an image-only PDF is handed to the vision model so the reviewer receives
+    # the document already read, and the case escalates anyway — the transcript
+    # is evidence for a person, never an input to a decision. Without this the
+    # upload path silently lacked a capability the pipeline has, which is worse
+    # than not having it: a judge uploading a scan would conclude we cannot
+    # read scans at all.
+    if llm is not None:
+        _transcribe_if_scan(si_doc, si_bytes, llm)
+        _transcribe_if_scan(bl_doc, bl_bytes, llm)
+
     doctype.classify_document(si_doc)
     doctype.classify_document(bl_doc)
 

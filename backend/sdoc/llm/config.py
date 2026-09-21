@@ -16,6 +16,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
+from typing import Optional
 
 # Read from https://developers.openai.com/api/docs/pricing on this date.
 PRICING_SNAPSHOT = "openai-published-pricing-2026-09-19"
@@ -109,14 +111,36 @@ def cost_usd(model: str, *, input_tokens: int, output_tokens: int,
     ) / _MILLION
 
 
-def load_dotenv_if_present(path: str = ".env") -> None:
+def load_dotenv_if_present(path: Optional[str] = None) -> None:
     """Load a local .env so the CLI works without exporting variables.
 
-    Deliberately silent when the file is absent: on a deployed server the
-    variables come from the platform, and a missing .env there is normal.
+    Searched from this file upwards, not from the working directory. That
+    distinction was a real bug rather than tidiness: `api/main.py` documents
+    `cd backend && uvicorn api.main:app` as a way to run the server, and under
+    a bare `".env"` the repository-root file is then invisible, so the model
+    tier switches itself off — silently, because an absent key is a normal
+    state that degrades to the deterministic path rather than raising. The
+    symptom is a `/compare?use_llm=true` that quietly behaves exactly like
+    `use_llm=false`.
+
+    Deliberately silent when the file really is absent: on a deployed server
+    the variables come from the platform, and there is no .env to find.
     """
     try:
         from dotenv import load_dotenv
     except ImportError:                                   # pragma: no cover
         return
-    load_dotenv(path, override=False)
+
+    if path is not None:
+        load_dotenv(path, override=False)
+        return
+
+    # backend/sdoc/llm/config.py -> backend/sdoc/llm, backend/sdoc, backend,
+    # <repo root>. The repository root is where .env lives and .env.example
+    # tells people to put it.
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / ".env"
+        if candidate.is_file():
+            load_dotenv(candidate, override=False)
+            return

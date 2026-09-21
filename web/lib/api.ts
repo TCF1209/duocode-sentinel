@@ -76,6 +76,10 @@ export interface CaseReport {
   duration_ms: number;
   llm_calls: number;
   review?: ReviewRecord | null;
+  /** /compare only: whether the model tier was offered, and whether any field
+   *  actually came back from it. */
+  model_offered?: boolean;
+  model_used?: boolean;
   /** What the case is NOW, after any human correction. The keys above stay
    *  the system's own answer, so a card can show both. */
   effective?: EffectiveOutcome | null;

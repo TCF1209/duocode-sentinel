@@ -359,14 +359,55 @@ def submission(run_id: Optional[str] = None) -> dict:
     return out
 
 
+# One client for every model-enabled upload, for the life of the process.
+#
+# `build_client()` per request looked harmless and was not: the run budget
+# (SENTINEL_RUN_BUDGET_USD) lives on the client's own usage counter, so a fresh
+# client per call meant the ceiling reset every time and bounded nothing. On a
+# public, unauthenticated endpoint with a visible "use the model" switch, that
+# is an invitation to spend the key one upload at a time. Sharing the client
+# makes the ceiling cumulative, which is what a ceiling is for — and it shares
+# the response cache too, so a judge pressing the button twice on the same
+# document pays once.
+_compare_client = None
+_compare_client_built = False
+
+
+def _shared_compare_client():
+    global _compare_client, _compare_client_built
+    if not _compare_client_built:
+        _compare_client = build_client(enabled=True)
+        _compare_client_built = True
+    return _compare_client
+
+
 @app.post("/compare")
 async def compare(
     si: UploadFile = File(..., description="Shipping Instruction"),
     bl: UploadFile = File(..., description="draft Bill of Lading"),
     use_llm: bool = False,
 ) -> dict:
+    """Compare two uploaded documents. Nothing is stored.
+
+    `use_llm` is the switch the dashboard exposes, and it is the point of this
+    endpoint: run the same pair twice, once each way, and the difference shows
+    where the model actually sits in this system. Unlike `POST /runs` it is not
+    gated behind SENTINEL_ALLOW_LLM_RUNS — one document pair is bounded work,
+    where a model-enabled run is the whole inbox — but it draws on a shared,
+    budgeted client so the spend is bounded across requests as well as within
+    one.
+    """
     si_bytes = await si.read()
     bl_bytes = await bl.read()
-    client = build_client(enabled=use_llm)
+    client = _shared_compare_client() if use_llm else None
     result = compare_uploads(si.filename or "si", si_bytes, bl.filename or "bl", bl_bytes, llm=client)
-    return result.to_report()
+
+    report = result.to_report()
+    # So the page can say which tier answered rather than the reader guessing
+    # from the extractor tags.
+    report["model_used"] = bool(client) and any(
+        side and side.get("extractor") == "llm"
+        for f in report["fields"] for side in (f.get("si"), f.get("bl"))
+    )
+    report["model_offered"] = bool(client)
+    return report

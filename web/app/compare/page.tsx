@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { FileCheck2, Loader2, Upload, X } from "lucide-react";
+import { FileCheck2, Loader2, Sparkles, Upload, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,12 +15,70 @@ import { cn } from "@/lib/utils";
  * drops in their own SI and BL and watches the system work, live, on a
  * document it has never seen. No run, no stored case: just this one request.
  */
+/**
+ * Three pairs a judge can load without preparing anything. They exist to make
+ * the rule/model split visible rather than described: run each one with the
+ * model off, then on, and watch which stage was actually doing the work.
+ */
+const SAMPLES = [
+  {
+    id: "unfamiliar-labels",
+    title: "Labels we have never seen",
+    blurb:
+      "A human reads it at a glance — Sender of Goods, Deliver To, Loading Terminal. Our synonym table has none of them. Rules alone find nothing and escalate; the model reads it and the real defect surfaces.",
+    si: "unfamiliar-labels_SI.txt",
+    bl: "unfamiliar-labels_BL.txt",
+    needsModel: true,
+  },
+  {
+    id: "scanned",
+    title: "A scan with no text layer",
+    blurb:
+      "Image-only PDFs. No parser can read them. With the model on, the vision path transcribes both for the reviewer — and the case still escalates, because a transcript is evidence for a person, not grounds for a verdict.",
+    si: "scanned_SI.pdf",
+    bl: "scanned_BL.pdf",
+    needsModel: true,
+  },
+  {
+    id: "ordinary",
+    title: "Ordinary wording (the control)",
+    blurb:
+      "The same shipment, labelled the way our table expects. The rules answer it in milliseconds for nothing. This is the 100% of the graded inbox, and the reason the model is a fallback rather than the engine.",
+    si: "ordinary_SI.txt",
+    bl: "ordinary_BL.txt",
+    needsModel: false,
+  },
+] as const;
+
+async function fetchSample(name: string): Promise<File> {
+  const res = await fetch(`/samples/${name}`);
+  if (!res.ok) throw new Error(`could not load sample ${name}`);
+  return new File([await res.blob()], name);
+}
+
 export default function ComparePage() {
   const [si, setSi] = useState<File | null>(null);
   const [bl, setBl] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [useLlm, setUseLlm] = useState(false);
+  const [loadingSample, setLoadingSample] = useState<string | null>(null);
   const [report, setReport] = useState<CaseReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function loadSample(s: (typeof SAMPLES)[number]) {
+    setLoadingSample(s.id);
+    setError(null);
+    setReport(null);
+    try {
+      const [a, b] = await Promise.all([fetchSample(s.si), fetchSample(s.bl)]);
+      setSi(a);
+      setBl(b);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingSample(null);
+    }
+  }
 
   async function submit() {
     if (!si || !bl) return;
@@ -28,7 +86,7 @@ export default function ComparePage() {
     setError(null);
     setReport(null);
     try {
-      setReport(await compareUploads(si, bl));
+      setReport(await compareUploads(si, bl, useLlm));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : String(e));
     } finally {
@@ -49,17 +107,69 @@ export default function ComparePage() {
 
       <motion.div variants={fadeUp}>
         <Card>
-          <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-end">
-            <FilePicker label="Shipping Instruction (SI)" file={si} onChange={setSi} />
-            <FilePicker label="Draft Bill of Lading (BL)" file={bl} onChange={setBl} />
-            <motion.div whileTap={!busy ? TAP : undefined} transition={TAP_TRANSITION} className="inline-block">
-              <Button onClick={submit} disabled={!si || !bl || busy}>
-                {busy && <Loader2 className="size-4 animate-spin" />}
-                {busy ? "Comparing…" : "Compare"}
-              </Button>
-            </motion.div>
+          <CardContent className="flex flex-col gap-5 p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+              <FilePicker label="Shipping Instruction (SI)" file={si} onChange={setSi} />
+              <FilePicker label="Draft Bill of Lading (BL)" file={bl} onChange={setBl} />
+              <motion.div whileTap={!busy ? TAP : undefined} transition={TAP_TRANSITION} className="inline-block">
+                <Button onClick={submit} disabled={!si || !bl || busy}>
+                  {busy && <Loader2 className="size-4 animate-spin" />}
+                  {busy ? "Comparing…" : "Compare"}
+                </Button>
+              </motion.div>
+            </div>
+
+            {/* The toggle is the point of this page, not a setting. Run a
+                sample with it off, then on: the difference is the whole
+                argument for where the model sits in this system. */}
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-dashed p-3 transition-colors hover:bg-muted/40">
+              <input
+                type="checkbox"
+                checked={useLlm}
+                onChange={(e) => setUseLlm(e.target.checked)}
+                className="mt-0.5 size-4 accent-primary"
+              />
+              <span className="text-sm">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <Sparkles className="size-3.5 text-primary" />
+                  Let the model read what the rules could not
+                </span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Off by default, and off for all 520 emails of the graded inbox — the rules
+                  answer every one of them. Switch it on and the model is asked only about
+                  fields no rule could resolve; every answer it gives is re-located in the
+                  document before it is accepted, and anything it cannot ground is dropped.
+                </span>
+              </span>
+            </label>
           </CardContent>
         </Card>
+      </motion.div>
+
+      <motion.div variants={fadeUp} className="flex flex-col gap-2">
+        <p className="text-sm text-muted-foreground">
+          Or load a pair — then run each one twice, once with the model off and once on.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {SAMPLES.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => loadSample(s)}
+              disabled={loadingSample !== null}
+              className="flex flex-col gap-1.5 rounded-md border p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/40 disabled:opacity-60"
+            >
+              <span className="flex items-center gap-1.5 text-sm font-medium">
+                {loadingSample === s.id && <Loader2 className="size-3.5 animate-spin" />}
+                {s.title}
+              </span>
+              <span className="text-xs leading-relaxed text-muted-foreground">{s.blurb}</span>
+              {s.needsModel && (
+                <span className="mt-0.5 text-[11px] text-primary">needs the model to get past &ldquo;unreadable&rdquo;</span>
+              )}
+            </button>
+          ))}
+        </div>
       </motion.div>
 
       <AnimatePresence mode="popLayout" initial={false}>
