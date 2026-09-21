@@ -150,20 +150,26 @@ The rules allow a GitHub README explicitly, alongside Google Slides, a PDF on
 Drive, and Notion. **Nothing needs to be exported to PDF** — this field takes a
 URL, not a file.
 
-The README answers all four required items, and says so itself: *This page is
-the project documentation*, high on the page, is an index from each requirement
-to the section that answers it. It was added for two reasons. Three of the four
-requirements matched a heading already, but **Implementation Details** matched
-none — it is spread across Quick start, The API and the dashboard, and
-Repository map, so a judge scanning headings against the brief's checklist
-would not have found it. And this link and the GitHub link (field 3) are the
-same repository, so without something on the page announcing itself as the
-documentation, field 5 can read as though it were left blank.
+**All four required items now have a heading of their own** — checked by
+matching each one against the README's headings, exactly one hit each:
+`Technical architecture`, `Implementation details`, `Challenges faced`,
+`Future roadmap`. Three of them always did. The fourth did not: implementation
+was real but scattered across Quick start, The API and the dashboard and
+Repository map, so a judge working down the brief's checklist would have
+found nothing under that name and would have been right. It is now its own
+section — what was built around the six stages, the 11 API routes, the 7
+dashboard routes, the committed deployment and the test suite — rather than a
+cross-reference asking the judge to assemble it.
+
+The page also says outright that it *is* the documentation submission, in an
+index near the top. That is there because this link and the GitHub link
+(field 3) are the same repository, so without it field 5 can read as though it
+were left blank.
 
 | Required by the rules | Where |
 |---|---|
 | Technical Architecture | [Technical architecture](../README.md#technical-architecture) — six stages and what each decides; `docs/ARCHITECTURE.md` in full |
-| Implementation Details | [Quick start](../README.md#quick-start), [The API and the dashboard](../README.md#the-api-and-the-dashboard), [Repository map](../README.md#repository-map), [Verify it yourself](../README.md#verify-it-yourself) |
+| Implementation Details | [Implementation details](../README.md#implementation-details) — the pipeline modules, the model tier, 11 API routes, 7 dashboard routes, the committed deployment, the test suite |
 | Challenges Faced | [Challenges faced](../README.md#challenges-faced) |
 | Future Roadmap | [Future roadmap](../README.md#future-roadmap) |
 

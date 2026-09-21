@@ -43,7 +43,7 @@ that brief asks for are listed here with the section that answers each:
 | | Section |
 |---|---|
 | **Technical architecture** | [Technical architecture](#technical-architecture) — the six stages and what each decides, then [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design reasoning and [`docs/DECISIONS.md`](docs/DECISIONS.md) for the alternatives we rejected |
-| **Implementation details** | [Quick start](#quick-start) to run it · [The API and the dashboard](#the-api-and-the-dashboard) · [Repository map](#repository-map) for where each part lives · [Verify it yourself](#verify-it-yourself) for the commands behind every number above |
+| **Implementation details** | [Implementation details](#implementation-details) — what was built around the six stages, the 11 API routes and the 7 dashboard routes. Then [Quick start](#quick-start) to run it, [Repository map](#repository-map) for where each file lives, and [Verify it yourself](#verify-it-yourself) for the commands behind every number above |
 | **Challenges faced** | [Challenges faced](#challenges-faced) — five defects found by measurement, what each cost, and the one still open |
 | **Future roadmap** | [Future roadmap](#future-roadmap) — five items in build order, and the one thing we would deliberately not do |
 
@@ -101,6 +101,60 @@ container on Render) and a **Next.js 16** dashboard on Vercel. The design and
 the reasoning behind each choice is in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the alternatives we rejected,
 and why, are in [`docs/DECISIONS.md`](docs/DECISIONS.md).
+
+---
+
+## Implementation details
+
+The architecture above is the six stages. This is what was actually built
+around them, and where each part lives. Running any of it is
+[Quick start](#quick-start); the directory listing is the
+[repository map](#repository-map).
+
+**The pipeline — `backend/sdoc/`.** A library with no web, database or network
+imports, so `backend/run.py` and the API execute identical code and the thing
+that is scored is the thing that is demonstrated. `readers/` dispatches by
+format (`rows.py`, `plain.py`, `office.py`, `pdf.py`, `scan.py`, and
+`fallback.py` for anything with no precise reader); `labels.py` resolves a
+printed label to one of the seven fields in three passes; `normalize.py`
+canonicalises companies, ports and quantities; `compare.py` decides each
+field; `evidence_gate.py` may overrule it; `pipeline.py` assembles the case.
+
+**The model tier — `llm/`, `classify/llm.py`, `extract/llm.py`,
+`readers/scan.py`.** Structured outputs, a content-hash cache so repeated runs
+are reproducible and not re-billed, per-purpose token metering and a run
+budget. Every path is optional: with no `OPENAI_API_KEY` the pipeline still
+runs end to end and escalates what it cannot read (`CLAUDE.md` rule 5).
+
+**The API — `backend/api/`, FastAPI, 11 routes.** Pydantic models at the
+boundary only; `store.py` isolates state so the in-memory store is one file to
+replace, not a rewrite of the routes.
+
+| | |
+|---|---|
+| `GET /` | readiness, data root, whether model runs are permitted |
+| `POST /runs` · `GET /runs` · `GET /runs/{id}` | start a run over the bundled inbox; list; status and `metrics.json` |
+| `GET /runs/{id}/cases` | case list, filterable by category, status and `decided_by` |
+| `GET /cases/{id}` | one full report — seven fields, both sides, every piece of evidence |
+| `POST /cases/{id}/review` | a reviewer confirms or corrects; the report updates |
+| `POST /cases/{id}/retry` | re-process one email in place, re-reading it from disk |
+| `POST /compare` | **upload two documents of your own** and get the same report |
+| `GET /metrics` · `GET /submission` | operational counters; the graded artefact |
+
+**The dashboard — `web/`, Next.js 16 App Router, 7 routes.** `/` · `/runs` ·
+`/runs/[runId]` · `/runs/[runId]/cases/[emailId]` — the side-by-side report
+with the source line under every value, which is the screen the project exists
+to produce · `/runs/[runId]/metrics` · `/compare` · `/pitch`.
+
+**Deployment.** Committed, not clicked into a dashboard: the root `Dockerfile`
+and `render.yaml` build the API, `web/vercel.json` the frontend. Runbook and
+the failures worth predicting: [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+**Tests — 574.** 431 pass on a fresh clone with no dataset and no key, 573
+with the bundle in place, and 1 strict `xfail` pinning a defect we have found
+and not yet fixed. The skips are guarded in `conftest.py` and print their
+reason rather than failing on an empty read — see [The test
+suite](#the-test-suite).
 
 ---
 
