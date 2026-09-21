@@ -46,11 +46,38 @@ appear by making it public.
 
 ---
 
-## 2. ~~Unblock Vercel~~ — **done, 22 Sep 00:2x**
+## 2. Trigger Vercel once more — **and this one is before you record**
 
-Your empty commit `8029435` worked. Checked against production, not assumed:
-the new bundle is being served and `/pitch` now has all five screens including
-*How we know*, so the eleven blocked commits are live.
+Your empty commit `8029435` worked and put the five-screen `/pitch` live. Then
+`b261600` had to fix something on slide 4, and being pushed from the other
+machine it was blocked again. **Checked against production: the old, wrong card
+is still what the camera would film.**
+
+```bash
+git pull
+git commit --allow-empty -m "chore: ship the slide 4 correction"
+git push origin main
+```
+
+**Verify before recording** — open <https://duocode-sentinel.vercel.app/pitch>,
+go to slide 4, and read the orange card on the right. It must talk about a
+**masked discrepancy**. If it still says *"151 of 188 documents"*, the build has
+not landed and the take will contain a claim our own `docs/ADVERSARIAL.md`
+contradicts.
+
+### What that fix was, in case it comes up in questions
+
+The card said OCR digit confusion invents a defect on 151 of 188 documents, and
+credited the pinned test to it. Both wrong, and both wrong in the direction of
+making us look worse. `ADVERSARIAL.md` line 414 is a before-and-after table —
+`false discrepancies | 151 | 0` — so 151 is the figure *before* the digit guard
+landed in September; re-running the harness on this commit gives zero. And the
+strict `xfail` lives in `test_compare_wrap.py`, pinning something else: when two
+parties share an identical first line, the repair that rejoins a wrapped name
+can complete the notify party from the consignee's block above it, and report a
+real mismatch as a match. One masked discrepancy across 3,008 perturbed
+documents. That is the truer card, and a better one — a defect we hide is worse
+than one we miss.
 
 What had happened, for the record: Vercel's Hobby plan refuses to build a
 commit pushed by anyone who is not the project owner, the project sits under
