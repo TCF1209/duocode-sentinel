@@ -4,6 +4,60 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-21 — Claude session 7 · Phase 4, and the numbers re-measured
+
+**Done**
+- **Read the rules PDF against what we have.** The one finding that changes
+  work: the rules list a **GitHub README** as an acceptable Slide Deck /
+  Documentation link, and ours already carries all four required sections
+  (Technical Architecture, Implementation Details, Challenges Faced, Future
+  Roadmap). Phase 4's deck is therefore answered without building a deck, which
+  leaves the evening for the video — the only component with a time penalty.
+- **`docs/SUBMISSION.md`** — every Google Form field, written out. Project
+  description in a full and a short version, all four links, a pre-submit
+  checklist, and a table mapping each mandatory rule to where it is met.
+- **`docs/VIDEO_SCRIPT.md`** — the ≤5:00 script with per-section timings
+  (target 4:30, thirty seconds of margin), the pre-record checklist, a table
+  of every spoken number with its source, and a "do not say" list.
+- **Re-measured every number the video speaks**, on this commit against the
+  committed 520-email `bundle_data/`, rather than trusting an older doc: 520
+  emails · 220/125/75/60/40 by category · 45 MISMATCH · 21 NEEDS_REVIEW over
+  4 reasons · `decided_by_rule` 520, `llm_calls` 0 · 2.37 ms/email, 1.23 s
+  total · **124 document pairs** actually compared, counted from `report.json`,
+  which is the pitch's own figure and had never been checked · 574 tests, 0
+  failures via `--junitxml`. All consistent with `SCORING.md` and
+  `ADVERSARIAL.md` §8.
+- **Shipped the three uncommitted demo-recording changes** that were sitting in
+  the working tree (progress panel holds the final tally for 2.5 s; the pitch
+  remembers its slide across the trip to `/runs` and back), and fixed a real
+  lint error they revealed: `ModelTier` was declared *inside* `CaseReportView`'s
+  body, so it was a new component type every render. Lint and `tsc --noEmit`
+  are both clean again.
+
+**Next**
+- **Record the video.** It is the only mandatory component still missing, and
+  the roadmap's own gate on everything else.
+- The two unchecked **(T)** items that are still a human's job and always were:
+  spot-check 10 escalated cases by hand (Phase 2), and confirm the public URL
+  from a phone on mobile data (Phase 3c).
+
+**Careful**
+- **The inbox run will never show an `llm` badge, and that is correct.**
+  `decided_by` is `rule` for all 520 and the deployed API sets
+  `llm_runs_allowed: false` as a cost guard on whole-inbox runs. The model is
+  demonstrable on `/compare` with the toggle on — `POST /compare` is
+  deliberately not gated — and nowhere else. A video that promises "watch the
+  AI work" over `/runs` cannot deliver it.
+- **`data/` is not on this machine** — no `data/bundle`, no `data/_grader`. So
+  the 1.0000 score could **not** be re-run here; it is quoted from
+  `SCORING.md`, unchanged, and 142 of the 574 tests skip for the same reason.
+  Everything else above was measured fresh.
+- Slide 4 says 520 emails in **13 seconds**; a laptop does it in 1.2. Both are
+  true and the slide is explicit that 13 is the free-tier container. Say 13 in
+  the video, because 13 is what the screen will show.
+
+---
+
 ## 2026-09-21 — Claude session 6 · the evidence gate measured, and the OCR row closed
 
 **Done**

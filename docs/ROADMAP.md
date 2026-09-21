@@ -222,11 +222,20 @@ whole participant bundle. **(T) to decide.**
 
 ## Phase 4 — Submission assets · target: 21 Sep evening
 
-- [ ] **(T)** Slide deck: architecture, implementation, challenges, roadmap
-- [ ] **(T)** Demo video ≤ 5:00 — intro, problem, tech stack, live demo, impact
-      *(1 mark lost per 30s over — rehearse with a timer)*
+- [x] **(T)/(C)** Slide deck: architecture, implementation, challenges, roadmap
+      — **answered with the README rather than a deck.** The rules list "GitHub
+      README" beside Google Slides, PDF and Notion as an acceptable
+      documentation link, and all four required sections are already in it
+      (`docs/SUBMISSION.md` maps each one to its heading). Building a deck the
+      evening before would have competed with the video, which is the component
+      that carries a time penalty.
+- [~] **(T)** Demo video ≤ 5:00 — intro, problem, tech stack, live demo, impact
+      *(1 mark lost per 30s over — rehearse with a timer)*. Script, running
+      order, per-section timings and the pre-record checklist are in
+      [`VIDEO_SCRIPT.md`](VIDEO_SCRIPT.md); **recording it is what is left.**
 - [x] **(C)** `README.md` with setup instructions a judge can follow
-- [ ] **(T)** Project description for the Google Form
+- [x] **(C)** Project description for the Google Form — both a full and a short
+      version, with every other form field, in [`SUBMISSION.md`](SUBMISSION.md)
 - [x] **(C)** Dry run: fresh clone → follow the README → does it work? **Yes**,
       re-run 21 Sep against a clone with no `data/`, no API key and no network:
       `pip install -r` resolves clean, `run.py --data demo_data` gives 30
