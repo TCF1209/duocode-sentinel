@@ -1,7 +1,7 @@
 # Adversarial self-consistency — where the reader holds, and where it breaks
 
-> Regenerated 2026-09-19 against the current working tree, which is **525
-> passed and one `xfail`**. That xfail is not decoration: it is the live
+> Regenerated 2026-09-19 against the current working tree; the suite is now
+> **532 passed and one `xfail`**. That xfail is not decoration: it is the live
 > defect in §5.4, marked strict so that fixing it breaks the build rather
 > than passing quietly. A second strict xfail recorded the address-line hole
 > in §4.3 and did exactly that when the fix landed — it went red, the fix was
@@ -27,7 +27,15 @@ third party's model temperature is not a measurement.
 
 ## 1. The method, and why there is no answer key
 
-The harness never opens `data/_grader/`. It does not need to:
+This is a **metamorphic test suite**, and naming it that is not decoration —
+it is the standard answer to the problem we actually had. Metamorphic testing
+exists for the *oracle problem*: the case where you cannot write down the
+correct output but you can state a relation that must hold between the outputs
+of two related inputs. We had no answer key for a perturbed document and no
+way to produce one, which is exactly that case.
+
+The relation here is an **invariance**: a perturbation a human reads
+identically must not move the compared value.
 
 ```
 Extraction from the UNPERTURBED document is the reference.
@@ -35,12 +43,22 @@ Perturb the document so that a human would still read it identically.
 Extract again. Any field whose compared value moved is OUR failure.
 ```
 
+`control_rewrite` is the *identity* perturbation and therefore the suite's own
+tripwire: it parses and re-renders without changing a character, so a non-zero
+row there means the apparatus is broken and every other row is suspect. It is
+zero in both runs.
+
+The vocabulary is Chen's (1998) and the NLP formulation most people will
+recognise is CheckList's invariance tests (Ribeiro et al., ACL 2020,
+[arXiv:2005.04118](https://arxiv.org/abs/2005.04118)); the survey of the
+technique applied to LLM-based systems is METAL
+([arXiv:2312.06056](https://arxiv.org/abs/2312.06056)). We did not invent the
+method. What is ours is the relation we chose and the perturbation families in
+§2 that instantiate it for shipping documents.
+
 One half of each SI/BL pair is perturbed at a time and the other is staged
 verbatim, because corrupting both sides identically hides the damage — two
-documents misread the same way still agree with each other. `control_rewrite`
-parses and re-renders without changing a character; a non-zero row there means
-the apparatus is broken and every other row is suspect. It is zero in both
-runs.
+documents misread the same way still agree with each other.
 
 **Why this is a stronger instrument than scoring against labels.** The
 organisers' scorer answers "did we get this draw right". We already know the
@@ -83,6 +101,32 @@ reasons.
 The measured field reads are 1,281 of a possible 1,316 (188 × 7) because a
 field the baseline never extracted has no reference to move away from and is
 excluded by design — counting it would flatter or damn the harness at random.
+
+### The headline number
+
+Counts are what the tables below report, because they say *which* documents
+broke. The standard metric for a metamorphic suite is the **invariance pass
+rate** — the share of measured reads the relation held for — so here it is,
+over all 16 modes and 20,496 reads of the dev bundle:
+
+| | pass rate | silent wrong values | false discrepancies |
+|---|---:|---:|---:|
+| all 16 modes | **88.4%** | 1,056 | 151 of 3,008 documents |
+| excluding `ocr_confusions` | **93.8%** | 74 | **0** |
+
+Both rows belong here and the second is not a flattering cut. `ocr_confusions`
+is the one mode that genuinely alters the value — the document really does now
+read `NANT0NG` — so it is the one place where "the compared value moved" is
+partly the document's doing rather than ours, and no reader can separate the
+two without a second source (§5.1). Every other mode leaves a document a human
+reads identically, which is where the invariance is a clean test of us. Quote
+the 88.4% as the honest whole-suite figure and the 93.8% only with that
+sentence attached.
+
+Per mode, worst first: `ocr_confusions` 6.2%, `unseen_labels` 14.1%,
+`wrapped_value` 93.5%, and **100% on the other thirteen** — punctuation drift,
+case and spacing noise, reflowed values, reordered fields, and the identity
+control.
 
 ### Reading the columns
 

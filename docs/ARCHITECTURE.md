@@ -91,7 +91,22 @@ for.
 unreadable scan, a missing attachment and a wrong document type are all
 *normal* states of an ops inbox. Each produces a case with a reason and the
 source evidence, routed to a review queue where a person confirms or corrects
-it — and the corrected result flows back into the report.
+it — and the corrected result flows back into the report
+(`Store.effective_outcome`: the system's answer is immutable and the review
+sits beside it, so the queue clears without the audit trail being overwritten).
+
+**Its name in the literature is the reject option**, and the three-way outcome
+is older than any of this: Chow formalised abstention in 1970, and
+Fellegi–Sunter's match / non-match / **clerical review** (1969) is the same
+decision rule for the same task — deciding whether two records describe the
+same entity. Saying "we escalate instead of guessing" as though it were new
+would be wrong. What we changed is the *criterion* for the middle band. The
+classical rule puts a probability in a grey zone between two thresholds; ours
+is not a probability at all but a hard locatability test — §2.2's gate — so
+there is no threshold to mis-tune on a document type we have never seen. The
+cost of that choice is stated in `ADVERSARIAL.md`: a binary gate cannot express
+that a missing locator on `notify_party` matters more than one on
+`gross_weight_kg`.
 
 ## 3. Module map
 
