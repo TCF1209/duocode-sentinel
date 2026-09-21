@@ -648,13 +648,14 @@ function Proof() {
             What we haven&rsquo;t fixed
           </div>
           <p className="text-sm leading-relaxed">
-            OCR digit confusion (<span className="font-mono text-xs">NANTONG</span> read as{" "}
-            <span className="font-mono text-xs">NANT0NG</span>) makes a scanned document report a defect
-            the shipment does not have — 151 of 188 documents on the dev set.
+            When two parties share an identical first line, the repair that rejoins a name split
+            across two lines can complete the notify party from the <em>consignee&rsquo;s</em>{" "}
+            block above it — and report a real mismatch as a match. One masked discrepancy in
+            3,008 perturbed documents.
           </p>
           <p className="mt-auto border-t border-warn/30 pt-2 text-xs text-muted-foreground">
-            One of our 574 tests is pinned to fail on purpose until this is fixed — we cannot
-            quietly stop caring about it.
+            A defect we hide is worse than one we miss, so one of our 574 tests is pinned to
+            fail on purpose until this is fixed — we cannot quietly stop caring about it.
           </p>
         </motion.div>
       </motion.div>
