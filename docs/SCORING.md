@@ -136,8 +136,22 @@ Keep this table updated every time the number moves — it is the evidence for
 | 2026-09-19 | (wip) | 1.000 | 1.000 | 0.978 | 0.9891 | 100% | font-aware PDF split: false alarms gone, one field-set regression |
 | 2026-09-19 | `a6a09c2` | 1.000 | 1.000 | 1.000 | **1.0000** | 100% | row-based value column; regression fixed |
 | 2026-09-19 | (Phase 2 close) | 1.000 | 1.000 | 1.000 | **1.0000** | 100% | robustness fixes: alt separators, wrap repair, short-synonym fuzzy guard |
+| 2026-09-21 | (Phase 3 close) | 1.000 | 1.000 | 1.000 | **1.0000** | 100% | API review propagation + retry; nothing in `backend/sdoc/` changed |
 
-The last row is the other kind of entry worth keeping: behaviour changed in
+The Phase 3 row is here for completeness rather than news: the reviewer
+correction path and the retry endpoint live in `backend/api/` and the CLI that
+produces a graded submission never touches them. It was re-run rather than
+assumed, which is the point of the rule.
+
+An ablation of the evidence gate now sits in `ADVERSARIAL.md` §6, and it says
+something this table cannot: disabling the gate's vetoes does **not** move
+`final_score`, because Stage 3 excludes gold `NEEDS_REVIEW` emails and the
+end-to-end axis counts only gold defect emails. The effect lands on escalation
+recall — 1.000 with the blank veto, 0.750 without — which the organisers report
+and deliberately leave unweighted. Read the two together: this table says the
+gate costs nothing, §6 says what it is buying.
+
+The Phase 2 row is the other kind of entry worth keeping: behaviour changed in
 three places — `readers/rows.py`, `compare.py` and `labels.py` — and the number
 did not move at all. That is the expected result and not a disappointment. All
 three fixes address documents **this generator cannot produce**, so the dataset

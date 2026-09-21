@@ -289,7 +289,7 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
   forces **168 of 188** cases to a human on the rules alone and **2** with the
   model, while false discrepancies, silent wrong values and masked
   discrepancies all stay at **zero**. 178 calls, $0.2447. Written up as
-  `ADVERSARIAL.md` §7, which also spells out how to quote it honestly — the
+  `ADVERSARIAL.md` §8, which also spells out how to quote it honestly — the
   model does no work on the graded inbox.
 - Added `--llm` to the harness CLI. It refuses to write a report labelled
   `assisted` if no usable client is configured, because a file that misstates

@@ -203,7 +203,7 @@ is no answer key in it: the unperturbed reading is the reference.
 The rules answer 520 of 520 graded emails, which leaves a fair question: what
 is the model for? Measured, on the one perturbation where the rules are known
 to fail — a perfectly legible document that says `Sender of Goods` where our
-table says `Shipper` (`docs/ADVERSARIAL.md` §7).
+table says `Shipper` (`docs/ADVERSARIAL.md` §8).
 
 | `unseen_labels`, dev bundle, 188 documents | rules only | rules + model |
 |---|---:|---:|

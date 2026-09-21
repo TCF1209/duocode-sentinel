@@ -76,7 +76,7 @@ The review also found a hole the harness structurally *cannot* see: short synony
 a port. Fixed in `labels.py` via `_MIN_FUZZY_SYNONYM_CHARS`.
 
 - [x] **(C)** Measure what the model layer recovers, not just what the rules
-      lose — `adversarial.py --llm`, written up in `ADVERSARIAL.md` §7.
+      lose — `adversarial.py --llm`, written up in `ADVERSARIAL.md` §8.
 
 **Definition of done: met.** `docs/ADVERSARIAL.md` states, with measurements,
 what breaks the deterministic path, what the model layer recovers, what was
@@ -89,7 +89,7 @@ the model, while false discrepancies, silent wrong values and masked
 discrepancies all stay at **zero**. Recall bought by guessing would have shown
 up in that second clause; it did not. 178 calls, $0.2447.
 
-Say it carefully, though — §7 spells out why. The model does **no** work on the
+Say it carefully, though — §8 spells out why. The model does **no** work on the
 graded inbox (`decided_by` is `rule` for all 520), so this is "here is what
 happens when wording we have never seen arrives", never "our pipeline is 89% AI".
 
@@ -126,9 +126,17 @@ layer over data that already exists** — resist the urge to touch `backend/sdoc
 - [x] **(C)** the endpoints above, Pydantic models at the boundary only — built
       in `backend/api/`, all 8 live and tested (`backend/tests/test_api.py`,
       7/7 passing). See `docs/STATUS.md` 2026-09-19 session 4.
-- [~] **(C)** job handling: visible failures, retry a single case — a failed
-      *run* is visible (`status`/`error` on `GET /runs/{id}`); retrying **one
-      case** without re-running the inbox is not built yet.
+- [x] **(C)** job handling: visible failures, retry a single case. A failed
+      *run* carries `status`/`error`; `POST /cases/{id}/retry` re-processes one
+      email in place, re-reading it from disk so a re-sent attachment is picked
+      up. The case keeps its position and `processed` does not double-count.
+- [x] **(C)** A reviewer's correction reaches the report — the problem
+      statement's "then update the report". `Store.effective_outcome` combines
+      the system's answer with the review; the case list, the submission and
+      the case detail all read it, so a corrected case leaves the queue while
+      the system's own answer stays visible beside it as `system_status`.
+      Measured in `ADVERSARIAL.md` §6: removing the blank veto takes escalation
+      recall from 1.000 to 0.750.
 
 ### 3b · `web/` — Next.js dashboard
 

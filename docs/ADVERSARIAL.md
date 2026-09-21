@@ -306,7 +306,7 @@ the same single case, `email_145`, and §5.2 is about why it stays.
 refusing an address line. It refused most of them, not all, and this document
 asserted the guard without qualification until an adversarial read of it
 checked. The hole was found by reading the code against the claim, **not** by
-a harness row — for the reason in §6.
+a harness row — for the reason in §7.
 
 `resolve()` skips its fuzzy pass for a *query* shorter than eight characters,
 but nothing stopped a short *synonym* matching inside a long query. `POL`
@@ -376,7 +376,7 @@ exists for are precisely keys glued to other characters
 
 No row in §2 or §3 moved, and no row in §2 or §3 is evidence about this either
 way: the harness cannot construct the input that triggers it. That blind spot
-is the last item in §6, and it outlives this fix.
+is the last item in §7, and it outlives this fix.
 
 ---
 
@@ -522,7 +522,63 @@ builds the two-blocks-same-first-line shape the defect needs.
 
 ---
 
-## 6. Limits of the harness itself
+## 6. What the evidence gate is worth, measured
+
+§2.2 of `ARCHITECTURE.md` argues that a discrepancy nobody can trace is a
+discrepancy we invented. This turns the argument into a table by switching the
+gate's vetoes off one at a time and re-scoring the graded inbox.
+
+```bash
+.venv/Scripts/python.exe scripts/ablate_gate.py --out runs/gate_ablation.json
+```
+
+The gate is not one switch, so an on/off ablation would hide the interesting
+part behind three conventional intake checks. Missing attachment, unreadable
+file and wrong document type stay on in every arm — removing those measures the
+absence of a front door. What varies is the two vetoes that are actually
+arguable.
+
+| arm | defects | escalations | escalation recall | final |
+|---|---:|---:|---:|---:|
+| full (shipped) | 46 | 20 | **1.000** | 1.0000 |
+| no `untraceable_value` | 46 | 20 | 1.000 | 1.0000 |
+| no `blank_value` | 46 | 15 | **0.750** | 1.0000 |
+| neither | 46 | 15 | 0.750 | 1.0000 |
+
+**Read the `final` column before quoting it.** It does not move, and that is
+the scorer's populations rather than a verdict on the gate: Stage 3 excludes
+emails whose *gold* status is `NEEDS_REVIEW`, and the end-to-end axis counts
+only gold defect emails. A veto that stops us auto-deciding an uncertain case
+therefore cannot change either number by construction. The effect lands on
+escalation recall, which the organisers compute, report and deliberately leave
+out of the weighted total.
+
+**What the two arms actually say.**
+
+*The blank veto earns its place on this inbox.* Disabling it drops five cases
+out of the review queue — the five the documents leave as `???`, `TBA` or
+blank. They do not become false defects, because a blank cannot differ from
+anything; they become confident `OK`s on shipments nobody checked. Escalation
+recall 1.000 → 0.750.
+
+*The untraceable veto never fires here.* Identical numbers in both arms. Every
+value the extractor produced across all 520 emails could be located in its
+source document, which is what a rule-based extractor working from a resolved
+label should do — it holds a slice of a chunk of the document, so tracing it is
+near-tautological. The check is insurance, and on this data the premium is
+zero: it costs nothing to carry and catches nothing.
+
+That is the honest claim: **on the graded inbox the gate costs nothing and the
+distinctive half of it is untested.** It is written for the case where a value
+did *not* come from a resolved label — a model answer, a mangled scan, a layout
+the coordinate reader misread — and §5 is where documents of that kind are
+measured. A judge is entitled to ask for a case where it fires; the answer
+today is that we can construct one and have not found one in the wild, which is
+a weaker answer than we would like and the true one.
+
+---
+
+## 7. Limits of the harness itself
 
 **It perturbs `.txt` only.** 94 of the 220 `BL_COMPARISON` emails in the dev
 bundle — 94 of the 124 emails carrying two attachments. The other 30 pairs
@@ -583,7 +639,7 @@ else.
 
 ---
 
-## 7. What the model layer recovers
+## 8. What the model layer recovers
 
 Every number above is the **deterministic** pipeline. That was deliberate — a
 measuring instrument whose answer depends on a third party's model is not a

@@ -43,7 +43,7 @@ this inbox the cheap tier answers 520 of 520, so the cascade never escalates
 and the expensive tier costs nothing. That is the optimum for a cascade whose
 cheap tier is accurate on the distribution, not a sign the tier is dead — but
 the honest corollary is that insurance never claimed on is insurance never
-tested, which is why `ADVERSARIAL.md` §7 measures the tier on inputs the
+tested, which is why `ADVERSARIAL.md` §8 measures the tier on inputs the
 generator cannot produce and `/compare` lets a judge fire it by hand.
 
 ---
