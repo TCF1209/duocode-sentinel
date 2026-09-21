@@ -9,52 +9,18 @@ import { CaseReportView } from "@/components/case-report-view";
 import { ApiError, compareUploads, type CaseReport } from "@/lib/api";
 import { fadeUp, stagger, TAP, TAP_TRANSITION } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { SAMPLES, fetchSample } from "@/lib/samples";
 
 /**
  * docs/ROADMAP.md 3d: "the upload path is the demo, not a feature" — a judge
  * drops in their own SI and BL and watches the system work, live, on a
  * document it has never seen. No run, no stored case: just this one request.
+ *
+ * SAMPLES lives in lib/samples.ts, not here — /demo's guided walkthrough
+ * loads the exact same "unfamiliar-labels" pair for its AI step, and a
+ * second copy of this list would drift the moment either page's blurb
+ * changed.
  */
-/**
- * Three pairs a judge can load without preparing anything. They exist to make
- * the rule/model split visible rather than described: run each one with the
- * model off, then on, and watch which stage was actually doing the work.
- */
-const SAMPLES = [
-  {
-    id: "unfamiliar-labels",
-    title: "Labels we have never seen",
-    blurb:
-      "A human reads it at a glance — Sender of Goods, Deliver To, Loading Terminal. Our synonym table has none of them. Rules alone find nothing and escalate; the model reads it and the real defect surfaces.",
-    si: "unfamiliar-labels_SI.txt",
-    bl: "unfamiliar-labels_BL.txt",
-    needsModel: true,
-  },
-  {
-    id: "scanned",
-    title: "A scan with no text layer",
-    blurb:
-      "Image-only PDFs. No parser can read them. With the model on, the vision path transcribes both for the reviewer — and the case still escalates, because a transcript is evidence for a person, not grounds for a verdict.",
-    si: "scanned_SI.pdf",
-    bl: "scanned_BL.pdf",
-    needsModel: true,
-  },
-  {
-    id: "ordinary",
-    title: "Ordinary wording (the control)",
-    blurb:
-      "The same shipment, labelled the way our table expects. The rules answer it in milliseconds for nothing. This is the 100% of the graded inbox, and the reason the model is a fallback rather than the engine.",
-    si: "ordinary_SI.txt",
-    bl: "ordinary_BL.txt",
-    needsModel: false,
-  },
-] as const;
-
-async function fetchSample(name: string): Promise<File> {
-  const res = await fetch(`/samples/${name}`);
-  if (!res.ok) throw new Error(`could not load sample ${name}`);
-  return new File([await res.blob()], name);
-}
 
 export default function ComparePage() {
   const [si, setSi] = useState<File | null>(null);

@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, useScroll, useTransform, type MotionValue } from "motion/react";
-import { FileSearch, GitCompareArrows, Inbox, ShipCargo, UserCheck } from "lucide-react";
+import { ShipCargo } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listRuns, type Category, type RunStatus } from "@/lib/api";
-import { fadeUp, stagger, TAP, TAP_TRANSITION, useCountUp } from "@/lib/motion";
-import { cn } from "@/lib/utils";
+import { fadeUp, stagger, TAP, TAP_TRANSITION } from "@/lib/motion";
 import { CATEGORY_LABELS } from "@/lib/labels";
+import { PIPELINE_STEPS, type PipelineStep } from "@/lib/pipeline-steps";
+import { BigStat, MiniStat } from "@/components/big-stat";
 
 /** The landing page — what this is and how it works, nothing operational on it. */
 export default function HomePage() {
@@ -30,30 +31,7 @@ export default function HomePage() {
           </p>
         </div>
 
-        <PipelineRoadmap
-          steps={[
-            {
-              icon: Inbox,
-              step: "1. Classify",
-              text: "Sort the inbox — comparison requests, new SI requests, invoice queries, general mail, spam.",
-            },
-            {
-              icon: FileSearch,
-              step: "2. Extract",
-              text: "Pull the 7 shipment fields from the SI and BL attachments, however each one labels them.",
-            },
-            {
-              icon: GitCompareArrows,
-              step: "3. Compare",
-              text: "Show which fields agree and flag exactly which ones don't, side by side.",
-            },
-            {
-              icon: UserCheck,
-              step: "4. Escalate",
-              text: "Missing, unreadable, or unsure? Send it to a person with the reason, not a silent guess.",
-            },
-          ]}
-        />
+        <PipelineRoadmap steps={PIPELINE_STEPS} />
       </motion.div>
 
       <motion.div className="flex flex-col gap-4 border-t pt-6" variants={fadeUp}>
@@ -93,12 +71,6 @@ export default function HomePage() {
   );
 }
 
-interface Step {
-  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
-  step: string;
-  text: string;
-}
-
 /**
  * Apple-product-page grammar, played with what we actually have (no 3D
  * render, no film): a cargo ship stands in for the product, pinned in view
@@ -107,7 +79,7 @@ interface Step {
  * is abreast of it, then lights up and holds — the "text ignites as you
  * arrive" beat from the reference page.
  */
-function PipelineRoadmap({ steps }: { steps: Step[] }) {
+function PipelineRoadmap({ steps }: { steps: PipelineStep[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -152,7 +124,7 @@ function RoadmapStep({
   text,
   threshold,
   scrollYProgress,
-}: Step & { threshold: number; scrollYProgress: MotionValue<number> }) {
+}: PipelineStep & { threshold: number; scrollYProgress: MotionValue<number> }) {
   // Only the icon badge dims/lights with scroll — text stays fully readable
   // at every position. Dimming a paragraph already sitting on
   // text-muted-foreground compounds two contrast cuts at once, which is
@@ -254,47 +226,3 @@ function LiveStats() {
   );
 }
 
-const STAT_ACCENT = {
-  primary: "text-primary",
-  danger: "text-danger",
-  warn: "text-warn",
-} as const;
-
-function BigStat({
-  label,
-  value,
-  accent,
-  href,
-}: {
-  label: string;
-  value: number;
-  accent: keyof typeof STAT_ACCENT;
-  href: string;
-}) {
-  const display = useCountUp(value);
-  return (
-    <Link
-      href={href}
-      className="group rounded-xl border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-muted/40"
-    >
-      <div className={cn("font-heading text-4xl font-semibold tabular-nums", STAT_ACCENT[accent])}>{display}</div>
-      <div className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-        {label}
-        <span className="opacity-0 transition-opacity group-hover:opacity-100">→</span>
-      </div>
-    </Link>
-  );
-}
-
-function MiniStat({ label, value, href }: { label: string; value: number; href: string }) {
-  const display = useCountUp(value);
-  return (
-    <Link
-      href={href}
-      className="rounded-lg border bg-card px-3 py-2 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
-    >
-      <div className="font-heading text-lg font-semibold tabular-nums">{display}</div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-    </Link>
-  );
-}

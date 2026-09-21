@@ -13,6 +13,7 @@ const LINKS = [
   { href: "/", label: "Home" },
   { href: "/runs", label: "Runs" },
   { href: "/compare", label: "Compare" },
+  { href: "/demo", label: "Demo" },
 ];
 
 export function Nav() {
