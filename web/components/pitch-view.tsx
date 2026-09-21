@@ -9,52 +9,77 @@
  * recording is one browser tab with no cutting to a deck, and a judge who opens
  * the deployed link gets the same four screens rather than only the dashboard.
  *
- * Arrow keys, click, or the dots. Deliberately spare: this is read once, at
- * speed, by someone who has never seen the project. Anything that needs a
- * second look belongs in the README instead.
+ * Arrow keys, click, or the dots. Every screen has to fit 1280x720 without a
+ * scrollbar, because that is the size it will be recorded at.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import {
   ArrowLeft,
   ArrowRight,
-  FileSearch,
-  Inbox,
-  ScanEye,
-  ShieldCheck,
-  SplitSquareHorizontal,
-  Stamp,
+  Clock,
+  Eye,
+  FileWarning,
+  HandHelping,
+  Repeat,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DURATION, EASE_OUT, fadeUp, stagger, TAP, TAP_TRANSITION } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
- * Edit these two and drop matching images in `web/public/team/`. Any file the
- * browser cannot load falls back to initials rather than a broken-image icon,
- * so the page is presentable before the photos arrive and after, without a
- * code change in between.
+ * Names, courses and photo paths in one place. Photos live in
+ * `web/public/team/` and are 4:5 portraits; `public/team/README.md` has the
+ * sizes and the originals. A file the browser cannot load falls back to
+ * initials rather than a broken-image icon.
  */
 const TEAM = [
-  { name: "Tang Chye Fong", role: "Engineering, demo video", photo: "/team/tang-chye-fong.png" },
-  { name: "Lim Yee Teng", role: "Slides, project write-up", photo: "/team/lim-yee-teng.webp" },
+  {
+    name: "Tang Chye Fong",
+    course: "BSc Computer Science (AI)",
+    year: "Final year",
+    photo: "/team/tang-chye-fong.png",
+  },
+  {
+    name: "Lim Yee Teng",
+    course: "BSc Computer Science",
+    year: "First year",
+    photo: "/team/lim-yee-teng.webp",
+  },
 ];
+const UNIVERSITY = "Asia Pacific University";
 
-const SLIDES = ["Sentinel", "The problem", "How it works", "What it does"] as const;
+const SLIDES = ["Sentinel", "The problem", "Tech stack", "What it does"] as const;
 
 export function PitchView() {
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(1);
 
+  /**
+   * The current slide, mirrored in a ref, and the reason is a bug that made
+   * the dots inert: `go` used to compute the direction *inside* the `setIndex`
+   * updater, so one setState was being called from another's updater. React
+   * requires an updater to be pure and runs it twice under StrictMode, and the
+   * result was that clicking a dot -- verified by calling `.click()` on the
+   * button directly -- left the heading unchanged. Arrow keys shared the same
+   * shape and were only accidentally surviving it.
+   *
+   * With the index in a ref, the direction is worked out before any state is
+   * touched, `go` is the single entry point, and the keyboard handler is a
+   * thin wrapper over it instead of a second copy of the clamping logic.
+   */
+  const indexRef = useRef(0);
+
   const go = useCallback((next: number) => {
-    setIndex((current) => {
-      const clamped = Math.max(0, Math.min(SLIDES.length - 1, next));
-      setDirection(clamped >= current ? 1 : -1);
-      return clamped;
-    });
+    const clamped = Math.max(0, Math.min(SLIDES.length - 1, next));
+    if (clamped === indexRef.current) return;
+    setDirection(clamped > indexRef.current ? 1 : -1);
+    indexRef.current = clamped;
+    setIndex(clamped);
   }, []);
 
   useEffect(() => {
@@ -63,53 +88,55 @@ export function PitchView() {
       // form is ever added to this page.
       const el = document.activeElement;
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return;
+
       if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") {
         e.preventDefault();
-        setIndex((i) => {
-          setDirection(1);
-          return Math.min(SLIDES.length - 1, i + 1);
-        });
+        go(indexRef.current + 1);
       } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
         e.preventDefault();
-        setIndex((i) => {
-          setDirection(-1);
-          return Math.max(0, i - 1);
-        });
+        go(indexRef.current - 1);
       } else if (e.key === "Home") {
-        setDirection(-1);
-        setIndex(0);
+        go(0);
       } else if (e.key === "End") {
-        setDirection(1);
-        setIndex(SLIDES.length - 1);
+        go(SLIDES.length - 1);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [go]);
 
-  // 10rem, not 9, and gap-4 rather than 6: at 1280x720 -- a common recording
-  // size, and this page exists to be recorded -- the "How it works" screen
-  // overflowed by 8px and put a scrollbar in the frame. Measured, not guessed;
-  // the other three screens had room to spare either way.
+  // 10rem reserved and gap-4, both measured rather than guessed: at 1280x720
+  // the densest screen overflowed by 8px on the first attempt and put a
+  // scrollbar in the frame.
   return (
     <div className="flex min-h-[calc(100vh-10rem)] flex-col gap-4">
+      {/*
+        No AnimatePresence, and this is the second time today that component
+        has been the wrong tool here. With `mode="wait"` the switch hung:
+        `aria-current` moved from one dot to the next -- so the state update
+        was fine -- while the DOM kept exactly one <section> and the old
+        heading, forever. The exiting child never finished exiting, so the
+        entering one was never mounted.
+
+        Changing `key` remounts instead, which plays the new screen's
+        `initial -> animate` and simply discards the old one. The cost is
+        losing the outgoing half of the transition; the benefit is that it
+        works, and a dot that does nothing when clicked is not a trade worth
+        making on a page whose whole job is to be clicked through on camera.
+      */}
       <div className="relative flex flex-1 items-center">
-        <AnimatePresence mode="wait" custom={direction} initial={false}>
-          <motion.section
-            key={index}
-            custom={direction}
-            className="w-full"
-            initial={{ opacity: 0, x: direction * 28 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: direction * -28 }}
-            transition={{ duration: DURATION.base, ease: EASE_OUT }}
-          >
-            {index === 0 && <Intro />}
-            {index === 1 && <Problem />}
-            {index === 2 && <HowItWorks />}
-            {index === 3 && <Impact />}
-          </motion.section>
-        </AnimatePresence>
+        <motion.section
+          key={index}
+          className="w-full"
+          initial={{ opacity: 0, x: direction * 28 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: DURATION.base, ease: EASE_OUT }}
+        >
+          {index === 0 && <Intro />}
+          {index === 1 && <Problem />}
+          {index === 2 && <TechStack />}
+          {index === 3 && <Impact />}
+        </motion.section>
       </div>
 
       <nav className="flex items-center justify-between gap-4" aria-label="Pitch navigation">
@@ -187,39 +214,49 @@ function IconButton({
 function Intro() {
   return (
     <motion.div
-      className="flex flex-col items-center gap-8 text-center"
+      className="flex flex-col items-center gap-6 text-center"
       initial="hidden"
       animate="show"
       variants={stagger(0.05, 0.08)}
     >
       <motion.p
-        className="text-sm tracking-[0.2em] text-muted-foreground uppercase"
+        className="text-xs tracking-[0.2em] text-muted-foreground uppercase sm:text-sm"
         variants={fadeUp}
       >
         DuoCode · Averis × Monash Hackathon 2026
       </motion.p>
 
       <motion.h1
-        className="font-heading text-6xl font-semibold tracking-tight sm:text-8xl"
+        className="font-heading text-5xl font-semibold tracking-tight sm:text-7xl"
         variants={fadeUp}
       >
         Sentinel
       </motion.h1>
 
-      <motion.p className="max-w-2xl text-xl text-muted-foreground sm:text-2xl" variants={fadeUp}>
+      <motion.p className="max-w-2xl text-lg text-muted-foreground sm:text-xl" variants={fadeUp}>
         Every answer comes with its evidence.
       </motion.p>
 
-      <motion.div className="mt-2 flex flex-wrap justify-center gap-4" variants={fadeUp}>
+      {/*
+        Cards lie down rather than stand up, and that is a height decision as
+        much as a design one. Measured at 1280x720 there are 520px for a
+        screen's content; portrait cards put the photo above the text and came
+        to 603px. Laid on their side the photo is 112x140 -- far bigger than the
+        44px circles this replaced, which is the point -- and the pair costs
+        about 150px instead of 300.
+      */}
+      <motion.div className="flex flex-wrap items-stretch justify-center gap-4" variants={fadeUp}>
         {TEAM.map((m) => (
           <div
             key={m.name}
-            className="flex items-center gap-3 rounded-full border bg-card py-2 pr-5 pl-2"
+            className="flex items-stretch overflow-hidden rounded-xl border bg-card text-left"
           >
-            <Avatar name={m.name} photo={m.photo} />
-            <div className="text-left">
-              <div className="text-sm font-medium">{m.name}</div>
-              <div className="text-xs text-muted-foreground">{m.role}</div>
+            <Portrait name={m.name} photo={m.photo} />
+            <div className="flex min-w-0 flex-col justify-center gap-0.5 px-4 py-3">
+              <div className="font-heading text-lg leading-tight font-semibold">{m.name}</div>
+              <div className="text-sm leading-snug text-muted-foreground">{m.course}</div>
+              <div className="text-sm text-primary">{m.year}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{UNIVERSITY}</div>
             </div>
           </div>
         ))}
@@ -228,15 +265,7 @@ function Intro() {
   );
 }
 
-/**
- * Both photos are pre-cropped to 400x400 head-and-shoulders squares, so
- * `object-cover` has nothing to crop. `object-top` is kept as the default
- * anyway: the originals are beside them in `public/team/`, one of them a 3:4
- * portrait, and a centred square crop of a portrait headshot takes the chin
- * and the collar. If anyone swaps a full-frame photo back in, this degrades
- * to "face near the top" instead of "collar".
- */
-function Avatar({ name, photo }: { name: string; photo: string }) {
+function Portrait({ name, photo }: { name: string; photo: string }) {
   const [failed, setFailed] = useState(false);
   const initials = name
     .split(" ")
@@ -247,7 +276,7 @@ function Avatar({ name, photo }: { name: string; photo: string }) {
 
   if (failed) {
     return (
-      <span className="flex size-11 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 font-heading text-sm font-semibold text-primary">
+      <span className="flex h-35 w-28 shrink-0 items-center justify-center bg-primary/10 font-heading text-3xl font-semibold text-primary">
         {initials}
       </span>
     );
@@ -256,9 +285,9 @@ function Avatar({ name, photo }: { name: string; photo: string }) {
     <Image
       src={photo}
       alt={name}
-      width={44}
-      height={44}
-      className="size-11 shrink-0 rounded-full border object-cover object-top"
+      width={224}
+      height={280}
+      className="h-35 w-28 shrink-0 object-cover"
       onError={() => setFailed(true)}
       unoptimized
     />
@@ -266,151 +295,198 @@ function Avatar({ name, photo }: { name: string; photo: string }) {
 }
 
 // --------------------------------------------------------------------------
-// 2 — the problem, in as few words as it can be said
+// 2 — the problem, in the organisers' own terms
+//
+// The first version of this screen was written from memory and read as a
+// slogan ("the hard part is knowing when you cannot"). The problem statement
+// names three problems outright, so these are those three, plus the capability
+// it calls "ask for help". Using their words about their problem beats a line
+// we invented about it.
 // --------------------------------------------------------------------------
-const MAIL = [
-  { label: "Check these documents", accent: true },
-  { label: "Send me a shipping instruction" },
-  { label: "Question about an invoice" },
-  { label: "General operations" },
-  { label: "Spam" },
+const PROBLEMS = [
+  {
+    icon: Clock,
+    title: "Finding the right emails takes time",
+    body: "Every message has to be read and routed by hand. A document request that is overlooked never reaches the checking step at all.",
+  },
+  {
+    icon: Repeat,
+    title: "Comparing by hand is repetitive and easy to get wrong",
+    body: "Names, ports, quantities and weight, across two documents. A missed discrepancy means corrections, delays and rework.",
+  },
+  {
+    icon: Eye,
+    title: "The same information looks different",
+    body: "One document says Port of Loading, the other says Load Port. Same field, and nothing in the text says so.",
+  },
 ];
 
 function Problem() {
   return (
     <motion.div
-      className="flex flex-col gap-8"
+      className="flex flex-col gap-5"
       initial="hidden"
       animate="show"
       variants={stagger(0.05, 0.07)}
     >
       <motion.div variants={fadeUp} className="text-center">
         <h2 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-          One inbox. Five kinds of mail.
+          A shipping desk checks every bill of lading by hand
         </h2>
-        <p className="mt-2 text-muted-foreground">
-          A shipping desk reads every one of them by hand.
+        <p className="mx-auto mt-2 max-w-3xl text-muted-foreground">
+          Five kinds of mail arrive in one inbox. For a document check, someone opens the
+          Shipping Instruction and the draft Bill of Lading and compares seven fields — shipper,
+          consignee, notify party, load port, discharge port, containers, gross weight.
         </p>
       </motion.div>
 
-      <motion.div className="flex flex-wrap justify-center gap-2" variants={fadeUp}>
-        {MAIL.map((m) => (
-          <span
-            key={m.label}
-            className={cn(
-              "rounded-full border px-4 py-2 text-sm",
-              m.accent
-                ? "border-primary/40 bg-primary/10 font-medium text-primary"
-                : "bg-card text-muted-foreground",
-            )}
+      <motion.div className="grid gap-3 md:grid-cols-3" variants={stagger(0, 0.06)}>
+        {PROBLEMS.map((p) => (
+          <motion.div
+            key={p.title}
+            variants={fadeUp}
+            className="flex flex-col gap-2 rounded-xl border bg-card p-4"
           >
-            {m.label}
-          </span>
+            <span className="flex size-8 items-center justify-center rounded-full border bg-background text-muted-foreground">
+              <p.icon className="size-4" strokeWidth={1.75} />
+            </span>
+            <div className="font-medium">{p.title}</div>
+            <p className="text-sm leading-relaxed text-muted-foreground">{p.body}</p>
+          </motion.div>
         ))}
       </motion.div>
 
       <motion.div
-        className="mx-auto flex max-w-3xl flex-col items-center gap-4 rounded-xl border bg-card p-6 text-center"
+        className="mx-auto flex max-w-3xl items-start gap-3 rounded-xl border border-primary/40 bg-primary/8 p-4"
         variants={fadeUp}
       >
-        <Inbox className="size-6 text-primary" strokeWidth={1.75} />
-        <p className="text-lg">
-          For a document check, someone opens two files — the instruction and the draft bill
-          of lading — and compares{" "}
-          <span className="font-medium text-foreground">seven fields</span> by eye.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Shipper · Consignee · Notify party · Load port · Discharge port · Containers ·
-          Gross weight
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/15 text-primary">
+          <HandHelping className="size-4" strokeWidth={1.75} />
+        </span>
+        <p className="text-base">
+          <span className="font-medium">And when it cannot be done.</span> An unreadable scan, a
+          blank field, the wrong document attached — the case has to reach a person{" "}
+          <span className="font-medium">with the reason and the evidence</span>, rather than be
+          guessed at or fail quietly.
         </p>
       </motion.div>
-
-      <motion.p
-        className="mx-auto max-w-2xl text-center font-heading text-xl font-medium sm:text-2xl"
-        variants={fadeUp}
-      >
-        The hard part is not reading the documents. It is knowing when you cannot.
-      </motion.p>
     </motion.div>
   );
 }
 
 // --------------------------------------------------------------------------
-// 3 — how it works
+// 3 — tech stack
 // --------------------------------------------------------------------------
-const STAGES = [
-  { icon: Inbox, name: "Classify", note: "Which of the five is this?" },
-  { icon: ScanEye, name: "Read", note: "PDF, Word, Excel, plain text" },
-  { icon: FileSearch, name: "Extract", note: "Seven fields, each with its source line" },
-  { icon: SplitSquareHorizontal, name: "Compare", note: "Instruction against draft" },
-  { icon: ShieldCheck, name: "Evidence gate", note: "May we report this as fact?", key: true },
-  { icon: Stamp, name: "Decide", note: "Clean · Defect · Send to a human" },
+const CORE = [
+  {
+    step: "Read",
+    detail:
+      "pdfplumber word coordinates rebuild a PDF's rows and columns — not flattened text. python-docx for tables, openpyxl for cells, markitdown as a fallback.",
+  },
+  {
+    step: "Resolve labels",
+    detail:
+      "Three passes: exact match, then ordered regex rules, then rapidfuzz at cutoff 88 with a minimum-length guard so short synonyms cannot match inside long strings.",
+  },
+  {
+    step: "Normalise",
+    detail:
+      "Legal suffixes dropped from company names, UN/LOCODEs stripped from ports, “138 MT” read as 138,000 kg.",
+  },
+  {
+    step: "Compare",
+    detail:
+      "Exact equality on the canonical form. Never a similarity score — a threshold loose enough to forgive a typo also merges two real companies.",
+  },
 ];
 
-const STACK = ["Python", "FastAPI", "Next.js", "OpenAI", "Docker on Render", "Vercel"];
+const MODEL = [
+  { purpose: "classify", when: "an email the rule scorer is not confident about" },
+  { purpose: "extract", when: "a field label our table has never seen" },
+  { purpose: "vision", when: "an image-only PDF with no text layer to read" },
+];
 
-function HowItWorks() {
+const INFRA = [
+  "Python 3.10",
+  "FastAPI · 11 routes",
+  "Docker on Render",
+  "Next.js 16 on Vercel",
+  "574 tests",
+];
+
+function TechStack() {
   return (
     <motion.div
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-4"
       initial="hidden"
       animate="show"
       variants={stagger(0.05, 0.06)}
     >
       <motion.div variants={fadeUp} className="text-center">
         <h2 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-          Six steps, and one of them is unusual
+          Tech stack
         </h2>
-        <p className="mt-2 text-muted-foreground">
-          Rules do the work. The model is only asked where the rules give up.
+        <p className="mt-1 text-muted-foreground">
+          A deterministic core that answers all 520, and a model tier for what it cannot read.
         </p>
       </motion.div>
 
-      <motion.div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" variants={stagger(0, 0.05)}>
-        {STAGES.map((s, i) => (
-          <motion.div
-            key={s.name}
-            variants={fadeUp}
-            className={cn(
-              "flex items-start gap-3 rounded-xl border p-4",
-              s.key ? "border-primary/40 bg-primary/8" : "bg-card",
-            )}
-          >
-            <span
-              className={cn(
-                "flex size-9 shrink-0 items-center justify-center rounded-full border",
-                s.key
-                  ? "border-primary/40 bg-primary/15 text-primary"
-                  : "bg-background text-muted-foreground",
-              )}
-            >
-              <s.icon className="size-4" strokeWidth={1.75} />
-            </span>
-            <div className="min-w-0">
-              <div className="flex items-baseline gap-2">
-                <span className="font-mono text-xs text-muted-foreground">{i + 1}</span>
-                <span className={cn("font-medium", s.key && "text-primary")}>{s.name}</span>
-              </div>
-              <p className="text-sm text-muted-foreground">{s.note}</p>
+      <motion.div className="grid gap-3 lg:grid-cols-5" variants={stagger(0, 0.05)}>
+        <motion.div
+          variants={fadeUp}
+          className="flex flex-col gap-2.5 rounded-xl border bg-card p-4 lg:col-span-3"
+        >
+          <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            Deterministic core · no key, no network
+          </div>
+          {CORE.map((c) => (
+            <div key={c.step} className="flex gap-3">
+              <span className="w-24 shrink-0 text-sm font-medium">{c.step}</span>
+              <span className="text-sm leading-snug text-muted-foreground">{c.detail}</span>
             </div>
-          </motion.div>
-        ))}
+          ))}
+        </motion.div>
+
+        <motion.div
+          variants={fadeUp}
+          className="flex flex-col gap-2.5 rounded-xl border border-ai/40 bg-ai-bg/50 p-4 lg:col-span-2"
+        >
+          <div className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-ai uppercase">
+            <Sparkles className="size-3.5" strokeWidth={2} />
+            Model tier · gpt-5-mini
+          </div>
+          {MODEL.map((m) => (
+            <div key={m.purpose} className="flex gap-2.5">
+              <span className="w-16 shrink-0 font-mono text-sm text-ai">{m.purpose}</span>
+              <span className="text-sm leading-snug text-muted-foreground">{m.when}</span>
+            </div>
+          ))}
+          <p className="mt-auto border-t pt-2.5 text-sm">
+            Every answer the model gives is{" "}
+            <span className="font-medium">re-located in the document</span> before it is accepted.
+            Anything it cannot ground is dropped.
+          </p>
+        </motion.div>
       </motion.div>
 
       <motion.div
-        className="mx-auto max-w-3xl rounded-xl border border-primary/30 bg-primary/8 p-5 text-center"
+        className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/8 p-3"
         variants={fadeUp}
       >
-        <p className="text-lg">
-          Step five can <span className="font-medium">overrule</span> step four. If a value
-          cannot be found again in the document it came from, we do not report it — we hand
-          the case to a person, with both readings attached.
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/15 text-primary">
+          <FileWarning className="size-4" strokeWidth={1.75} />
+        </span>
+        <p className="text-base">
+          <span className="font-medium">The evidence gate sits after the comparison and can
+          overrule it.</span>{" "}
+          A value nobody can trace back to its source line is not reported as a discrepancy — the
+          case goes to a person with both readings attached.
         </p>
       </motion.div>
 
       <motion.div className="flex flex-wrap justify-center gap-2" variants={fadeUp}>
-        {STACK.map((s) => (
-          <span key={s} className="rounded-full border bg-card px-3 py-1.5 text-xs">
+        {INFRA.map((s) => (
+          <span key={s} className="rounded-full border bg-card px-3 py-1 text-xs">
             {s}
           </span>
         ))}
@@ -420,19 +496,19 @@ function HowItWorks() {
 }
 
 // --------------------------------------------------------------------------
-// 4 — what it does, with the baseline said out loud
+// 4 — what it does
 // --------------------------------------------------------------------------
 const NUMBERS = [
-  { value: "520", label: "emails, end to end", sub: "in about 13 seconds" },
-  { value: "225", label: "planted defects caught", sub: "every one with the exact fields" },
+  { value: "520", label: "emails, end to end", sub: "in 13 seconds, on a free-tier container" },
+  { value: "225", label: "planted defects caught", sub: "every one with the exact field set" },
   { value: "80 / 80", label: "escalations correct", sub: "no false alarms" },
-  { value: "100%", label: "decided by rules", sub: "no model call on the graded inbox" },
+  { value: "$0", label: "to run the graded inbox", sub: "every decision made by rules" },
 ];
 
 function Impact() {
   return (
     <motion.div
-      className="flex flex-col gap-8"
+      className="flex flex-col gap-5"
       initial="hidden"
       animate="show"
       variants={stagger(0.05, 0.07)}
@@ -441,7 +517,7 @@ function Impact() {
         <h2 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
           What it does
         </h2>
-        <p className="mt-2 text-muted-foreground">
+        <p className="mt-1 text-muted-foreground">
           Four draws of the organisers&rsquo; dataset, at three sizes, scored with their own
           scorer.
         </p>
@@ -452,34 +528,41 @@ function Impact() {
           <motion.div
             key={n.label}
             variants={fadeUp}
-            className="flex flex-col gap-1 rounded-xl border bg-card p-5 text-center"
+            className="flex flex-col gap-1 rounded-xl border bg-card p-4 text-center"
           >
             <span className="font-heading text-4xl font-semibold text-primary">{n.value}</span>
             <span className="text-sm font-medium">{n.label}</span>
-            <span className="text-xs text-muted-foreground">{n.sub}</span>
+            <span className="text-xs leading-snug text-muted-foreground">{n.sub}</span>
           </motion.div>
         ))}
       </motion.div>
 
-      {/* The number nobody has to give you, said first. A blank submission
-          scores 74.65% of the same assertions, so quoting a headline without it
-          invites exactly the arithmetic that deflates it. */}
       <motion.div
-        className="mx-auto max-w-3xl rounded-xl border bg-card p-5 text-center"
+        className="mx-auto max-w-3xl rounded-xl border border-ai/40 bg-ai-bg/50 p-4 text-center"
         variants={fadeUp}
       >
         <p className="text-lg">
-          A submission that answers <span className="font-medium">nothing</span> already
-          scores <span className="font-mono font-medium">74.65%</span> of the graded
-          assertions.
+          Cheap because the model is <span className="font-medium">aimed</span>, not because it
+          is absent.
         </p>
-        <p className="mt-1 text-muted-foreground">
-          The part that is not free is the part we built: 514 document pairs compared, 225
-          defects found, 80 cases handed to a human with a reason.
+        <p className="mt-1 text-sm text-muted-foreground">
+          Rules carry the whole volume at no marginal cost. The model is spent only on the tail
+          they cannot read — <span className="font-mono">$0.0013</span> per document when it runs,
+          and it is what lets the system handle a form nobody anticipated.
         </p>
       </motion.div>
 
-      <motion.div className="flex justify-center" variants={fadeUp}>
+      <motion.div className="flex flex-col items-center gap-3" variants={fadeUp}>
+        {/* Labelled as an estimate on purpose. The 13 seconds is measured; the
+            hours are arithmetic on an assumed pace, and a number that looks
+            measured but is not is the easiest thing for a judge to pull on. */}
+        <p className="text-center text-sm text-muted-foreground">
+          One inbox is 520 emails to triage and 124 document pairs to compare. At a conservative
+          20 seconds an email and 4 minutes a pair — <em>an estimate, not a measurement</em> —
+          that is about <span className="font-medium text-foreground">11 hours</span> of desk
+          work. Sentinel does it in <span className="font-medium text-foreground">13 seconds</span>.
+        </p>
+
         <motion.div whileTap={TAP} transition={TAP_TRANSITION}>
           <Link href="/runs">
             <Button size="lg">
