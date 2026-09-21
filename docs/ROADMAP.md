@@ -19,7 +19,14 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · **(C)** = Claude sessio
 - [x] **(C)** Readers: `rows.py`, `plain.py`, `office.py`, `pdf.py`
 - [x] **(C)** Docs: `ARCHITECTURE.md`, `DATA_NOTES.md`, `SCORING.md`, this file
 - [ ] **(T)** Read `DATA_NOTES.md` end to end — it is the shared mental model
-- [ ] **(T)** Decide the project name (placeholder: *Sentinel*) and lock it before the slides
+- [x] **(T)** **Project name locked: Sentinel.** Tagline for the deck and the
+      video: ***Sentinel — every answer comes with its evidence.*** Considered
+      and rejected: *Flagship*, which names a status rather than a behaviour and
+      would have cost a rename across 30 files, 96 references, 9 `SENTINEL_*`
+      environment variables and — the part that actually mattered — both
+      deployed URLs, the day before submission. *Sentinel* also happens to be
+      the accurate word: this system's whole claim is that it stands watch and
+      says what it cannot read, rather than answering everything.
 
 ## Phase 1 — Measurable baseline · **COMPLETE** (19 Sep)
 

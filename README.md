@@ -1,5 +1,7 @@
 # Sentinel — shipping document verification
 
+> **Every answer comes with its evidence.**
+
 *From email inbox to discrepancy report.*
 Built by **DuoCode** for the Averis × Monash Hackathon 2026.
 
