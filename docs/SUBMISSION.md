@@ -6,14 +6,43 @@
 Open this file on submission morning and copy from it. Nothing here needs to be
 composed on the day.
 
+## How the form is actually laid out
+
+Read from the live form, not from the rules PDF — the two differ in one way
+that matters. **The description field caps at 150 words, which the PDF never
+says.**
+
+It is four pages, Google sign-in required, and the signed-in account's address
+is recorded with the response.
+
+| Page | Asks for |
+|---|---|
+| 1 | Intro, and confirmation of the account's email |
+| 2 | Team Name\* · Team Representative Full Name\* · WhatsApp/Phone\* (with country code) · Representative Email\* |
+| 3 | Project Name\* · Project Description\* (**≤150 words**) · GitHub URL\* · Live Prototype URL\* · Slide Deck/Documentation URL\* · Video Demo URL\* |
+| 4 | not reachable without filling page 3 — expect consent and the resume the rules mention |
+
+\* = required. Page 3 will not advance until every field on it is filled, so
+**the video link must exist before the first submit** — there is no submitting
+early and adding it later.
+
+Two things the form says that the rules PDF does not:
+
+- **Only one team member should submit, on behalf of the whole team.** Agree who
+  before the morning, so two of you do not file two entries.
+- **You may edit your submission before the deadline.** That is the safety net
+  for a mistyped link, not a licence to file a placeholder video URL.
+
 ---
 
 ## First part — team details
 
 | Field | Answer |
 |---|---|
-| **1. Team name** | `DuoCode` |
-| **2. Team representative** | name / email / contact number — *fill in on the day* |
+| **Team Name** | `DuoCode` |
+| **Team Representative Full Name** | *fill in on the day* |
+| **WhatsApp / Phone Number** | *with country code, e.g. `+60…`* |
+| **Team Representative Email Address** | *fill in on the day* |
 
 ## Second part — project details
 
@@ -25,72 +54,32 @@ Sentinel
 
 ### 2. Project Description / Summary
 
-The brief asks for *"a brief summary of the project, including its name, purpose
-and problem statement."* All three are in the first three paragraphs below.
+**The form caps this at 150 words** — a limit that is nowhere in the rules PDF,
+only in the field's own help text. The version below is **147**. Count again if
+you edit it.
 
-The capitalised labels are deliberate: the form field is plain text with no
-bold, and a judge reading a hundred of these skims for structure. The last two
-paragraphs exist because **AI as a key component** and **meaningful use of cloud
-infrastructure** are separately mandatory under the rules — a judge should not
-have to open the repository to find out whether we met them.
+That cap is the whole design constraint. At 150 words there is no room to
+restate the problem the judges wrote themselves, so this leads with what the
+system does at a scale a reader can picture, then spends the middle on the two
+things no other entry will have, and closes on the measurement. AI and cloud
+each get a sentence because both are separately mandatory under the rules and a
+judge should not have to open the repository to check them.
 
 ```
 Sentinel — every answer comes with its evidence.
 
-THE PROBLEM. A shipping operations team receives everything in one inbox:
-requests to check documents, requests for new shipping instructions, invoice
-queries, operational updates and spam. For a document check, someone opens the
-Shipping Instruction against the draft Bill of Lading and compares seven fields
-— shipper, consignee, notify party, port of loading, port of discharge,
-container count and gross weight — before the draft is finalised. Finding the
-right emails is manual, comparing by hand is repetitive, the same field is
-printed under a different name on each document, and a missed discrepancy
-becomes a correction, a delay and rework.
+A shipping desk compares each Shipping Instruction against its draft Bill of Lading across seven fields, inside an inbox that also carries invoice queries and spam. Sentinel reads that inbox end to end: 520 emails triaged and 124 document pairs compared in 13 seconds.
 
-WHAT IT DOES. Sentinel reads that inbox end to end. It classifies every email
-into five categories, compares each SI/BL pair across the seven fields, and
-reports the exact set that disagree. Every value it extracts carries a pointer
-back to the line it was read from, so a reviewer can confirm a flag in seconds
-instead of reopening the source document.
+Two things are unusual. Every extracted value carries the source line it came from. And an evidence gate runs after the comparison and can overrule it — anything untraceable, blank or OCR-damaged becomes a reviewable case with its reason, never a reported discrepancy.
 
-AND WHEN IT CANNOT. A missing attachment, an unreadable scan, a blank required
-value or the wrong document type becomes a case for a human with the reason and
-the evidence attached — never a confident guess. An evidence gate sits after the
-comparison and can overrule it: a value that cannot be traced back to a real
-line in the document is escalated rather than reported as a discrepancy.
+The model tier reads what rules cannot: ambiguous emails, labels never seen before, scanned PDFs. Nothing it returns is adopted until re-located in the source. FastAPI on Render, Next.js on Vercel.
 
-AI. Deterministic readers answer all 520 emails of the graded inbox at no
-marginal cost. A model tier is spent only on the tail those rules cannot read —
-classifying an ambiguous email, reading a field label the table has never seen,
-and a vision path for an image-only PDF with no text layer. Nothing the model
-returns is adopted until it has been re-located in the source document.
-
-CLOUD. A FastAPI service in a Docker container on Render, and a Next.js 16
-dashboard on Vercel, both deployed from configuration committed in the
-repository rather than typed into a dashboard.
-
-RESULT. 1.0000 on the organisers' own scorer across four draws of their
-generator at three sizes: 225 planted defects, every one caught with the exact
-field set, no false alarms, and all 80 escalations correct. 574 tests.
+1.0000 on the organisers' own scorer — dev set plus three held-out seeds never developed against. 225 defects caught, 80/80 escalations correct, 574 tests.
 ```
 
-If the field turns out to be a short-answer box, use this instead:
-
-```
-Sentinel turns a shipping operations inbox into a per-email decision — and every
-decision it is not sure about goes to a human with the evidence attached.
-
-It classifies each email into five categories, compares each Shipping Instruction
-against its draft Bill of Lading across seven fields, and reports the exact set
-that disagree. Every extracted value carries a pointer back to the line it was
-read from, so a reviewer can confirm a flag in seconds. A missing attachment, an
-unreadable scan or a blank field becomes a reviewable case with a reason — never a
-confident guess.
-
-Deterministic readers answer all 520 emails at no marginal cost; an LLM tier is
-spent only on what the rules cannot read. Scored 1.0000 on the organisers' own
-scorer across four draws of their generator. FastAPI on Render, Next.js on Vercel.
-```
+**Do not reorder it to put the problem first.** Problem Statement Understanding
+is 10 points; Working Core Prototype is 25 and Technology Integration is 15.
+The first sentence a judge reads should be doing work the other fields cannot.
 
 ### 3. GitHub Repository Link
 
