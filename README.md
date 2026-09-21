@@ -307,10 +307,25 @@ after one is start a run again.
 .venv/Scripts/python.exe scripts/evaluate.py
 .venv/Scripts/python.exe scripts/evaluate.py --data data/holdout --out runs/holdout
 
-# where the reader holds and where it breaks — no answer key involved
-.venv/Scripts/python.exe backend/tools/adversarial.py --data data/bundle \
+# where the reader holds and where it breaks — no answer key involved.
+# bundle_data/ is committed, so this one needs nothing you do not already have.
+.venv/Scripts/python.exe backend/tools/adversarial.py --data bundle_data \
     --out runs/adversarial.json
 ```
+
+**The last command is the one to run if you only run one.** It needs no
+dataset download, no API key and no network: `bundle_data/` is the participant
+bundle, committed — 520 emails and 251 attachments — and the harness has no
+answer key by construction, because the reference is the unperturbed reading of
+the same document. Re-run on this commit it reports 16 modes over **3,008
+perturbed documents and 20,496 field reads**: thirteen modes at zero movement
+including the `control_rewrite` sanity row, `ocr_confusions` at **0** silent
+wrong values and **0** invented defects, unfamiliar wording escalating **168**
+documents rather than guessing at them, and `wrapped_value` still carrying its
+74 short reads and the **1** masked discrepancy that
+[§5.4](docs/ADVERSARIAL.md) pins with a strict `xfail`. Those last two are in
+the output on purpose. A harness that only prints zeroes is not measuring
+anything.
 
 ---
 
