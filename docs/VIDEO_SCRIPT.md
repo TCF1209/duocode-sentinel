@@ -1,13 +1,24 @@
-# Demo video — script and running order
+# Demo video — the reasoning behind the script
 
-**Hard limit 5:00. One mark is deducted per 30 seconds over, so the target is
-now ~4:50, maybe a few seconds past it** — a new slide (below) pushed the old
-4:30 target out by the length of one more beat, and a since-added callback
-line on slide 3 costs another few seconds on top of that. The margin for a
-sentence that runs long is down to five or ten seconds, not thirty.
-**Rehearse this one with a timer** and, if it runs long, the tech-stack
-narration (slide 3) is the one with room to tighten — it is prose describing
-what is already on screen, not a number that needs to be said aloud.
+> **Read this once, before the first take. Do not record from it.**
+>
+> [`VIDEO_NARRATION.md`](VIDEO_NARRATION.md) is the one to have open while
+> talking to the camera, and **where the two disagree on wording or timing, it
+> wins** — its running order was rebuilt against the judges' rubric and its
+> section marks are computed from their own word counts, adding up to 4:46
+> with 14 seconds of margin. The version below is the earlier cut, kept because
+> everything *around* the words is still the useful part: where every number
+> comes from, and what not to say.
+>
+> The earlier cut also did not fit. Counted afterwards, it was 866 spoken words
+> — 5:46 at a normal pace, before a single click, page load or the
+> thirteen-second run was added. That is why the narration was re-timed rather
+> than re-worded.
+
+**Hard limit 5:00. One mark is deducted per 30 seconds over.** If a take runs
+long, the tech-stack narration (slide 3) is the one with room to tighten — it
+is prose describing what is already on screen, not a number that needs to be
+said aloud. **Rehearse with a timer.**
 
 The brief names five parts and this is their order — *Quick intro · The problem ·
 Tech stack · Live demo · Impact*. Slides 1–5 of `/pitch` are those first three
@@ -182,7 +193,7 @@ copied from an older doc.
 | 574 tests | `pytest --junitxml`: 574 tests, 0 failures, 0 errors |
 | 1.0000 · 225 defects · 80/80 escalations | `docs/SCORING.md` §4.1 — 46+57+31+91 across four seeds |
 | 168 forced to a human -> 2, with the model; 0 false discrepancies / silent wrong values / masked discrepancies both ways | `docs/ADVERSARIAL.md` §7, `unseen_labels` on the dev bundle |
-| 151 of 188 dev documents misread by OCR digit confusion, pinned by a strict `xfail` | `docs/ADVERSARIAL.md` §5.1, §5.4 |
+| 1 masked discrepancy across 3,008 perturbed documents — the truncation repair completing a name from the wrong block — pinned by a strict `xfail` | `docs/ADVERSARIAL.md` §5.4 and `backend/tests/test_compare_wrap.py`. **This row used to say "151 of 188 documents misread by OCR digit confusion".** Both halves were wrong: `ADVERSARIAL.md` line 414 is a before-and-after table reading `false discrepancies │ 151 │ 0`, so 151 is the figure from before the digit guard landed, and re-running the harness on this commit gives zero; and the `xfail` is in `test_compare_wrap.py`, pinning the wrapped-value repair rather than OCR. Slide 4 carried the same error and was corrected in `b261600`. |
 | $0.0013 per document, 178 calls / $0.2447 | `docs/ADVERSARIAL.md` §8 |
 | 13 seconds | the deployed free-tier container. **A laptop does it in 1.2 s** (2.37 ms/email) — say 13, because 13 is what the screen will show. |
 | ~11 hours of desk work | **an estimate, not a measurement** — 20 s an email, 4 min a pair. Say "at a conservative estimate" out loud, as slide 4 does in print. |
