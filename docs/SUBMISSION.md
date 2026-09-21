@@ -58,23 +58,36 @@ Sentinel
 only in the field's own help text. The version below is **147**. Count again if
 you edit it.
 
-That cap is the whole design constraint. At 150 words there is no room to
-restate the problem the judges wrote themselves, so this leads with what the
-system does at a scale a reader can picture, then spends the middle on the two
-things no other entry will have, and closes on the measurement. AI and cloud
-each get a sentence because both are separately mandatory under the rules and a
-judge should not have to open the repository to check them.
+That cap is the whole design constraint, and it forces a decision about what
+150 words are *for*. They are not for restating the problem the judges wrote
+themselves — Problem Statement Understanding is 10 points, against 25 for
+Working Core Prototype and 15 for Technology Integration. So the problem gets
+one clause, and the budget goes on the four things no other entry can copy:
+
+1. **The rule, stated as a rule** — *never report what it cannot prove*. Shorter
+   and harder than "we escalate uncertain cases", which is merely the thing the
+   problem statement asked every team to do.
+2. **The model held to that same rule.** "Nothing it returns is used until found
+   again in the document" is an anti-hallucination mechanism, and it reads as
+   engineering rather than as the obligatory sentence about using AI.
+3. **That we attacked our own system** with 16 kinds of damage and no answer
+   key, and published what it found: 982 silently wrong values, now zero. Almost
+   nothing in a hackathon field will have been adversarially tested by its own
+   authors, and the number is not fakeable without the work.
+4. **A maximum score on the organisers' own scorer**, re-proved on three draws
+   from *their* generator at seeds we never saw. Naming their generator matters:
+   "three datasets we generated" reads as marking our own homework.
 
 ```
 Sentinel — every answer comes with its evidence.
 
-A shipping desk compares each Shipping Instruction against its draft Bill of Lading across seven fields, inside an inbox that also carries invoice queries and spam. Sentinel reads that inbox end to end: 520 emails triaged and 124 document pairs compared in 13 seconds.
+Checking a draft Bill of Lading against its Shipping Instruction means seven fields, by hand. Sentinel does a whole inbox: 520 emails, 124 document pairs, 13 seconds.
 
-Two things are unusual. Every extracted value carries the source line it came from. And an evidence gate runs after the comparison and can overrule it — anything untraceable, blank or OCR-damaged becomes a reviewable case with its reason, never a reported discrepancy.
+Its rule: never report what it cannot prove. Every value carries the source line it came from, and a gate can overrule the comparison — anything untraceable, blank or damaged goes to a person, not into the report. The model — ambiguous emails, unseen labels, scanned PDFs — obeys it too: nothing it returns is used until found again in the document.
 
-The model tier reads what rules cannot: ambiguous emails, labels never seen before, scanned PDFs. Nothing it returns is adopted until re-located in the source. FastAPI on Render, Next.js on Vercel.
+Then we attacked it ourselves: 16 kinds of document damage, no answer key. The worst exposed 982 silently wrong values, now zero.
 
-1.0000 on the organisers' own scorer — dev set plus three held-out seeds never developed against. 225 defects caught, 80/80 escalations correct, 574 tests.
+A maximum 1.0000 on the organisers' own scorer — on their dataset, and on three more from their generator at seeds we never saw. 574 tests. Live: FastAPI on Render, Next.js on Vercel.
 ```
 
 **Do not reorder it to put the problem first.** Problem Statement Understanding
