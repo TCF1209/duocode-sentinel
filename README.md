@@ -38,8 +38,23 @@ of being reported as a discrepancy.*
 | **Cost** | **100% of decisions are made by rules.** `decided_by` is `"rule"` for all 520 emails; no model call decides anything on the graded inbox. |
 
 Every number above was re-measured on the current commit before this file was
-written — the commands are in [Verify it yourself](#verify-it-yourself). What
-those numbers do **not** prove is in
+written — the commands are in [Verify it yourself](#verify-it-yourself).
+
+The accuracy row is the only one a reader cannot reproduce without the
+organisers' dataset, so here is its provenance instead of asking for trust. It
+was measured at `4c852a7`, and **no commit since has touched
+`backend/sdoc/`** — the pipeline the score is a function of, and the library
+both the CLI and the API call. One command checks that:
+
+```bash
+git log 4c852a7..HEAD -- backend/sdoc/     # empty
+```
+
+Everything committed after that point is the API surface, the dashboard, the
+demo inbox and these documents. The score cannot have moved, because nothing
+that computes it has.
+
+What those numbers do **not** prove is in
 [What the evidence shows](#what-the-evidence-shows-and-what-it-does-not), and
 what breaks the system is measured in
 [`docs/ADVERSARIAL.md`](docs/ADVERSARIAL.md).
