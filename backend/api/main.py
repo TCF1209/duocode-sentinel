@@ -37,7 +37,7 @@ from .models import (  # noqa: E402
     RunCreateResponse,
     RunStatusResponse,
 )
-from .pipeline_runner import start_run  # noqa: E402
+from .pipeline_runner import retry_case, start_run  # noqa: E402
 from .store import store  # noqa: E402
 
 DEFAULT_DATA_ROOT = Path(os.environ.get("SENTINEL_DATA_ROOT", str(BACKEND.parent / "data" / "bundle")))
@@ -203,9 +203,14 @@ def list_cases(
     _run_or_404(run_id)
     out = []
     for c in store.list_cases(run_id):
+        # The effective outcome, so a `status=NEEDS_REVIEW` filter stops
+        # returning a case a person has already resolved. Filtering on
+        # `c.status` here was the bug: a correction saved, the detail page
+        # showed it, and the queue it was supposed to clear never moved.
+        eff = store.effective_outcome(run_id, c)
         if category and c.category != category:
             continue
-        if status and c.status != status:
+        if status and eff["status"] != status:
             continue
         if decided_by and c.decided_by != decided_by:
             continue
@@ -214,11 +219,18 @@ def list_cases(
             "email_id": c.email_id,
             "category": c.category,
             "category_confidence": round(c.category_confidence, 3),
-            "status": c.status,
-            "review_reason": c.review_reason,
-            "has_defect": c.has_defect,
-            "defect_fields": sorted(c.defect_fields),
+            "status": eff["status"],
+            "review_reason": eff["review_reason"],
+            "has_defect": eff["has_defect"],
+            "defect_fields": eff["defect_fields"],
             "decided_by": c.decided_by,
+            # Both halves stay visible. A row the system called NEEDS_REVIEW
+            # and a person corrected to OK is not the same thing as a row the
+            # system called OK, and an operator scanning the queue should be
+            # able to see which is which without opening it.
+            "reviewed": eff["reviewed"],
+            "outcome_source": eff["source"],
+            "system_status": c.status,
         })
     return {"run_id": run_id, "count": len(out), "cases": out}
 
@@ -231,6 +243,10 @@ def get_case(case_id: str) -> dict:
         raise HTTPException(status_code=404, detail=f"no case '{case_id}'")
     report = result.to_report()
     report["review"] = store.get_review(run_id, email_id)
+    # The system's own answer stays where it was, under the keys it has always
+    # used; `effective` is what the case is now. A UI that wants to show "we
+    # said X, a reviewer said Y" has both without diffing anything.
+    report["effective"] = store.effective_outcome(run_id, result)
     return report
 
 
@@ -258,6 +274,39 @@ def review_case(case_id: str, body: ReviewRequest) -> dict:
     )
 
 
+@app.post("/cases/{case_id}/retry")
+def retry_one_case(case_id: str) -> dict:
+    """Re-process a single email in place.
+
+    The problem statement asks for visible failures and retries together, and
+    they belong together: a case that shows `errors` or an `unreadable` reason
+    is exactly the one a reviewer wants to run again after the sender re-sends
+    a readable attachment. Re-running the whole inbox to find out is minutes of
+    work and a different run_id from the one they were looking at.
+
+    The email is re-read from disk, so a replaced attachment is picked up. The
+    case keeps its position in the run and `processed` does not double-count.
+    Any review recorded against it is deliberately left alone — the new result
+    is the system's answer, and whether it still needs the reviewer's
+    correction is the reviewer's call, not ours.
+    """
+    run_id, email_id = _split_case_id(case_id)
+    if store.get_case(run_id, email_id) is None:
+        raise HTTPException(status_code=404, detail=f"no case '{case_id}'")
+
+    try:
+        result = retry_case(store, run_id, email_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=410, detail=str(exc)) from exc
+
+    report = result.to_report()
+    report["review"] = store.get_review(run_id, email_id)
+    report["effective"] = store.effective_outcome(run_id, result)
+    return report
+
+
 @app.get("/metrics")
 def metrics(run_id: Optional[str] = None) -> dict:
     rec = _run_or_404(run_id) if run_id else store.latest_done_run()
@@ -265,7 +314,11 @@ def metrics(run_id: Optional[str] = None) -> dict:
         raise HTTPException(status_code=404, detail="no completed run yet")
     if rec.metrics is None:
         raise HTTPException(status_code=409, detail=f"run '{rec.run_id}' has not finished")
-    return {"run_id": rec.run_id, **rec.metrics}
+    # The pipeline's own numbers are left exactly as the run produced them —
+    # they are what Sentinel did, and a human confirming a case afterwards
+    # must not retro-improve them. What humans did is reported beside them.
+    return {"run_id": rec.run_id, **rec.metrics,
+            "review": store.review_summary(rec.run_id)}
 
 
 @app.get("/submission")
@@ -289,7 +342,21 @@ def submission(run_id: Optional[str] = None) -> dict:
                    f"({rec.processed}/{rec.total_emails}); a partial submission "
                    f"would score as wrong answers, not as fewer answers.",
         )
-    return {c.email_id: c.to_submission() for c in store.list_cases(rec.run_id)}
+    out = {}
+    for c in store.list_cases(rec.run_id):
+        # A reviewer's correction is the answer that ships. The submission is
+        # what the desk stands behind, not a record of what the machine
+        # thought before a person looked at it — `GET /cases/{id}` keeps that.
+        eff = store.effective_outcome(rec.run_id, c)
+        out[c.email_id] = {
+            "category": c.category,
+            "status": eff["status"],
+            "review_reason": eff["review_reason"],
+            "defect_fields": eff["defect_fields"],
+            "has_defect": eff["has_defect"],
+            "decided_by": c.decided_by,
+        }
+    return out
 
 
 @app.post("/compare")

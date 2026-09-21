@@ -71,6 +71,19 @@ class Store:
         with self._lock:
             return self._cases.get(run_id, {}).get(email_id)
 
+    def replace_case(self, run_id: str, result: CaseResult) -> None:
+        """Overwrite one case after a retry, keeping its place in the order.
+
+        Distinct from `add_case`, which appends and increments `processed`.
+        Retrying an email that has already been counted must not count it
+        twice, and must not move it to the bottom of the operator's list.
+        """
+        with self._lock:
+            self._cases[run_id][result.email_id] = result
+            if result.email_id not in self._order[run_id]:
+                self._order[run_id].append(result.email_id)
+                self._runs[run_id].processed += 1
+
     def list_cases(self, run_id: str) -> list[CaseResult]:
         with self._lock:
             order = self._order.get(run_id, [])
@@ -115,6 +128,73 @@ class Store:
     def get_review(self, run_id: str, email_id: str) -> Optional[dict]:
         with self._lock:
             return self._reviews.get(run_id, {}).get(email_id)
+
+    # -- what the case is NOW -------------------------------------------
+    #
+    # The problem statement asks that a reviewer be able to "confirm or
+    # correct it, then update the report". The obvious way to do that is to
+    # overwrite the CaseResult, and it is the wrong way: it destroys the
+    # distinction between what Sentinel decided and what a person decided,
+    # which is the one thing an audit trail exists to keep. It would also
+    # quietly flatter our own accuracy — a corrected case would look like a
+    # case we got right.
+    #
+    # So the system's answer is immutable and the review sits beside it.
+    # Everything that reports an outcome — the case list, the submission,
+    # the metrics — asks this method instead of reading `result.status`
+    # directly, and the answer carries `source` so a reader can always see
+    # which of the two they are looking at.
+    def effective_outcome(self, run_id: str, result: CaseResult) -> dict:
+        review = self.get_review(run_id, result.email_id)
+
+        system = {
+            "status": result.status,
+            "review_reason": result.review_reason,
+            "has_defect": result.has_defect,
+            "defect_fields": sorted(result.defect_fields),
+        }
+        if review is None:
+            return {**system, "source": "system", "reviewed": False,
+                    "review_decision": None}
+
+        # `confirm` signs the system's answer off without changing it. That is
+        # not a no-op — it is the difference between "nobody has looked" and
+        # "a person looked and agreed", which is what a review queue is for.
+        if review.get("decision") != "correct":
+            return {**system, "source": "system", "reviewed": True,
+                    "review_decision": review.get("decision")}
+
+        status = review.get("status") or result.status
+        fields = sorted(review.get("defect_fields") or [])
+        # Derived, never taken from the request: the submission shape requires
+        # has_defect and defect_fields to agree with status, and a reviewer
+        # correcting a status should not have to know that rule.
+        if status == "MISMATCH":
+            has_defect, defect_fields = True, fields
+        else:
+            has_defect, defect_fields = False, []
+        reason = result.review_reason if status == "NEEDS_REVIEW" else None
+
+        return {
+            "status": status,
+            "review_reason": reason,
+            "has_defect": has_defect,
+            "defect_fields": defect_fields,
+            "source": "review",
+            "reviewed": True,
+            "review_decision": "correct",
+        }
+
+    def review_summary(self, run_id: str) -> dict:
+        """Counts for the metrics page: how much of this run a human touched."""
+        with self._lock:
+            reviews = list(self._reviews.get(run_id, {}).values())
+        corrected = [r for r in reviews if r.get("decision") == "correct"]
+        return {
+            "reviewed": len(reviews),
+            "confirmed": len(reviews) - len(corrected),
+            "corrected": len(corrected),
+        }
 
 
 # One process-wide store. Fine for a single-instance hackathon deployment;

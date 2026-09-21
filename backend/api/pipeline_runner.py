@@ -44,6 +44,39 @@ def start_run(store: Store, *, data_root: Path, limit: Optional[int], use_llm: b
     return run_id
 
 
+def retry_case(store: Store, run_id: str, email_id: str):
+    """Re-process one email without re-running the inbox.
+
+    The problem statement asks for visible failures *and* retries. A run of
+    520 emails that stumbled on one of them should not have to be repeated in
+    full — that is minutes of work and a new run_id for a reviewer who was
+    looking at this one case.
+
+    The email is re-read from the run's own data root rather than kept in
+    memory, so a retry picks up a file that has since been replaced — which is
+    the realistic reason to press it: the sender re-sent a readable copy of the
+    attachment that came through corrupt.
+
+    Runs synchronously. One email is milliseconds on the deterministic path,
+    and a caller who pressed "retry" is waiting for this specific answer.
+    """
+    rec = store.get_run(run_id)
+    if rec is None:
+        raise KeyError(f"no run '{run_id}'")
+
+    data_root = Path(rec.data_root)
+    path = data_root / "inbox" / f"{email_id}.json"
+    if not path.is_file():
+        raise FileNotFoundError(f"no email '{email_id}' under {data_root / 'inbox'}")
+
+    email = EmailRecord.from_json(json.loads(path.read_text(encoding="utf-8")))
+    client = build_client(enabled=rec.llm_enabled)
+    pipeline = Pipeline(PipelineConfig(data_root=data_root, llm=client))
+    result = pipeline.process(email)          # Pipeline.process never raises
+    store.replace_case(run_id, result)
+    return result
+
+
 def _execute(
     store: Store, run_id: str, emails: list[EmailRecord], data_root: Path, use_llm: bool,
 ) -> None:

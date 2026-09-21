@@ -244,6 +244,22 @@ export function RunPageView({ runId }: { runId: string }) {
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={c.status} />
+                      {/* A row a person overrode must not read like a row we
+                          got right. The badge shows the outcome that stands;
+                          this shows who it came from, and what we had said. */}
+                      {c.outcome_source === "review" && (
+                        <span
+                          className="ml-2 whitespace-nowrap text-[11px] text-muted-foreground"
+                          title={`Sentinel said ${c.system_status}; corrected by a reviewer`}
+                        >
+                          corrected
+                        </span>
+                      )}
+                      {c.outcome_source === "system" && c.reviewed && (
+                        <span className="ml-2 whitespace-nowrap text-[11px] text-muted-foreground">
+                          confirmed
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {c.defect_fields.length > 0 ? (

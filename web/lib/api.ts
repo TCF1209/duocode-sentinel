@@ -76,6 +76,20 @@ export interface CaseReport {
   duration_ms: number;
   llm_calls: number;
   review?: ReviewRecord | null;
+  /** What the case is NOW, after any human correction. The keys above stay
+   *  the system's own answer, so a card can show both. */
+  effective?: EffectiveOutcome | null;
+}
+
+export interface EffectiveOutcome {
+  status: CaseStatus;
+  review_reason: ReviewReason | null;
+  has_defect: boolean;
+  defect_fields: string[];
+  /** "system" until a reviewer corrects it, then "review". */
+  source: "system" | "review";
+  reviewed: boolean;
+  review_decision: "confirm" | "correct" | null;
 }
 
 export interface CaseSummary {
@@ -83,11 +97,17 @@ export interface CaseSummary {
   email_id: string;
   category: Category;
   category_confidence: number;
+  /** The effective status — a corrected case leaves the queue it was in. */
   status: CaseStatus;
   review_reason: ReviewReason | null;
   has_defect: boolean;
   defect_fields: string[];
   decided_by: DecidedBy;
+  reviewed: boolean;
+  outcome_source: "system" | "review";
+  /** What Sentinel itself said, kept beside the effective status so a row a
+   *  person overrode does not look like a row we got right. */
+  system_status: CaseStatus;
 }
 
 export interface RunStatus {
@@ -186,6 +206,16 @@ export function reviewCase(
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+/** Re-process one email in place. The case keeps its position in the run and
+ *  any review recorded against it is left alone — whether the new result still
+ *  needs that correction is the reviewer's call. */
+export function retryCase(runId: string, emailId: string) {
+  return request<CaseReport>(
+    `/cases/${encodeURIComponent(runId)}:${encodeURIComponent(emailId)}/retry`,
+    { method: "POST" },
+  );
 }
 
 export function getMetrics(runId?: string) {
