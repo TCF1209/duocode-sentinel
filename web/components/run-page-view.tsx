@@ -120,6 +120,39 @@ export function RunPageView({ runId }: { runId: string }) {
     return Math.round((run.processed / run.total_emails) * 100);
   }, [run]);
 
+  // <RunProgress> stays mounted for a few seconds after the run actually
+  // finishes, instead of unmounting the instant `status` flips to "done" —
+  // that instant is exactly when someone narrating a demo wants to point at
+  // the final tally, and the old behaviour pulled it out from under them.
+  //
+  // The transition is detected during render (React's own "adjusting state
+  // when a prop changes" pattern — comparing against a snapshot held in
+  // state, not a ref), not inside a useEffect: the effect below only arms a
+  // setTimeout and calls setState from *its* callback, never synchronously
+  // in the effect body, which is what react-hooks/set-state-in-effect
+  // actually objects to. Only a genuine running -> done transition counts:
+  // a page opened straight onto an already-finished run has nothing to
+  // hold, so it never shows the panel at all.
+  const [prevStatus, setPrevStatus] = useState(runStatus);
+  const [progressVisible, setProgressVisible] = useState(runStatus === "running");
+  const [holdGeneration, setHoldGeneration] = useState(0);
+  if (runStatus !== prevStatus) {
+    setPrevStatus(runStatus);
+    if (runStatus === "running") {
+      setProgressVisible(true);
+    } else if (prevStatus === "running" && runStatus === "done") {
+      setProgressVisible(true);
+      setHoldGeneration((g) => g + 1);
+    } else {
+      setProgressVisible(false);
+    }
+  }
+  useEffect(() => {
+    if (holdGeneration === 0) return;
+    const id = setTimeout(() => setProgressVisible(false), 2500);
+    return () => clearTimeout(id);
+  }, [holdGeneration]);
+
   // Emails finish in strict file order and the backend records that order
   // separately from the case data itself (backend/api/store.py's `_order`
   // list), so the last entry in an UNFILTERED case list is genuinely "the
@@ -188,16 +221,18 @@ export function RunPageView({ runId }: { runId: string }) {
         </div>
       </motion.div>
 
-      {/* Only while the run is going, and it removes itself when the run ends
-          rather than turning into a "100%" panel nobody needs. */}
+      {/* Stays up through a short hold after the run finishes (see
+          progressVisible above), then removes itself rather than turning
+          into a permanent "100%" panel nobody needs. */}
       <AnimatePresence initial={false}>
-        {run?.status === "running" && (
+        {progressVisible && run && (
           <RunProgress
             key="progress"
             processed={run.processed}
             total={run.total_emails}
             cases={cases}
             filtered={Boolean(categoryFilter || statusFilter)}
+            done={run.status === "done"}
           />
         )}
       </AnimatePresence>

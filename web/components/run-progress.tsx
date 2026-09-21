@@ -112,12 +112,21 @@ export function RunProgress({
   total,
   cases,
   filtered,
+  done = false,
 }: {
   processed: number;
   total: number;
   cases: CaseSummary[];
   /** True when a filter is active, so the stream and tallies are a subset. */
   filtered: boolean;
+  /**
+   * True for the brief hold after the run finishes, before the panel
+   * collapses — see run-page-view.tsx. "Reading the inbox" and a live
+   * emails/second rate stop being true statements the instant the run is
+   * done, so this swaps them for a completed heading and drops the rate row
+   * rather than leaving stale process-in-progress language on screen.
+   */
+  done?: boolean;
 }) {
   const count = useSmoothCount(processed);
   const rate = useRate(processed);
@@ -154,31 +163,35 @@ export function RunProgress({
 
         <div className="flex min-w-0 flex-1 flex-col gap-3 text-center sm:text-left">
           <div>
-            <h2 className="font-heading text-lg font-semibold">Reading the inbox</h2>
+            <h2 className="font-heading text-lg font-semibold">
+              {done ? "Done reading the inbox" : "Reading the inbox"}
+            </h2>
             <p className="text-sm text-muted-foreground">
               Every email classified, every document pair compared, on rules alone — no
               model call, no network.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-muted-foreground sm:justify-start">
-            <span>
-              <span className="font-mono font-medium text-foreground">
-                {rate > 0 ? Math.round(rate) : "—"}
-              </span>{" "}
-              emails / second
-            </span>
-            <span aria-hidden className="text-border">
-              ·
-            </span>
-            <span>
-              {remaining === null
-                ? "estimating…"
-                : remaining <= 1
-                  ? "finishing"
-                  : `about ${remaining}s left`}
-            </span>
-          </div>
+          {!done && (
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-muted-foreground sm:justify-start">
+              <span>
+                <span className="font-mono font-medium text-foreground">
+                  {rate > 0 ? Math.round(rate) : "—"}
+                </span>{" "}
+                emails / second
+              </span>
+              <span aria-hidden className="text-border">
+                ·
+              </span>
+              <span>
+                {remaining === null
+                  ? "estimating…"
+                  : remaining <= 1
+                    ? "finishing"
+                    : `about ${remaining}s left`}
+              </span>
+            </div>
+          )}
 
           <CategoryBar byCategory={tally.byCategory} total={total} />
         </div>

@@ -55,8 +55,25 @@ const UNIVERSITY = "Asia Pacific University";
 
 const SLIDES = ["Sentinel", "The problem", "Tech stack", "What it does"] as const;
 
+// The last slide's button sends a presenter on to /runs for the live part of
+// the demo, which unmounts this component — coming back (to re-check Tech
+// stack, say) landed back on slide 0 every time, because `index` lived only
+// in this component's own state. sessionStorage survives that round trip
+// without turning slide position into a URL a judge would ever share.
+const STORAGE_KEY = "sentinel-pitch-slide";
+
+function readStoredIndex(): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const n = Number(window.sessionStorage.getItem(STORAGE_KEY));
+    return Number.isInteger(n) && n >= 0 && n < SLIDES.length ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export function PitchView() {
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(readStoredIndex);
   const [direction, setDirection] = useState(1);
 
   /**
@@ -72,7 +89,7 @@ export function PitchView() {
    * touched, `go` is the single entry point, and the keyboard handler is a
    * thin wrapper over it instead of a second copy of the clamping logic.
    */
-  const indexRef = useRef(0);
+  const indexRef = useRef(readStoredIndex());
 
   const go = useCallback((next: number) => {
     const clamped = Math.max(0, Math.min(SLIDES.length - 1, next));
@@ -80,6 +97,12 @@ export function PitchView() {
     setDirection(clamped > indexRef.current ? 1 : -1);
     indexRef.current = clamped;
     setIndex(clamped);
+    try {
+      window.sessionStorage.setItem(STORAGE_KEY, String(clamped));
+    } catch {
+      // Private mode or blocked storage — losing the remembered slide is a
+      // minor inconvenience, not worth surfacing to whoever is rehearsing.
+    }
   }, []);
 
   useEffect(() => {
@@ -124,13 +147,18 @@ export function PitchView() {
         works, and a dot that does nothing when clicked is not a trade worth
         making on a page whose whole job is to be clicked through on camera.
       */}
-      <div className="relative flex flex-1 items-center">
+      {/* perspective on the static parent, not the animated child -- the
+          child's own rotateY needs a 3D space to rotate *into*, and putting
+          perspective on the thing that is itself transforming warps the
+          effect as it animates instead of holding a fixed vanishing point. */}
+      <div className="relative flex flex-1 items-center" style={{ perspective: 1200 }}>
         <motion.section
           key={index}
           className="w-full"
-          initial={{ opacity: 0, x: direction * 28 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: DURATION.base, ease: EASE_OUT }}
+          initial={{ opacity: 0, x: direction * 28, rotateY: direction * -10, scale: 0.98 }}
+          animate={{ opacity: 1, x: 0, rotateY: 0, scale: 1 }}
+          transition={{ duration: DURATION.slow, ease: EASE_OUT }}
+          style={{ transformStyle: "preserve-3d" }}
         >
           {index === 0 && <Intro />}
           {index === 1 && <Problem />}
