@@ -39,8 +39,8 @@ import { cn } from "@/lib/utils";
  * code change in between.
  */
 const TEAM = [
-  { name: "Tang", role: "Pipeline, API, dashboard", photo: "/team/tang.jpg" },
-  { name: "Lim Yee Teng", role: "Slides, project write-up", photo: "/team/yee-teng.jpg" },
+  { name: "Tang Chye Fong", role: "Engineering, demo video", photo: "/team/tang-chye-fong.png" },
+  { name: "Lim Yee Teng", role: "Slides, project write-up", photo: "/team/lim-yee-teng.webp" },
 ];
 
 const SLIDES = ["Sentinel", "The problem", "How it works", "What it does"] as const;
@@ -224,6 +224,14 @@ function Intro() {
   );
 }
 
+/**
+ * Both photos are pre-cropped to 400x400 head-and-shoulders squares, so
+ * `object-cover` has nothing to crop. `object-top` is kept as the default
+ * anyway: the originals are beside them in `public/team/`, one of them a 3:4
+ * portrait, and a centred square crop of a portrait headshot takes the chin
+ * and the collar. If anyone swaps a full-frame photo back in, this degrades
+ * to "face near the top" instead of "collar".
+ */
 function Avatar({ name, photo }: { name: string; photo: string }) {
   const [failed, setFailed] = useState(false);
   const initials = name
@@ -246,7 +254,7 @@ function Avatar({ name, photo }: { name: string; photo: string }) {
       alt={name}
       width={44}
       height={44}
-      className="size-11 shrink-0 rounded-full border object-cover"
+      className="size-11 shrink-0 rounded-full border object-cover object-top"
       onError={() => setFailed(true)}
       unoptimized
     />
