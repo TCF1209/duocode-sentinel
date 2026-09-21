@@ -35,6 +35,23 @@ those numbers do **not** prove is in
 what breaks the system is measured in
 [`docs/ADVERSARIAL.md`](docs/ADVERSARIAL.md).
 
+### This page is the project documentation
+
+It is the submission's *Slide Deck / Documentation* link, so the four things
+that brief asks for are listed here with the section that answers each:
+
+| | Section |
+|---|---|
+| **Technical architecture** | [Technical architecture](#technical-architecture) — the six stages and what each decides, then [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design reasoning and [`docs/DECISIONS.md`](docs/DECISIONS.md) for the alternatives we rejected |
+| **Implementation details** | [Quick start](#quick-start) to run it · [The API and the dashboard](#the-api-and-the-dashboard) · [Repository map](#repository-map) for where each part lives · [Verify it yourself](#verify-it-yourself) for the commands behind every number above |
+| **Challenges faced** | [Challenges faced](#challenges-faced) — five defects found by measurement, what each cost, and the one still open |
+| **Future roadmap** | [Future roadmap](#future-roadmap) — five items in build order, and the one thing we would deliberately not do |
+
+Two more that the brief does not ask for and a reader should have anyway:
+[What the evidence shows, and what it does
+not](#what-the-evidence-shows-and-what-it-does-not), and [Where the data comes
+from](#where-the-data-comes-from).
+
 ---
 
 ## The problem
