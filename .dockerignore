@@ -17,6 +17,14 @@
 !backend/
 !demo_data/
 
+# The organisers' participant bundle, 520 emails, so the deployed API can run
+# the whole graded inbox live instead of a curated sample. It is a separate
+# top-level directory rather than an exception inside `data/` for exactly the
+# reason the last block of this file gives: the guard around `data/` should not
+# have to be edited to publish material that was never the problem.
+# `bundle_data/README.md` states what is in it and what is not.
+!bundle_data/
+
 # --- re-excluded from inside the allow-list --------------------------------
 # `!backend/` takes the whole tree, including things the running API never
 # touches.

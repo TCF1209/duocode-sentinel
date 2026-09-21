@@ -95,6 +95,14 @@ COPY --chown=sentinel:sentinel backend/ backend/
 # .dockerignore is written as an allow-list so that it cannot.
 COPY --chown=sentinel:sentinel demo_data/ demo_data/
 
+# The full participant inbox, 520 emails and 251 attachments, 3.2 MB. This is
+# what SENTINEL_DATA_ROOT points at, so a judge pressing "Start a run" watches
+# the whole graded inbox go through rather than a sample of it. `demo_data/`
+# stays for a faster run. Only the participant bundle is ever copied here --
+# `bundle_data/README.md` and `.dockerignore` both say why, and the answer key
+# has no path into this image.
+COPY --chown=sentinel:sentinel bundle_data/ bundle_data/
+
 # backend/sdoc/llm/cache.py writes model responses under `.cache/llm` relative
 # to the working directory, and swallows OSError on the way out ("a cache that
 # cannot write is not a failure"). That swallow is correct and it is also why

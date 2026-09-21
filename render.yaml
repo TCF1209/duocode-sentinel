@@ -80,8 +80,12 @@ services:
       # Only the participant bundle may ship here. data/_grader/ holds the
       # answer key and the generator and may never enter the image — see
       # CLAUDE.md rule 1 and docs/SCORING.md section 3.
+      # The full 520-email participant inbox, so the live demo is the graded
+      # inbox rather than a sample of it. `/app/demo_data` (30 emails) is still
+      # in the image if a faster default is ever wanted, and the dashboard's
+      # limit box takes a subset of whichever root is set here.
       - key: SENTINEL_DATA_ROOT
-        value: /app/demo_data
+        value: /app/bundle_data
 
       # This is already the default in backend/api/main.py; it is stated here so
       # that it is visible and changeable without a code edit. `*` is legal only
