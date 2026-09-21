@@ -1,13 +1,15 @@
 # Demo video — script and running order
 
 **Hard limit 5:00. One mark is deducted per 30 seconds over, so the target is
-4:30** and the thirty seconds left over are the margin for a sentence that runs
-long, not spare time to fill.
+now 4:50** — a new slide (below) pushed the old 4:30 target out by the length
+of one more beat, and the margin for a sentence that runs long is down to
+about ten seconds. Rehearse this one with a timer; there is less room in it
+than the earlier cut of this script had.
 
 The brief names five parts and this is their order — *Quick intro · The problem ·
-Tech stack · Live demo · Impact*. Slides 1–4 of `/pitch` are those first three
-parts and the last one, which is why the whole recording is one browser tab with
-no cutting to a deck.
+Tech stack · Live demo · Impact*. Slides 1–5 of `/pitch` are those first three
+parts, the evidence behind them, and the last one, which is why the whole
+recording is one browser tab with no cutting to a deck.
 
 ---
 
@@ -16,6 +18,7 @@ no cutting to a deck.
 | | |
 |---|---|
 | **Wake Render** | Open <https://sdoc-sentinel-api.onrender.com> and wait for `ready: true`. Cold start is **30–60 s** and it sleeps again after ~15 minutes idle. Do this last, right before recording. |
+| **Then throw away one run** | Measured on the live deployment, twice: the **first** run after the container has been idle takes **41.6 s** end to end, the next one **12.7 s**. Same pipeline both times — 11.4 s and 12.1 s of actual work — so the difference is the container waking, not the inbox. **Start a run, let it finish, and only then press record.** The script says "thirteen seconds" at 2:20; that is true of a warm container and a lie about a cold one. |
 | **Window size** | 1280×720. Every `/pitch` screen is built to fit that without a scrollbar. |
 | **Browser** | Hide bookmarks, close other tabs, no notifications. |
 | **Start position** | `/pitch` on slide 1. Arrow keys advance; don't hunt for the dots on camera. |
@@ -76,11 +79,24 @@ Don't read the cards out. They are on screen; let them be read.
 >
 > Python and FastAPI in Docker on Render; Next.js 16 on Vercel; 574 tests."
 
-## 1:40 – 3:45 · Live demo
+## 1:40 – 1:55 · How we know *(slide 4)*
 
-Click through to `/runs` from the slide's own button.
+> "This isn't just the dev set — the same rules score 1.0000 on three more
+> datasets we never trained against. And on labels we've never seen, the model
+> turns a hundred and sixty-eight forced escalations into two, without a
+> single wrong answer. The one thing we haven't fixed yet is up there too."
 
-**1:40 – 2:05 · the run.** Press **Start a run**.
+Don't read the two callout cards word for word — the OCR line and the
+zero-guarantees line are both dense enough to be read off the screen. Say the
+one sentence above, then advance.
+
+## 1:55 – 4:00 · Live demo
+
+Click through to `/runs` from slide 5's button — advance one more slide first
+(you won't narrate it yet; that happens after the demo, when `/pitch` is
+reopened and lands back on it — see the sessionStorage note below).
+
+**1:55 – 2:20 · the run.** Press **Start a run**.
 
 > "This is the real inbox — 520 emails, the organisers' full bundle, running on
 > a free-tier container."
@@ -92,7 +108,7 @@ finishes, so point at the final tally while it's up:
 > queries, 60 general, 40 spam. 45 mismatches, and 21 cases it refused to
 > decide."
 
-**2:05 – 2:40 · a MISMATCH case.** Open one.
+**2:20 – 2:55 · a MISMATCH case.** Open one.
 
 > "Here's the Shipping Instruction on the left, the draft Bill of Lading on the
 > right, seven fields, and the ones that disagree are flagged. The part that
@@ -101,14 +117,14 @@ finishes, so point at the final tally while it's up:
 > already here. That's what lets us tell 'the document genuinely says something
 > different' apart from 'we read the document wrong'."
 
-**2:40 – 3:00 · a NEEDS_REVIEW case.** Open one from the escalated four.
+**2:55 – 3:15 · a NEEDS_REVIEW case.** Open one from the escalated four.
 
 > "And this is the other half. No confident guess — the reason it stopped, and
 > the evidence a person needs to settle it. When the reviewer corrects it, the
 > correction goes into the report, and the system's own answer stays visible
 > beside it rather than being overwritten."
 
-**3:00 – 3:45 · `/compare` — this is the AI beat.**
+**3:15 – 4:00 · `/compare` — this is the AI beat.**
 
 > "Judges shouldn't have to take our word for it, so anyone can drop in two
 > documents of their own."
@@ -127,7 +143,7 @@ Now turn the toggle on and re-run:
 > The badge says **model answered**. That's the model earning its place on the
 > case the rules admitted they couldn't do."
 
-## 3:45 – 4:25 · Impact *(back to slide 4)*
+## 4:00 – 4:40 · Impact *(back to slide 5)*
 
 > "Scored on the organisers' own scorer across four draws of their generator, at
 > three different sizes: **1.0000**. 225 planted defects, every one caught with
@@ -142,7 +158,7 @@ Now turn the toggle on and re-run:
 >
 > Cheap because the model is *aimed*, not because it's absent."
 
-## 4:25 – 4:35 · Close
+## 4:40 – 4:50 · Close
 
 > "Sentinel, by DuoCode. Every answer comes with its evidence. Thank you."
 
@@ -161,6 +177,8 @@ copied from an older doc.
 | every decision made by rules, $0 | `decided_by_rule: 520`, `llm_calls: 0`, `rule_share: 1.0` |
 | 574 tests | `pytest --junitxml`: 574 tests, 0 failures, 0 errors |
 | 1.0000 · 225 defects · 80/80 escalations | `docs/SCORING.md` §4.1 — 46+57+31+91 across four seeds |
+| 168 forced to a human -> 2, with the model; 0 false discrepancies / silent wrong values / masked discrepancies both ways | `docs/ADVERSARIAL.md` §7, `unseen_labels` on the dev bundle |
+| 151 of 188 dev documents misread by OCR digit confusion, pinned by a strict `xfail` | `docs/ADVERSARIAL.md` §5.1, §5.4 |
 | $0.0013 per document, 178 calls / $0.2447 | `docs/ADVERSARIAL.md` §8 |
 | 13 seconds | the deployed free-tier container. **A laptop does it in 1.2 s** (2.37 ms/email) — say 13, because 13 is what the screen will show. |
 | ~11 hours of desk work | **an estimate, not a measurement** — 20 s an email, 4 min a pair. Say "at a conservative estimate" out loud, as slide 4 does in print. |
