@@ -87,8 +87,12 @@ export function PitchView() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // 10rem, not 9, and gap-4 rather than 6: at 1280x720 -- a common recording
+  // size, and this page exists to be recorded -- the "How it works" screen
+  // overflowed by 8px and put a scrollbar in the frame. Measured, not guessed;
+  // the other three screens had room to spare either way.
   return (
-    <div className="flex min-h-[calc(100vh-9rem)] flex-col gap-6">
+    <div className="flex min-h-[calc(100vh-10rem)] flex-col gap-4">
       <div className="relative flex flex-1 items-center">
         <AnimatePresence mode="wait" custom={direction} initial={false}>
           <motion.section
@@ -348,7 +352,7 @@ const STACK = ["Python", "FastAPI", "Next.js", "OpenAI", "Docker on Render", "Ve
 function HowItWorks() {
   return (
     <motion.div
-      className="flex flex-col gap-8"
+      className="flex flex-col gap-6"
       initial="hidden"
       animate="show"
       variants={stagger(0.05, 0.06)}
