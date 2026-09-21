@@ -23,8 +23,8 @@ Built by **DuoCode** for the Averis × Monash Hackathon 2026.
 
 | | |
 |---|---|
-| **Accuracy** | **1.0000** final score on the dev set **and** on three held-out seeds we never developed against — 225 planted defects across four draws of the organisers' generator — three from seeds we generated ourselves and never developed against — every one caught with the **exact** field set, no false alarms, all 80 escalations correct. |
-| **Tests** | **533** — 532 pass, and 1 strict `xfail` pinning a defect we have found and not yet fixed (`docs/ADVERSARIAL.md` §5.4). |
+| **Accuracy** | **1.0000** final score on the dev set **and** on three held-out draws, generated from the organisers' own generator with seeds we never developed against — 225 planted defects, every one caught with the **exact** field set, no false alarms, all 80 escalations correct. Not four *independent* tests, and `docs/SCORING.md` §4.1 says why. |
+| **Tests** | **574** — 573 pass, and 1 strict `xfail` pinning a defect we have found and not yet fixed (`docs/ADVERSARIAL.md` §5.4). |
 | **Speed** | **~3 ms per email**, single-threaded on a laptop: 520 emails end to end in about 1.5 s. |
 | **Cost** | **100% of decisions are made by rules.** `decided_by` is `"rule"` for all 520 emails; no model call decides anything on the graded inbox. |
 
@@ -57,7 +57,31 @@ reason and the source evidence attached, not a confident guess.
 | **Compare** | Labels are matched by meaning (`Load Port` = `Port of Loading`); values are canonicalised and compared exactly. Side-by-side SI/BL output with the differing fields flagged. |
 | **Ask for help** | Missing attachment · wrong document type · unreadable file · blank required value → routed to a review queue with the evidence, for a person to confirm or correct. |
 
-The design and the reasoning behind each choice is in
+### Technical architecture
+
+Six stages, in one direction, with no web framework or database anywhere in the
+core — `backend/sdoc/` is a library the CLI and the API both call, so the thing
+that is scored and the thing that is demonstrated are the same code.
+
+| # | Stage | Module | What it decides |
+|---:|---|---|---|
+| 1 | Classify | `classify/rules.py`, `classify/llm.py` | which of the 5 categories; the model is asked only when the rule score is ambiguous |
+| 2 | Intake | `readers/`, `doctype.py` | can each attachment be read at all, and is it the document it claims to be |
+| 3 | Extract | `labels.py`, `extract/fields.py`, `extract/llm.py` | the 7 field values, each carrying `Evidence(doc, locator, label, snippet)` |
+| 4 | Compare | `normalize.py`, `compare.py` | per field: MATCH, MISMATCH, or UNCOMPARABLE |
+| 5 | **Evidence gate** | `evidence_gate.py` | **may this outcome be reported as fact at all** — a veto stage, not a step |
+| 6 | Decide | `pipeline.py` | `OK` / `MISMATCH` / `NEEDS_REVIEW`, with the reason and the recovery action |
+
+Stage 5 is the one that is unusual and the one the design rests on. It runs
+*after* the comparison and can overrule it: a value we cannot re-locate in its
+source, a blank treated as a difference, a pair that is not an SI and a BL, two
+readings that differ only in characters OCR confuses — each becomes an
+escalation carrying both readings, rather than an answer. `docs/ADVERSARIAL.md`
+§6 measures what that costs and what it buys.
+
+Around the core: **FastAPI** (11 routes over the same pipeline, deployed as a
+container on Render) and a **Next.js 16** dashboard on Vercel. The design and
+the reasoning behind each choice is in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the alternatives we rejected,
 and why, are in [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
@@ -137,7 +161,7 @@ cp .env.example .env     # then set OPENAI_API_KEY
 ### The API and the dashboard
 
 ```bash
-# API — 10 routes over the same pipeline code the CLI uses
+# API — 11 routes over the same pipeline code the CLI uses
 .venv/Scripts/python.exe -m uvicorn backend.api.main:app --reload --port 8000
 #   SENTINEL_DATA_ROOT=<a bundle>    which inbox POST /runs processes
 #                                    (defaults to data/bundle; demo_data works)
@@ -201,7 +225,7 @@ is no answer key in it: the unperturbed reading is the reference.
 |---|---|
 | **Holds** | Punctuation drift, case and spacing noise, reflowed values, indented labels, reordered fields — **zero** movement on both draws. The `control_rewrite` row is zero too, so the instrument itself is sound. |
 | **Costs recall, safely** | Unfamiliar label wording loses 1,100 of 1,281 fields and escalates every one: zero false discrepancies, zero silent wrong values. The right failure direction, and useless to an operator — see the next section. |
-| **Bends, safely** | OCR character confusion (`NANTONG` → `NANT0NG`) still moves 972 of 1,281 dev reads, and always will: the document genuinely says something else, and nothing separates "the scanner misread a digit" from "the document says that" from one source. What it no longer does is *decide*. Silent wrong values and invented defects are both **zero**, down from 1,056 and 151, because a damaged number is now refused rather than parsed short and a value differing only on confusable glyphs is escalated rather than reported (`docs/ADVERSARIAL.md` §4.4). Fuzzy value matching is still banned and still the wrong fix — this veto never produces a match, so it cannot clear a bad BL (`docs/DECISIONS.md` §D2). |
+| **Bends, safely** | OCR character confusion (`NANTONG` → `NANT0NG`) still moves 972 of 1,281 dev reads, and always will: the document genuinely says something else, and nothing separates "the scanner misread a digit" from "the document says that" from one source. What it no longer does is *decide*. Silent wrong values and invented defects are both **zero**, down from 982 and 151, because a damaged number is now refused rather than parsed short and a value differing only on confusable glyphs is escalated rather than reported (`docs/ADVERSARIAL.md` §4.4). Fuzzy value matching is still banned and still the wrong fix — this veto never produces a match, so it cannot clear a bad BL (`docs/DECISIONS.md` §D2). |
 | **Open** | The truncation repair can mask a real discrepancy (§5.4). It is pinned by a **strict** `xfail`, so fixing it turns the build red rather than passing quietly. |
 
 ## What the model layer recovers
@@ -223,7 +247,7 @@ had the model invented values to fill the gaps, false discrepancies would have
 climbed and the trade would have been a bad one. They stay at zero because
 `extract/llm.py` re-locates every answer in the document before adopting it,
 and the evidence gate vetoes anything it cannot trace. Cost at the pinned rate
-card: 178 calls, $0.2447 — $0.0014 per document.
+card: 178 calls, $0.2447 — $0.0013 per document.
 
 **State this carefully.** The model does **no** work on the graded inbox:
 `decided_by` is `"rule"` for all 520 emails, and the only live calls in a
@@ -234,13 +258,104 @@ row of sixteen — the OCR row above is untouched by it.
 
 ---
 
+## Challenges faced
+
+Every item here was found by measurement rather than by review, and each one
+changed the code. The harness that found most of them is `docs/ADVERSARIAL.md`;
+it has no answer key, so it could only ever report on us.
+
+**A value split across two lines was read as a different company.** A party
+name too long for its column wraps, and the reader cannot tell that
+continuation from the address block that normally follows a name — so
+`APRIL FINE PAPER TRADING (MIDDLE` was compared against the full name and
+reported as a discrepancy that does not exist. **74 silent wrong values.** The
+fix in `compare.py` completes the short side from *its own next line* and only
+accepts the completion if it reproduces the other side exactly, so the repair
+can recognise a value we cut short but cannot invent agreement. False
+discrepancies went 64 → 0 (§4.2).
+
+**A document that omits the colon lost every field on the page.** Real forms
+print `Shipper` above the value, or separate it with an em dash, a tab or a
+non-breaking space. The row reader wanted `Label: value`. The failure was
+*safe* — the case escalated — and completely useless to an operator. Fixed in
+`readers/rows.py`; thirteen of sixteen perturbation modes are now at a 100%
+invariance pass rate (§4.1).
+
+**OCR character confusion was the worst row, and it was two defects wearing one
+name** (§4.4). The numeric half was not a comparison problem at all: the number
+regex is a prefix match, so `216,9S0 KG` parsed as **2169 kg** and `13B MT` as
+13,000 instead of 138,000 — a confident, plausible, wrong quantity on a field
+whose planted defects are ±500 kg. Nothing downstream could tell a truncated
+number from a short one. The text half needed a judgement: `NANT0NG` is not a
+second port. Both are fixed, and measured — silent wrong values **982 → 0**,
+invented defects **151 → 0**, on both draws — but the honest framing is that
+the *pass rate did not move*. The document genuinely says something else now.
+What changed is that the failure is fail-safe instead of fail-silent.
+
+**A three-character synonym matched inside a long string.** `POL` scored 90
+against `NAPOLI CENTRALE`, so an address line resolved to a port. Found by
+adversarial review rather than by the harness, because the harness cannot
+construct that input. Fixed with a minimum-length floor in `labels.py` — and
+the fix immediately broke `G.W. (KGS)`, which had no other resolver, which is
+recorded in §4.3 rather than quietly patched.
+
+**Three defects that had nothing to do with shipping.** A dependency pin
+(`pdfplumber==0.11.4`) sat under the floor `markitdown[pdf]` imposes, so
+`pip install -r` failed outright — nobody following the README could install
+the project. `load_dotenv` searched the working directory while the README's
+own command is `cd backend && uvicorn`, so the entire model tier was silently
+disabled and `use_llm=true` behaved identically to `false`. And
+`scripts/evaluate.py` graded every dataset against the dev answer key, so
+re-running the held-out validation returned ~0.08 and looked like a
+catastrophic regression. All three are the same class of bug: something that
+fails without saying so.
+
+**What is still open**, and pinned rather than hidden: the truncation repair
+can mask a real discrepancy when both canonical values already match
+(§5.2, §5.4). It has fired zero times on real data. It is held by a **strict**
+`xfail`, so the day someone fixes it the build turns red instead of passing
+quietly.
+
+## Future roadmap
+
+Beyond the hackathon, in the order we would actually build them:
+
+1. **Confidence calibration.** Today a case is escalated or it is not. Attaching
+   a score to *why* lets a desk tune its own threshold — a team that wants
+   fewer escalations should be able to buy that, knowingly, rather than
+   discovering it.
+2. **Reviewer corrections feed the synonym table.** Every correction a human
+   makes is a labelled example of wording we could not read. The API already
+   keeps the correction beside the system's own answer without overwriting it
+   (`store.effective_outcome`); the missing half is promoting a confirmed
+   correction into `labels.py`. That is the learning loop, and it is the one
+   place this system should learn — the label vocabulary, never the value
+   comparison.
+3. **Batch patterns.** "Twelve emails from this carrier all mismatch on port of
+   discharge" is a different and more valuable statement than twelve separate
+   reports. The data is already in `report.json`; this is an aggregation the
+   dashboard does not yet do.
+4. **Throughput and cost at real inbox volume.** We measure ~3 ms per email and
+   $0 on the graded set. A desk needs the projection at its own volume, with
+   the model tier's cost as a function of how unfamiliar its documents are.
+5. **Per-desk rules.** The four desks in this dataset (AIE, AFPTME, AFRT,
+   AFEMY) have different forms and different tolerances. The stage boundaries
+   already allow a per-desk label table and a per-desk escalation policy; the
+   plumbing to select one does not exist.
+
+What we would deliberately **not** do is loosen the value comparison. Every
+request for "fewer false alarms" on this problem resolves to a similarity
+threshold, and a threshold that forgives a scanning artefact also merges two
+real companies (`docs/DECISIONS.md` §D2). The only safe direction is the one
+taken in §4.4: escalate the ambiguity, never absorb it.
+
 ## Repository map
 
 ```
 backend/sdoc/          the pipeline — no web, no database, no network imports
-backend/api/           FastAPI surface over it (10 routes, incl. POST /compare)
+backend/api/           FastAPI surface over it (11 routes, incl. POST /compare)
 backend/tools/         adversarial.py, the perturbation harness; smoke_readers.py
-backend/tests/         533 tests over the traps in docs/DATA_NOTES.md
+backend/tests/         574 tests over the traps in docs/DATA_NOTES.md
 backend/run.py         an inbox -> submission.json + report.json + metrics.json
 web/                   Next.js 16 dashboard (App Router, shadcn/ui, Recharts)
 demo_data/             30-email demo inbox — what a clone can run without the bundle

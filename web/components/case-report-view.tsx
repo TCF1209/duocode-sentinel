@@ -28,6 +28,36 @@ export function CaseReportView({
   const readableNotes = report.notes.filter((n) => n.includes(" "));
   const signalNotes = report.notes.filter((n) => !n.includes(" "));
 
+// The backend computes `model_offered` and `model_used` so the page can say
+// which tier answered instead of the reader inferring it from extractor tags.
+// Nothing rendered them, which made the most interesting outcome invisible:
+// "we asked the model and adopted nothing" looked exactly like "the model was
+// switched off". That distinction is the product's own thesis -- the model is a
+// fallback that has to earn each value -- so it belongs on screen, and on the
+// /compare page it is the one place a judge can watch it happen.
+function ModelTier({ offered, used }: { offered?: boolean; used?: boolean }) {
+  if (offered === undefined) return null;
+  const label = !offered
+    ? "model off"
+    : used
+      ? "model answered"
+      : "model asked, nothing adopted";
+  return (
+    <span
+      className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
+      title={
+        !offered
+          ? "No model was configured for this run; every value came from the deterministic readers."
+          : used
+            ? "At least one field was filled by the model and re-located in its source before being adopted."
+            : "The model was available and was asked, but nothing it returned could be traced back to the document, so nothing was adopted."
+      }
+    >
+      {label}
+    </span>
+  );
+}
+
   return (
     <motion.div
       key={report.email_id}
@@ -41,6 +71,7 @@ export function CaseReportView({
         <CategoryBadge category={report.category} />
         <StatusBadge status={report.status} />
         <DecidedByBadge decidedBy={report.decided_by} />
+        <ModelTier offered={report.model_offered} used={report.model_used} />
         <span className="text-xs text-muted-foreground">{report.duration_ms}ms</span>
         {report.llm_calls > 0 && <span className="text-xs text-muted-foreground">{report.llm_calls} model call(s)</span>}
       </motion.div>

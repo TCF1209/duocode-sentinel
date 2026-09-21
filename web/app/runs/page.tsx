@@ -24,10 +24,30 @@ export default function RunsPage() {
   // to explain it; a 0 sitting in the box would.
   const [limitInput, setLimitInput] = useState("");
 
+  // The poll fires every 3s and the API is on Render's free tier, which sleeps
+  // after 15 minutes idle and takes 30-60s to wake. Toasting every failure
+  // stacked ten to twenty red errors on the first screen a judge opens, which
+  // reads as a broken product rather than a cold start. So: one toast per
+  // outage, cleared when the API answers again, and a line of copy that says
+  // what is actually happening. `app/page.tsx`'s LiveStats already swallows
+  // the same failure silently; this is the same choice with an explanation.
+  const [waking, setWaking] = useState(false);
+  const toasted = useRef(false);
+
   const refresh = useCallback(() => {
     listRuns()
-      .then(setRuns)
-      .catch((e) => toast.error(`Could not load runs: ${e.message}`));
+      .then((r) => {
+        setRuns(r);
+        setWaking(false);
+        toasted.current = false;
+      })
+      .catch((e) => {
+        setWaking(true);
+        if (!toasted.current) {
+          toasted.current = true;
+          toast.error(`Could not load runs: ${e.message}`);
+        }
+      });
   }, []);
 
   useEffect(() => {
@@ -97,6 +117,13 @@ export default function RunsPage() {
           >
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-20 w-full" />
+            {waking && (
+              <p className="text-center text-xs text-muted-foreground">
+                Waking the API — it runs on a free tier that sleeps after 15
+                minutes idle, so the first request can take 30–60 seconds. This
+                page keeps retrying on its own.
+              </p>
+            )}
           </motion.div>
         ) : runs.length === 0 ? (
           <motion.div

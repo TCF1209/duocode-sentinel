@@ -1,7 +1,7 @@
 # Adversarial self-consistency — where the reader holds, and where it breaks
 
 > Regenerated 2026-09-19 against the current working tree; the suite is now
-> **532 passed and one `xfail`**. That xfail is not decoration: it is the live
+> **573 passed and one `xfail`**. That xfail is not decoration: it is the live
 > defect in §5.4, marked strict so that fixing it breaks the build rather
 > than passing quietly. A second strict xfail recorded the address-line hole
 > in §4.3 and did exactly that when the fix landed — it went red, the fix was
@@ -771,7 +771,7 @@ at zero because `extract/llm.py` re-locates every answer in the document
 before adopting it, and the evidence gate vetoes anything it cannot trace.
 
 Cost, at the pinned rate card: **178 calls, 172 of them live, $0.2447** —
-$0.0014 per document, against a deterministic path that costs nothing and
+$0.0013 per document, against a deterministic path that costs nothing and
 still answers 100% of the graded inbox.
 
 ### What this does and does not license us to say

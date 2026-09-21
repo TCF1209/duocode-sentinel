@@ -13,6 +13,7 @@ a data root and an upload has neither.
 """
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -96,6 +97,9 @@ def compare_uploads(
     bl_filename: str, bl_bytes: bytes,
     *, llm: Optional[LLMClient] = None,
 ) -> CaseResult:
+    started = time.perf_counter()
+    calls_before = llm.usage.calls if llm is not None else 0
+
     si_doc = read_upload(si_filename, si_bytes)
     bl_doc = read_upload(bl_filename, bl_bytes)
 
@@ -127,7 +131,17 @@ def compare_uploads(
             si_fields = extract_llm.fill_missing_fields(si_doc, si_fields, "SI", client=llm)
         if bl_fields is not None:
             bl_fields = extract_llm.fill_missing_fields(bl_doc, bl_fields, "BL", client=llm)
-        result.decided_by = "llm"
+        # `decided_by` says which tier produced the answer, and offering the
+        # model is not the same as it answering. This used to be set here
+        # unconditionally, which badged the ordinary control pair "llm" with
+        # zero model calls behind it -- and `web/app/compare/page.tsx` tells a
+        # judge to run each sample twice, once with the model off and once on.
+        # So the page's own script produced a case that contradicted the
+        # README's "100% of decisions are made by rules". It is now driven by
+        # whether a field was actually filled by the model, the same predicate
+        # `main.py` uses for `model_used`.
+        if _model_contributed(si_fields, bl_fields):
+            result.decided_by = "llm"
 
     comparisons = []
     if si_fields is not None and bl_fields is not None:
@@ -149,4 +163,23 @@ def compare_uploads(
         comparisons=comparisons, intent=intent, pair_problem=pair_problem,
     )
     Pipeline._apply(decision, comparisons, result)
+
+    # Without these two the dashboard reported "0ms" and could never show the
+    # model-call line at all (`case-report-view.tsx` gates it on
+    # `llm_calls > 0`), so a pair that genuinely ran a paid vision call still
+    # read as though nothing had happened. On the one surface where a judge can
+    # watch the model work, that is the wrong thing to be silent about.
+    result.llm_calls = (llm.usage.calls - calls_before) if llm is not None else 0
+    result.duration_ms = (time.perf_counter() - started) * 1000.0
     return result
+
+
+def _model_contributed(si_fields, bl_fields) -> bool:
+    """Did the model actually fill a field, as opposed to being available?"""
+    for doc_fields in (si_fields, bl_fields):
+        if doc_fields is None:
+            continue
+        for value in doc_fields.fields.values():
+            if value.extractor and value.extractor.startswith("llm"):
+                return True
+    return False
