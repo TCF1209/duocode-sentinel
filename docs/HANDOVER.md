@@ -46,36 +46,26 @@ appear by making it public.
 
 ---
 
-## 2. Unblock Vercel — one command, and it may already be fixed by step 1
+## 2. ~~Unblock Vercel~~ — **done, 22 Sep 00:2x**
 
-The deployed dashboard is **11 commits behind**. GitHub shows a red ✗ on recent
-commits, and opening it says:
+Your empty commit `8029435` worked. Checked against production, not assumed:
+the new bundle is being served and `/pitch` now has all five screens including
+*How we know*, so the eleven blocked commits are live.
 
-> **Vercel — Deployment was blocked**
+What had happened, for the record: Vercel's Hobby plan refuses to build a
+commit pushed by anyone who is not the project owner, the project sits under
+`vercel.com/tang-chye-fongs-projects/…`, and GitHub was showing **"Vercel —
+Deployment was blocked"** on every commit pushed from the other machine. A
+commit pushed by you at the tip of `main` is what it wants.
 
-The Details link points at `vercel.com/tang-chye-fongs-projects/…`, so the
-project is under your account and Vercel's Hobby plan refuses to build commits
-pushed by anyone else. Everything on `main` is correct; it simply has not been
-built.
+**If you see a red ✗ on a later commit, check what it changed before acting.**
+Anything touching only `docs/` cannot alter the deployed app, so a blocked
+build on a documentation commit leaves production correct and is not worth a
+second empty commit. Only re-trigger when something under `web/` has not
+shipped.
 
-**Do step 1 first**, then check whether Vercel picked it up on its own — a
-public repository is one of the fixes Vercel itself offers. If the dashboard
-still looks old:
-
-```bash
-git pull
-git commit --allow-empty -m "chore: trigger vercel build"
-git push origin main
-```
-
-The tip of `main` is then a commit you pushed, which is what Vercel wants.
-
-**Do not use the Vercel dashboard's "Redeploy" button** — it rebuilds the last
-commit that *successfully* built, which is the old one, not the new work.
-
-**Check it landed:** open <https://duocode-sentinel.vercel.app/pitch> and press
-→ to slide 2, then leave and come back. If it returns to the slide you were on
-rather than slide 1, the new build is live.
+**Never use the dashboard's "Redeploy" button** — it rebuilds the last commit
+that *successfully* built, which is the old one.
 
 ---
 
