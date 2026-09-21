@@ -63,8 +63,12 @@ and why, are in [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## Quick start
 
-Verified on a fresh clone on 19 Sep 2026 — every command below was run on a
-machine holding no other copy of this project.
+Re-verified on a fresh clone on 21 Sep 2026 — every command below was run
+against a clone holding no `data/`, no API key and no network access, on a
+venv built from scratch. The dependency floors resolve to current releases
+(`openai` 3.x against a `>=1.60` floor, `pytest` 9, `fastapi` 0.141,
+`pydantic` 2.13) and the suite passes on them, so the pins are floors by
+intent rather than by neglect.
 
 ```bash
 git clone <repo-url> && cd sdoc-sentinel
@@ -99,7 +103,7 @@ the 520-email one, below.
 .venv/Scripts/python.exe -m pytest backend/tests
 ```
 
-On a fresh clone: **391 passed, 141 skipped, 1 xfailed, 0 errors**.
+On a fresh clone: **431 passed, 142 skipped, 1 xfailed, 0 errors**.
 
 The skips are not a broken checkout. `data/` is git-ignored — it holds the
 organisers' dataset and, beside it, their answer key (see
@@ -107,7 +111,7 @@ organisers' dataset and, beside it, their answer key (see
 full bundle to read. `backend/tests/conftest.py` guards exactly the tests that
 open it and skips them with the reason printed, rather than letting ~100 tests
 fail on an empty read and read as a broken project. With the participant bundle
-at `data/bundle/`, the same command gives **532 passed, 1 xfailed**.
+at `data/bundle/`, the same command gives **573 passed, 1 xfailed**.
 
 ### The full inbox
 

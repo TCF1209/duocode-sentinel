@@ -218,9 +218,21 @@ whole participant bundle. **(T) to decide.**
 - [ ] **(T)** Slide deck: architecture, implementation, challenges, roadmap
 - [ ] **(T)** Demo video ≤ 5:00 — intro, problem, tech stack, live demo, impact
       *(1 mark lost per 30s over — rehearse with a timer)*
-- [ ] **(C)** `README.md` with setup instructions a judge can follow
+- [x] **(C)** `README.md` with setup instructions a judge can follow
 - [ ] **(T)** Project description for the Google Form
-- [ ] **(T)** Dry run: fresh clone → follow the README → does it work?
+- [x] **(C)** Dry run: fresh clone → follow the README → does it work? **Yes**,
+      re-run 21 Sep against a clone with no `data/`, no API key and no network:
+      `pip install -r` resolves clean, `run.py --data demo_data` gives 30
+      emails / 5 categories / 4 escalation reasons, `pytest` gives **431
+      passed, 142 skipped, 0 errors**, `uvicorn backend.api.main:app` serves
+      from the repo root with `ready: true`, and `npm ci && npm run build &&
+      npx tsc --noEmit` is clean (645 packages, 0 vulnerabilities, 7 routes).
+      The README's three stale numbers were corrected from it.
+      **Not covered, and each needs the bundle or a browser:** the 520-email
+      path and `score_cli.py` (a judge supplies `data/`), the dashboard
+      driving the API in a browser (verified earlier on the deployed URLs
+      instead), and the macOS/Linux command variants — the Windows ones were
+      the ones run.
 
 ## Phase 5 — Buffer · 22 Sep morning
 
