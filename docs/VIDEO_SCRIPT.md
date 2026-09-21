@@ -1,10 +1,13 @@
 # Demo video — script and running order
 
 **Hard limit 5:00. One mark is deducted per 30 seconds over, so the target is
-now 4:50** — a new slide (below) pushed the old 4:30 target out by the length
-of one more beat, and the margin for a sentence that runs long is down to
-about ten seconds. Rehearse this one with a timer; there is less room in it
-than the earlier cut of this script had.
+now ~4:50, maybe a few seconds past it** — a new slide (below) pushed the old
+4:30 target out by the length of one more beat, and a since-added callback
+line on slide 3 costs another few seconds on top of that. The margin for a
+sentence that runs long is down to five or ten seconds, not thirty.
+**Rehearse this one with a timer** and, if it runs long, the tech-stack
+narration (slide 3) is the one with room to tighten — it is prose describing
+what is already on screen, not a number that needs to be said aloud.
 
 The brief names five parts and this is their order — *Quick intro · The problem ·
 Tech stack · Live demo · Impact*. Slides 1–5 of `/pitch` are those first three
@@ -77,7 +80,8 @@ Don't read the cards out. They are on screen; let them be read.
 > to a real line in the document is never reported as a discrepancy. It goes to
 > a person instead.
 >
-> Python and FastAPI in Docker on Render; Next.js 16 on Vercel; 574 tests."
+> Python and FastAPI in Docker on Render; Next.js 16 on Vercel; 574 tests —
+> one of them deliberately failing, and that's worth coming back to."
 
 ## 1:40 – 1:55 · How we know *(slide 4)*
 

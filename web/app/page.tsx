@@ -60,7 +60,7 @@ export default function HomePage() {
         <div>
           <h2 className="font-heading text-xl font-semibold tracking-tight">What it&apos;s caught so far</h2>
           <p className="text-sm text-muted-foreground">
-            Real numbers from the most recent run over the demo inbox — nothing here is made up.
+            Real numbers from the most recent run over the graded inbox — nothing here is made up.
           </p>
         </div>
         <LiveStats />
@@ -73,7 +73,7 @@ export default function HomePage() {
         <div>
           <h2 className="font-heading text-xl font-semibold tracking-tight">See it work</h2>
           <p className="text-sm text-muted-foreground">
-            Run the pipeline over the demo inbox, or drop in your own SI and BL.
+            Run the pipeline over the graded inbox, or drop in your own SI and BL.
           </p>
         </div>
         <div className="flex gap-3">

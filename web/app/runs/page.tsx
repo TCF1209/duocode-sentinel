@@ -89,7 +89,7 @@ export default function RunsPage() {
         <div>
           <h1 className="font-heading text-2xl font-semibold tracking-tight">Runs</h1>
           <p className="text-sm text-muted-foreground">
-            One run processes the whole demo inbox end to end. Start one to see it work.
+            One run processes the whole graded inbox end to end. Start one to see it work.
           </p>
         </div>
         <div className="flex items-center gap-2">

@@ -1,13 +1,14 @@
 "use client";
 
 /**
- * The pitch, as four screens inside the product rather than a slide file.
+ * The pitch, as five screens inside the product rather than a slide file.
  *
- * The demo video is recorded entirely in this app, so the three parts of the
+ * The demo video is recorded entirely in this app, so the parts of the
  * submission brief that are *not* a live demo — who we are, the problem, the
- * stack — need somewhere on screen to exist. Putting them here means the whole
- * recording is one browser tab with no cutting to a deck, and a judge who opens
- * the deployed link gets the same four screens rather than only the dashboard.
+ * stack, the evidence behind the numbers — need somewhere on screen to exist.
+ * Putting them here means the whole recording is one browser tab with no
+ * cutting to a deck, and a judge who opens the deployed link gets the same
+ * five screens rather than only the dashboard.
  *
  * Arrow keys, click, or the dots. Every screen has to fit 1280x720 without a
  * scrollbar, because that is the size it will be recorded at.
@@ -53,7 +54,7 @@ const TEAM = [
 ];
 const UNIVERSITY = "Asia Pacific University";
 
-const SLIDES = ["Sentinel", "The problem", "Tech stack", "What it does"] as const;
+const SLIDES = ["Sentinel", "The problem", "Tech stack", "How we know", "What it does"] as const;
 
 // The last slide's button sends a presenter on to /runs for the live part of
 // the demo, which unmounts this component — coming back (to re-check Tech
@@ -73,7 +74,15 @@ function readStoredIndex(): number {
 }
 
 export function PitchView() {
-  const [index, setIndex] = useState(readStoredIndex);
+  // Starts at 0 on every render pass, server or client, and only ever reads
+  // sessionStorage after mount (below) -- reading it in the initializer
+  // looked convenient but is a real hydration mismatch, not a harmless
+  // shortcut: Next server-renders this "use client" component too, `window`
+  // does not exist there, so the initializer returns 0 server-side while the
+  // client's first render read whatever slide was actually stored. React
+  // caught server and client disagreeing on the very first paint and threw
+  // "Hydration failed" for the whole page, not just a wrong slide.
+  const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(1);
 
   /**
@@ -89,7 +98,7 @@ export function PitchView() {
    * touched, `go` is the single entry point, and the keyboard handler is a
    * thin wrapper over it instead of a second copy of the clamping logic.
    */
-  const indexRef = useRef(readStoredIndex());
+  const indexRef = useRef(0);
 
   const go = useCallback((next: number) => {
     const clamped = Math.max(0, Math.min(SLIDES.length - 1, next));
@@ -104,6 +113,15 @@ export function PitchView() {
       // minor inconvenience, not worth surfacing to whoever is rehearsing.
     }
   }, []);
+
+  // The one place readStoredIndex() is allowed to actually read
+  // sessionStorage: after mount, client-only, same as any other effect that
+  // syncs from an external source. A silent jump from slide 0 to the
+  // remembered one for one frame is a fine trade for never mismatching SSR.
+  useEffect(() => {
+    const restored = readStoredIndex();
+    if (restored !== 0) go(restored);
+  }, [go]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -132,7 +150,24 @@ export function PitchView() {
   // the densest screen overflowed by 8px on the first attempt and put a
   // scrollbar in the frame.
   return (
-    <div className="flex min-h-[calc(100vh-10rem)] flex-col gap-4">
+    <div className="relative flex min-h-[calc(100vh-10rem)] flex-col gap-4">
+      {/* A blueprint-paper grid, not a texture image -- two repeating linear
+          gradients in the brand's own primary colour at 6% strength, so
+          "precise/engineered" reads through the existing warm palette
+          instead of the blue-glow-and-glass look that would clash with
+          Home/Runs/Compare. `-z-10` on a `relative` root keeps it behind
+          every slide's content without touching layout: a background never
+          adds to document height, so it can't be what reopens the
+          720p-scrollbar problem the way a new line of text could. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(0deg, color-mix(in srgb, var(--primary) 6%, transparent) 0px, transparent 1px, transparent 40px), repeating-linear-gradient(90deg, color-mix(in srgb, var(--primary) 6%, transparent) 0px, transparent 1px, transparent 40px)",
+        }}
+      />
+
       {/*
         No AnimatePresence, and this is the second time today that component
         has been the wrong tool here. With `mode="wait"` the switch hung:
@@ -158,12 +193,12 @@ export function PitchView() {
           initial={{ opacity: 0, x: direction * 28, rotateY: direction * -10, scale: 0.98 }}
           animate={{ opacity: 1, x: 0, rotateY: 0, scale: 1 }}
           transition={{ duration: DURATION.slow, ease: EASE_OUT }}
-          style={{ transformStyle: "preserve-3d" }}
         >
           {index === 0 && <Intro />}
           {index === 1 && <Problem />}
           {index === 2 && <TechStack />}
-          {index === 3 && <Impact />}
+          {index === 3 && <Proof />}
+          {index === 4 && <Impact />}
         </motion.section>
       </div>
 
@@ -242,11 +277,24 @@ function IconButton({
 function Intro() {
   return (
     <motion.div
-      className="flex flex-col items-center gap-6 text-center"
+      className="relative flex flex-col items-center gap-6 text-center"
       initial="hidden"
       animate="show"
       variants={stagger(0.05, 0.08)}
     >
+      {/* Purely decorative, absolutely positioned, zero document-flow height
+          -- this page's other three slides are already within 5-15px of
+          720p's own scrollHeight (see the "fit 720p" fix commit), so
+          anything added here couldn't cost layout space without risking
+          that scrollbar back. A radial glow behind the title can't: it
+          never participates in flow at all. Same technique as the Home
+          roadmap's ship glow, just centred behind text instead of an icon. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute top-1/2 left-1/2 size-72 -translate-x-1/2 -translate-y-1/2"
+        style={{ background: "radial-gradient(circle, var(--primary) 0%, transparent 70%)", opacity: 0.16 }}
+      />
+
       <motion.p
         className="text-xs tracking-[0.2em] text-muted-foreground uppercase sm:text-sm"
         variants={fadeUp}
@@ -439,7 +487,7 @@ const INFRA = [
   "FastAPI · 11 routes",
   "Docker on Render",
   "Next.js 16 on Vercel",
-  "574 tests",
+  "574 tests, 1 held failing on purpose",
 ];
 
 function TechStack() {
@@ -524,19 +572,117 @@ function TechStack() {
 }
 
 // --------------------------------------------------------------------------
-// 4 — what it does
+// 4 — how we know: generalisation, what the model recovers, and the one
+// thing still open. Every number here already lives in README.md /
+// docs/ADVERSARIAL.md -- this slide's only job is putting it where a judge
+// who never opens the repo still sees it, per the same "surface it, don't
+// leave it buried" principle as the rest of this page.
+// --------------------------------------------------------------------------
+const DATASETS = [
+  { name: "Dev set", emails: 520, defects: 46 },
+  { name: "Held-out A", emails: 520, defects: 57 },
+  { name: "Held-out B", emails: 320, defects: 31 },
+  { name: "Held-out C", emails: 820, defects: 91 },
+];
+
+function Proof() {
+  return (
+    <motion.div
+      className="flex flex-col gap-4"
+      initial="hidden"
+      animate="show"
+      variants={stagger(0.05, 0.07)}
+    >
+      <motion.div variants={fadeUp} className="text-center">
+        <h2 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">How we know</h2>
+        <p className="mt-1 text-muted-foreground">
+          Three numbers we didn&rsquo;t have to publish, and one — found by attacking our own system
+          3,008 times — we haven&rsquo;t fixed yet.
+        </p>
+      </motion.div>
+
+      <motion.div variants={fadeUp} className="flex flex-col gap-1.5">
+        <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          Not memorised — four datasets, seeds we never developed against
+        </div>
+        <div className="grid grid-cols-4 gap-2">
+          {DATASETS.map((d) => (
+            <div key={d.name} className="flex flex-col items-center gap-0.5 rounded-lg border bg-card py-2 text-center">
+              <span className="text-xs text-muted-foreground">{d.name}</span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {d.emails}/{d.defects}
+              </span>
+              <span className="font-heading text-lg font-semibold text-primary tabular-nums">1.0000</span>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+
+      <motion.div className="grid gap-3 lg:grid-cols-5" variants={stagger(0, 0.05)}>
+        <motion.div
+          variants={fadeUp}
+          className="flex flex-col gap-2 rounded-xl border border-ai/40 bg-ai-bg/50 p-4 lg:col-span-2"
+        >
+          <div className="text-xs font-medium tracking-wide text-ai uppercase">
+            What the model recovers · unseen labels, 188 documents
+          </div>
+          <div className="flex items-center justify-center gap-3 py-1">
+            <span className="font-heading text-3xl font-semibold text-muted-foreground tabular-nums">168</span>
+            <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+            <span className="font-heading text-3xl font-semibold text-ai tabular-nums">2</span>
+          </div>
+          <p className="text-center text-xs text-muted-foreground">forced to a human, rules alone vs. rules + model</p>
+          <p className="mt-auto border-t pt-2 text-center text-xs">
+            False discrepancies, silent wrong values, masked discrepancies —{" "}
+            <span className="font-medium">all zero, both ways.</span> Recall bought by guessing would
+            have shown up there; it didn&rsquo;t.
+          </p>
+        </motion.div>
+
+        <motion.div
+          variants={fadeUp}
+          className="flex flex-col gap-2 rounded-xl border border-warn/40 bg-warn-bg/40 p-4 lg:col-span-3"
+        >
+          <div className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-warn uppercase">
+            <FileWarning className="size-3.5" strokeWidth={2} />
+            What we haven&rsquo;t fixed
+          </div>
+          <p className="text-sm leading-relaxed">
+            OCR digit confusion (<span className="font-mono text-xs">NANTONG</span> read as{" "}
+            <span className="font-mono text-xs">NANT0NG</span>) makes a scanned document report a defect
+            the shipment does not have — 151 of 188 documents on the dev set.
+          </p>
+          <p className="mt-auto border-t border-warn/30 pt-2 text-xs text-muted-foreground">
+            One of our 574 tests is pinned to fail on purpose until this is fixed — we cannot
+            quietly stop caring about it.
+          </p>
+        </motion.div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// 5 — what it does
+//
+// One isolated number, not four equal ones. Four same-size stat cards read
+// back as "there were some big numbers" -- nobody retells a judge four
+// figures. 11 hours -> 13 seconds is the one worth being able to repeat, so
+// it gets the same before/after treatment as slide 4's 168 -> 2 (muted,
+// arrow, coloured) rather than sitting inside a paragraph at the bottom.
+// The other four numbers still say themselves, just smaller.
 // --------------------------------------------------------------------------
 const NUMBERS = [
-  { value: "520", label: "emails, end to end", sub: "in 13 seconds, on a free-tier container" },
-  { value: "225", label: "planted defects caught", sub: "every one with the exact field set" },
-  { value: "80 / 80", label: "escalations correct", sub: "no false alarms" },
-  { value: "$0", label: "to run the graded inbox", sub: "every decision made by rules" },
+  { value: "520", label: "emails, end to end" },
+  { value: "225", label: "planted defects caught" },
+  { value: "80 / 80", label: "escalations correct" },
+  { value: "$0", label: "to run the graded inbox" },
 ];
 
 function Impact() {
   return (
     <motion.div
-      className="flex flex-col gap-5"
+      className="flex flex-col gap-4"
       initial="hidden"
       animate="show"
       variants={stagger(0.05, 0.07)}
@@ -551,16 +697,40 @@ function Impact() {
         </p>
       </motion.div>
 
-      <motion.div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" variants={stagger(0, 0.06)}>
+      <motion.div
+        variants={fadeUp}
+        className="rounded-xl border border-primary/40 bg-primary/8 p-4 text-center"
+      >
+        <div className="flex items-center justify-center gap-3">
+          <span className="font-heading text-3xl font-semibold text-muted-foreground tabular-nums">11 hours</span>
+          <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+          <span className="font-heading text-4xl font-semibold text-primary tabular-nums">13 seconds</span>
+        </div>
+        {/* Labelled as an estimate on purpose. The 13 seconds is measured;
+            the hours are arithmetic on an assumed pace, and a number that
+            looks measured but is not is the easiest thing for a judge to
+            pull on. */}
+        <p className="mt-1 text-xs text-muted-foreground">
+          520 emails to triage, 124 document pairs to compare — 11 hours is a conservative
+          estimate of the desk work (20s/email, 4min/pair), <em>not a measurement</em>; 13 seconds
+          is measured, on a free-tier container.
+        </p>
+      </motion.div>
+
+      <motion.div className="grid grid-cols-2 gap-2 sm:grid-cols-4" variants={stagger(0, 0.06)}>
         {NUMBERS.map((n) => (
           <motion.div
             key={n.label}
             variants={fadeUp}
-            className="flex flex-col gap-1 rounded-xl border bg-card p-4 text-center"
+            className="flex flex-col items-center gap-0.5 rounded-lg border bg-card py-2 text-center"
           >
-            <span className="font-heading text-4xl font-semibold text-primary">{n.value}</span>
-            <span className="text-sm font-medium">{n.label}</span>
-            <span className="text-xs leading-snug text-muted-foreground">{n.sub}</span>
+            {/* font-heading, matching Home's BigStat/MiniStat and the
+                metrics page's own Stat component -- a stat-card count reads
+                in the serif everywhere else in this app; font-mono is for
+                identifiers (a run id, an email id) and values quoted
+                verbatim from a document, not an aggregate count. */}
+            <span className="font-heading text-lg font-semibold text-primary tabular-nums">{n.value}</span>
+            <span className="text-xs font-medium">{n.label}</span>
           </motion.div>
         ))}
       </motion.div>
@@ -580,17 +750,7 @@ function Impact() {
         </p>
       </motion.div>
 
-      <motion.div className="flex flex-col items-center gap-3" variants={fadeUp}>
-        {/* Labelled as an estimate on purpose. The 13 seconds is measured; the
-            hours are arithmetic on an assumed pace, and a number that looks
-            measured but is not is the easiest thing for a judge to pull on. */}
-        <p className="text-center text-sm text-muted-foreground">
-          One inbox is 520 emails to triage and 124 document pairs to compare. At a conservative
-          20 seconds an email and 4 minutes a pair — <em>an estimate, not a measurement</em> —
-          that is about <span className="font-medium text-foreground">11 hours</span> of desk
-          work. Sentinel does it in <span className="font-medium text-foreground">13 seconds</span>.
-        </p>
-
+      <motion.div variants={fadeUp} className="flex justify-center">
         <motion.div whileTap={TAP} transition={TAP_TRANSITION}>
           <Link href="/runs">
             <Button size="lg">
