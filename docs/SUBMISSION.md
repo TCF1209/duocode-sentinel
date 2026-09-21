@@ -58,41 +58,63 @@ Sentinel
 only in the field's own help text. The version below is **147**. Count again if
 you edit it.
 
-That cap is the whole design constraint, and it forces a decision about what
-150 words are *for*. They are not for restating the problem the judges wrote
-themselves — Problem Statement Understanding is 10 points, against 25 for
-Working Core Prototype and 15 for Technology Integration. So the problem gets
-one clause, and the budget goes on the four things no other entry can copy:
+That cap forces a decision about what 150 words are *for*, and the answer is
+in the judges' own rubric rather than in taste. The detailed criteria are a
+public Google Doc linked from page 4 of the rules PDF
+([preliminary](https://docs.google.com/document/d/1EiI_mqJYeMN0D-dtZ_npCavVGXVcePFmcZ7O4d4ygQI/edit)),
+and its instructions to judges are three lines long:
 
-1. **The rule, stated as a rule** — *never report what it cannot prove*. Shorter
-   and harder than "we escalate uncertain cases", which is merely the thing the
-   problem statement asked every team to do.
-2. **The model held to that same rule.** "Nothing it returns is used until found
-   again in the document" is an anti-hallucination mechanism, and it reads as
-   engineering rather than as the obligatory sentence about using AI.
-3. **That we attacked our own system** with 16 kinds of damage and no answer
-   key, and published what it found: 982 silently wrong values, now zero. Almost
-   nothing in a hackathon field will have been adversarially tested by its own
-   authors, and the number is not fakeable without the work.
-4. **A maximum score on the organisers' own scorer**, re-proved on three draws
-   from *their* generator at seeds we never saw. Naming their generator matters:
-   "three datasets we generated" reads as marking our own homework.
+> • Score each criterion **independently**.
+> • **Do not reward the same evidence twice.**
+> • Base scores on what is **demonstrated, submitted or clearly explained**.
+
+"Do not reward the same evidence twice" is the one that decides the shape.
+Hammering the single most impressive fact earns points in one criterion and
+nothing anywhere else, so the description is not an argument — it is a
+**distribution problem**. Seven criteria, 148 words, and the strongest thing
+we can hand each of them.
+
+An earlier draft that led on the adversarial harness scored well on criterion 4
+and left criteria 5 and 7 — 20 points — with no evidence at all, while its one
+line of stack for criterion 3 matched that criterion's *Weak* band almost
+word for word: *"integration is superficial... or primarily cosmetic."*
+
+Two phrasings are deliberate echoes of the Excellent bands, and both are true:
+**"end-to-end"** is criterion 2's own wording, and naming the organisers' own
+scorer and their generator is what turns criterion 4's *"critical assumptions
+are validated with clear evidence"* into something a judge can check rather
+than take on faith.
 
 ```
 Sentinel — every answer comes with its evidence.
 
-Checking a draft Bill of Lading against its Shipping Instruction means seven fields, by hand. Sentinel does a whole inbox: 520 emails, 124 document pairs, 13 seconds.
+Shipping desks check each draft Bill of Lading against its Shipping Instruction, seven fields, before it is finalised; a missed error means corrections, delays and rework. Sentinel runs that inbox end-to-end, live on Render and Vercel: 520 emails triaged, 124 pairs compared, 13 seconds.
 
-Its rule: never report what it cannot prove. Every value carries the source line it came from, and a gate can overrule the comparison — anything untraceable, blank or damaged goes to a person, not into the report. The model — ambiguous emails, unseen labels, scanned PDFs — obeys it too: nothing it returns is used until found again in the document.
+Its rule: never report what it cannot prove. Every value carries the source line it came from; a gate after the comparison sends anything untraceable, blank or damaged to a person. The model tier — ambiguous emails, unseen labels, scanned PDFs — obeys it too: nothing it returns is adopted until found again in the document.
 
-Then we attacked it ourselves: 16 kinds of document damage, no answer key. The worst exposed 982 silently wrong values, now zero.
+Then we attacked it: 16 kinds of damage, no answer key, 982 silently wrong values now zero. 574 tests. A maximum 1.0000 on the organisers' own scorer — their data, and three unseen draws.
 
-A maximum 1.0000 on the organisers' own scorer — on their dataset, and on three more from their generator at seeds we never saw. 574 tests. Live: FastAPI on Render, Next.js on Vercel.
+Next: per-desk rules, and pattern alerts across a carrier's inbox.
 ```
 
-**Do not reorder it to put the problem first.** Problem Statement Understanding
-is 10 points; Working Core Prototype is 25 and Technology Integration is 15.
-The first sentence a judge reads should be doing work the other fields cannot.
+### What each sentence is there to score
+
+Check this before editing a word out — the cost is usually a whole criterion.
+
+| Rubric criterion | Max | The evidence in the description |
+|---|---:|---|
+| System Design & Architecture | 15 | a gate that runs *after* the comparison; a model tier behind the deterministic one — two stages and their order |
+| Working Core Prototype | **25** | "runs that inbox **end-to-end**, live on Render and Vercel: 520 emails triaged, 124 pairs compared, 13 seconds" |
+| Technology Integration | 15 | the model bound to the same rule — "nothing it returns is adopted until found again in the document" — plus the two deployment targets |
+| Technical Feasibility & Validation | 15 | 16 kinds of damage with no answer key, 982 → 0, 574 tests, 1.0000 on the organisers' scorer over four draws |
+| Problem Statement Understanding | 10 | who (shipping desks), when (before the draft is finalised), why it matters (corrections, delays, rework) |
+| Innovation & Solution Approach | 10 | "never report what it cannot prove" — the rule, stated as a rule |
+| Practical Value & Potential | 10 | "Next: per-desk rules, and pattern alerts across a carrier's inbox" |
+
+**Do not reorder it to put the problem first,** and do not cut the last line to
+save space. Problem Statement Understanding is 10 points and already has its
+sentence; Practical Value is another 10 and that closing line is its only
+evidence in this field.
 
 ### 3. GitHub Repository Link
 
