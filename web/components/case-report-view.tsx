@@ -9,25 +9,6 @@ import { Separator } from "@/components/ui/separator";
 import { fadeUp, stagger } from "@/lib/motion";
 import { FIELD_LABELS, REVIEW_REASON_TEXT } from "@/lib/labels";
 
-/**
- * The discrepancy report — "the screen the whole project exists to produce"
- * (docs/ROADMAP.md 3b). Shared by the run case-detail page and the judge
- * upload page (/compare), since both render the exact same CaseReport shape.
- */
-export function CaseReportView({
-  report,
-  onReview,
-}: {
-  report: CaseReport;
-  onReview?: (body: { decision: "confirm" | "correct"; status?: CaseStatus; defect_fields?: string[]; note?: string }) => Promise<void>;
-}) {
-  // classify/intent.py's signal ids (e.g. "attach.attached-are") ride in the
-  // same `notes` list as human-written sentences. Every human sentence in
-  // this codebase's notes.append() calls contains a space; no signal id
-  // does — cheap, reliable split without needing the backend to tag them.
-  const readableNotes = report.notes.filter((n) => n.includes(" "));
-  const signalNotes = report.notes.filter((n) => !n.includes(" "));
-
 // The backend computes `model_offered` and `model_used` so the page can say
 // which tier answered instead of the reader inferring it from extractor tags.
 // Nothing rendered them, which made the most interesting outcome invisible:
@@ -57,6 +38,25 @@ function ModelTier({ offered, used }: { offered?: boolean; used?: boolean }) {
     </span>
   );
 }
+
+/**
+ * The discrepancy report — "the screen the whole project exists to produce"
+ * (docs/ROADMAP.md 3b). Shared by the run case-detail page and the judge
+ * upload page (/compare), since both render the exact same CaseReport shape.
+ */
+export function CaseReportView({
+  report,
+  onReview,
+}: {
+  report: CaseReport;
+  onReview?: (body: { decision: "confirm" | "correct"; status?: CaseStatus; defect_fields?: string[]; note?: string }) => Promise<void>;
+}) {
+  // classify/intent.py's signal ids (e.g. "attach.attached-are") ride in the
+  // same `notes` list as human-written sentences. Every human sentence in
+  // this codebase's notes.append() calls contains a space; no signal id
+  // does — cheap, reliable split without needing the backend to tag them.
+  const readableNotes = report.notes.filter((n) => n.includes(" "));
+  const signalNotes = report.notes.filter((n) => !n.includes(" "));
 
   return (
     <motion.div
