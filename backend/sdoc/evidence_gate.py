@@ -72,6 +72,7 @@ GATE_STATUSES: tuple[str, ...] = (
     "unreadable",
     "wrong_document",
     "blank_value",
+    "ocr_confusable",
     "untraceable_value",
 )
 
@@ -522,10 +523,18 @@ def _evaluate(
 
     blank_fields: list[str] = []
     blank_signals: list[str] = []
+    ocr_fields: list[str] = []
     for c in comparisons:
         si_bad = _side_unusable(c.si)
         bl_bad = _side_unusable(c.bl)
         if c.verdict != UNCOMPARABLE and not si_bad and not bl_bad:
+            continue
+        if c.reason == "ocr_confusable" and not si_bad and not bl_bad:
+            # Both documents state this field and both readings are legible.
+            # It belongs to the branch below, which says so; folding it in
+            # here would tell the operator the value is missing while they
+            # are looking straight at it.
+            ocr_fields.append(c.field)
             continue
         blank_fields.append(c.field)
         for role, bad_side in (("SI", si_bad), ("BL", bl_bad)):
@@ -555,6 +564,31 @@ def _evaluate(
             ),
             blocked_signals=blank_signals,
             recovery="Ask the sender to confirm the missing field(s) before the BL is released.",
+        )
+
+    # ---- 5b. the two readings differ only where OCR confuses glyphs -------
+    # `NANT0NG` against `NANTONG` is one port and a bad scan, not two ports.
+    # `compare.py` refuses to call that a discrepancy; the gate refuses to let
+    # the case be auto-decided either way, because the other possibility is
+    # that the character really is different and we cannot tell from the text
+    # layer alone. Both readings go to the operator, who can see the page.
+    if ocr_fields:
+        fields = _sorted_fields(ocr_fields)
+        return GateDecision(
+            status="ocr_confusable",
+            review_reason="unreadable",
+            reason=(
+                "The two documents differ on "
+                + ", ".join(f.replace("_", " ") for f in fields)
+                + " only in characters OCR routinely confuses (O/0, I/1, S/5,"
+                " B/8) — this reads as a scanning error rather than a"
+                " discrepancy, but the text alone cannot settle which."
+            ),
+            blocked_signals=[f"ocr_confusable:{f}" for f in fields],
+            recovery=(
+                "Compare the two values against the original pages; if they are"
+                " the same party or port, the draft BL is clean on this field."
+            ),
         )
 
     # ---- 6. can we actually find what we claim to have read? --------------

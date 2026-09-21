@@ -28,7 +28,10 @@ Fields: `shipper` `consignee` `notify_party` `port_of_loading`
 3. **Values are compared with exact equality after normalisation, never
    fuzzily.** The entity pools contain near-identical names that are genuinely
    different parties/ports; a similarity threshold swallows real defects.
-   Fuzzy matching is for *labels* only.
+   Fuzzy matching is for *labels* only. The single amendment is
+   `compare.ocr_confusable`, and the test it must pass to stay is that it
+   **never produces `MATCH`** — it escalates, so its worst case is a wasted
+   review rather than a cleared BL (`docs/DECISIONS.md` §D2).
 4. **A blank or unreadable value is not a discrepancy.** It is
    `NEEDS_REVIEW`. Reporting `MISMATCH` on a `???` field is a false alarm and
    costs precision.

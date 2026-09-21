@@ -111,8 +111,8 @@ over all 16 modes and 20,496 reads of the dev bundle:
 
 | | pass rate | silent wrong values | false discrepancies |
 |---|---:|---:|---:|
-| all 16 modes | **88.4%** | 1,056 | 151 of 3,008 documents |
-| excluding `ocr_confusions` | **93.8%** | 74 | **0** |
+| all 16 modes | **88.4%** | **74** | **0** of 3,008 documents |
+| excluding `ocr_confusions` | **93.8%** | 74 | 0 |
 
 Both rows belong here and the second is not a flattering cut. `ocr_confusions`
 is the one mode that genuinely alters the value — the document really does now
@@ -122,6 +122,17 @@ two without a second source (§5.1). Every other mode leaves a document a human
 reads identically, which is where the invariance is a clean test of us. Quote
 the 88.4% as the honest whole-suite figure and the 93.8% only with that
 sentence attached.
+
+**The pass rate did not move when the OCR defences went in, and that is the
+correct result.** The two columns beside it did: silent wrong values fell from
+1,056 to 74 and false discrepancies from 151 to 0 (§4.4). The invariance
+relation still fails on `ocr_confusions` — 972 reads still change, because the
+document genuinely does say something different now, and no amount of care
+makes `NANT0NG` read as `NANTONG` with certainty. What changed is the
+consequence of that failure. Before, a changed read was used as fact; now it
+is escalated. **Fail-safe rather than fail-silent** is the property worth
+claiming here, and it is deliberately not the same claim as a higher pass
+rate. Anyone quoting this suite should say both numbers and this sentence.
 
 Per mode, worst first: `ocr_confusions` 6.2%, `unseen_labels` 14.1%,
 `wrapped_value` 93.5%, and **100% on the other thirteen** — punctuation drift,
@@ -166,10 +177,16 @@ document**, i.e. per case the pipeline decided.
 | `case_lower_labels` | case and spacing noise | 1281 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `label_inner_spaces` | case and spacing noise | 1281 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `label_indented` | case and spacing noise | 1281 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| `ocr_confusions` | OCR-style confusion | 80 | 1181 | 20 | 982 | 219 | **151** | 0 | 168 |
+| `ocr_confusions` | OCR-style confusion | 80 | 972 | 229 | **0** | 1201 | **0** | 0 | 168 |
 | `reordered_fields` | reordered fields | 1281 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
-`escGain`: 168 for `unseen_labels`, 17 for `ocr_confusions`, 0 elsewhere.
+`escGain`: 168 for `unseen_labels`, 168 for `ocr_confusions`, 0 elsewhere.
+
+The `ocr_confusions` row is the one §4.4 changed, and the shape of the change
+is worth reading rather than skimming: `ok` is identical, `silent` and
+`falseD` are at zero, and everything that used to sit in `silent` has moved
+into `escal`. `lost` rose from 20 to 229 because a damaged number is now
+refused rather than parsed short. No other row moved.
 
 ## 3. Results — held-out seed 20260922
 
@@ -193,26 +210,27 @@ only works on the draw it was written against is not a fix.
 | `case_lower_labels` | case and spacing noise | 1169 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `label_inner_spaces` | case and spacing noise | 1169 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `label_indented` | case and spacing noise | 1169 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| `ocr_confusions` | OCR-style confusion | 106 | 1058 | 5 | 949 | 114 | **150** | 0 | 154 |
+| `ocr_confusions` | OCR-style confusion | 106 | 873 | 190 | **0** | 1063 | **0** | 0 | 152 |
 | `reordered_fields` | reordered fields | 1169 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
-`escGain`: 152 for `unseen_labels`, 4 for `ocr_confusions`, 0 elsewhere.
+`escGain`: 152 for `unseen_labels`, 152 for `ocr_confusions`, 0 elsewhere.
 
 The held-out draw agrees with the dev draw on the shape of every finding:
 layout and punctuation modes are clean, unseen wording costs recall and
-nothing else, OCR noise invents defects at a comparable rate (151/188 = 80% of
-dev documents, 150/172 = 87% held out — the held-out draw is the worse of the
-two, not the same), and the truncation repair holds. Two findings do not
-replicate, and neither is smoothed over here.
+nothing else, the OCR defences hold — zero silent wrong values and zero
+invented defects on both draws — and the truncation repair holds. One finding
+does not replicate, and it is not smoothed over here.
 
-1. The masked discrepancy in `wrapped_value` is 1 on dev and 0 here — see
-   §5.2: it needs a particular pair of party names to be drawn, and this seed
-   did not draw one. Its absence is luck, not immunity.
-2. `escGain` for `ocr_confusions` is 17 on dev and 4 held out. So the second of
-   the "two smaller findings" in §5.1 is a property of the dev draw, not of the
-   pipeline: on this seed OCR noise almost never converts an auto-decision into
-   an escalation — it converts it into a `MISMATCH`. Read 17 as one draw's
-   number, not as a rate.
+* The masked discrepancy in `wrapped_value` is 1 on dev and 0 here — see
+  §5.2: it needs a particular pair of party names to be drawn, and this seed
+  did not draw one. Its absence is luck, not immunity.
+
+`escGain` for `ocr_confusions` used to be the interesting disagreement between
+the two draws — 17 on dev against 4 held out, i.e. OCR noise almost never
+converted an auto-decision into an escalation, it converted it into a
+`MISMATCH`. It is now 168 and 152, every perturbed document on both draws.
+That is not a finding about the draws any more, it is the defences in §4.4
+doing exactly one thing, and the number is worth no more attention than that.
 
 ---
 
@@ -380,60 +398,142 @@ is the last item in §7, and it outlives this fix.
 
 ---
 
+### 4.4 OCR character damage — `normalize.py` and `compare.py`
+
+The worst row in the suite was `ocr_confusions`, and it was worst in the two
+ways that matter most: 982 reads were changed and used anyway, and 151 of 188
+perturbed documents reported a defect the shipment does not have. Both are now
+zero. Two separate changes did it, and they are separate on purpose because
+the two fields families fail differently.
+
+| `ocr_confusions`, dev bundle | before | after |
+|---|---:|---:|
+| reads unchanged (the pass rate) | 80 | 80 |
+| **silent wrong values** | **982** | **0** |
+| escalated | 219 | 1,201 |
+| **false discrepancies** | **151** | **0** |
+| masked discrepancies | 0 | 0 |
+
+Everything the suite measures moved in one direction or stayed put. No other
+mode changed at all.
+
+**The numeric half was not a comparison problem, it was a parsing problem —
+and a worse one than the row implied.** `normalize._NUM_RE` is a prefix match,
+so a damaged number did not fail to parse, it parsed *short*:
+
+```
+216,9S0 KG   ->  matched "216,9"  ->  2169 kg      (should be 216,950)
+13B MT       ->  matched "13"     ->  13,000 kg    (should be 138,000)
+2I6950       ->  matched "2"      ->  2 kg
+```
+
+A confident, plausible, wrong number on a field whose planted defects are
+±500 kg, and nothing downstream could tell a truncated number from a short
+one. `normalize.digits_contaminated` now rejects a number whose own edges
+touch a glyph OCR confuses with a digit (`O I l S B`), which makes the value
+unparseable and sends the case to a human — the treatment `CLAUDE.md` rule 4
+already prescribes for a value we cannot read.
+
+The check is at the *edges of the matched number* rather than anywhere in the
+value, and that was measured rather than assumed: checking the whole value
+turns 72 readable container counts into escalations and buys no accuracy,
+because in `6 x 4O'HC` the damage is in the box size and the count is still a
+legible 6. Checked against every distinct raw value of both numeric fields
+across all four datasets — 643 of them — zero legitimate values are rejected.
+
+**The text half is the one that needed a judgement.** `compare.ocr_confusable`
+holds when two canonical values are the same length and every differing
+position carries two characters from the **same** confusion class. `NANTONG`
+against `NANT0NG` qualifies; `215950` against `218950` does not (5 and 8 are
+in different classes); `NANTONG, CHINA` against `RUGAO/NANTONG/SHANGHAI,
+CHINA` does not (different lengths). A field that qualifies becomes
+`UNCOMPARABLE`, and the gate escalates it with its own status and its own
+wording — both documents plainly state the field, so telling the operator it
+is missing would destroy their trust in every other escalation.
+
+This is the only place in the pipeline where two values that are not equal are
+not reported as a discrepancy, so the argument for it has to be exact. It does
+not reopen the door `DATA_NOTES.md` §4 closed, for one reason:
+
+> **It never produces `MATCH`.** Its worst case is a human looking at a pair
+> that was fine. A similarity threshold's worst case is a cleared bill of
+> lading. That asymmetry is the whole difference, and it is why a threshold
+> stays banned while this does not.
+
+The measured cost of that worst case is zero: escalation precision and recall
+are still 1.000 on all four datasets, and the veto fires on none of the 520
+graded emails. Like the untraceable veto in §6, it is insurance carried at no
+charge on this inbox, and unlike that one it has a measured payoff — 151
+invented defects removed under adversarial noise.
+
+And the falsification that matters: across the entity pools of all four
+datasets, **none of 804 pairs of genuinely different parties and ports is
+confusable**, and none is even within two characters at equal length. The
+planted defects swap whole entities; there is no defect in this data the veto
+could swallow. `backend/tests/test_ocr_confusion.py` re-runs that sweep, so a
+future pool containing a confusable pair fails the suite rather than quietly
+losing the defect it belongs to.
+
+**What this does not fix** is the pass rate, and §5.1 says why it cannot.
+
+---
+
 ## 5. What is still open
 
-### 5.1 OCR character confusion — 151 of 188 documents invent a defect
+### 5.1 OCR character confusion — 972 reads still change, none of them silently
 
-Swapping a single character per value — `O`/`0`, `I`/`1`, `S`/`5` and `B`/`8`
-in both directions, plus a one-way lowercase `l` → `1` (`_OCR_MAP`,
-`backend/tools/adversarial.py`) — is the worst row in the table by a distance:
-1,181 of 1,281 field reads change, 982 of them silently, and 151 of the 188
-perturbed dev documents (150 of 172 on the held-out seed) end in a `MISMATCH`
-reporting a defect the shipment does not have. `NANTONG, CHINA` becomes `NANT0NG, CHINA`, a human reads it as Nantong,
-and exact-equality comparison — correctly, by `DECISIONS.md` §D2 — calls it a
-different port.
+This was the worst row in the suite and it is still the worst row: 6.2% of
+reads survive it, against 100% on thirteen of the sixteen modes. What §4.4
+changed is what happens next, not whether it happens. The consequence columns
+are at zero — no silent wrong value, no invented defect — and the reads
+themselves still move, because they genuinely have moved. `NANTONG, CHINA`
+became `NANT0NG, CHINA`; a human reads Nantong; the text alone cannot prove
+it. That gap does not close with better rules.
 
-**The honest caveat.** This perturbation is not like the others. Every other
-mode preserves the characters of the value, so a changed reading is
-unambiguously our fault. This one edits the value itself. The document now
-genuinely says `NANT0NG`, and no system can distinguish "the scanner misread a
-digit" from "the document really says that" without a second source of truth.
-Fuzzy value matching would appear to fix it and would be the wrong trade: the
-entity pools hold `APRIL FINE PAPER TRADING` beside
-`APRIL FINE PAPER TRADING (MIDDLE EAST) FZE`, and any threshold loose enough to
-forgive one swapped glyph swallows a real planted defect. So this row is
-reported, not closed. It is a worst case for *this* mode — `_ocr_swap`
-alters at most one character per value — not an upper bound on character-level
-noise in general; two swaps per value would cost more. It is not a to-do item
-with an obvious fix.
+So what is left open here is not a bug with a fix pending. It is the limit of
+reading one document: **a character-level ambiguity needs a second source, and
+this pipeline has one source.** The veto in §4.4 makes the ambiguity visible
+and hands it to someone who can look at the page. It does not resolve it, and
+nothing that works from the text layer alone could.
 
-**The mitigation that already exists.** Our own OCR never feeds a decision.
+Three things worth keeping straight about the residual:
+
+**The veto is not free in general, only here.** Its cost is a spurious
+escalation whenever two genuinely different values happen to differ only on
+confusable glyphs at equal length. That costs nothing on this data — 804
+entity pairs, zero confusable, escalation precision still 1.000 — but a real
+entity pool with `BLOCK 5` and `BLOCK S` in it would pay. The trade is
+deliberate and it is the right way round: an extra pair of eyes, never a
+cleared BL.
+
+**This mode is a floor, not a ceiling.** `_ocr_swap` alters at most one
+character per value. Two swaps in one value would defeat the length test only
+if they changed the length, which they do not — so the veto still fires — but
+a scan bad enough to drop or double a character produces a length change, and
+a length change reads as a real difference. That case is unmeasured.
+
+**Our own OCR still never feeds a decision, and that has not changed.**
 `readers/scan.py` transcribes an image-only PDF *for the reviewer only*: it
 never sets `doc.readable`, never writes `doc.text` and never touches
-`doc.chunks`, so the case still ends in `NEEDS_REVIEW` with reason
-`unreadable`, and the transcript arrives as context attached to that
-escalation. The failure mode measured here therefore requires a document that
-was OCR'd *before it reached us* — a scan someone else converted and sent as
-text. That is a real scenario in an ops inbox, which is why the row stays in
-this document, but it is not a path our own pipeline can walk into.
+`doc.chunks`, so a scanned document ends in `NEEDS_REVIEW` with reason
+`unreadable` and the transcript arrives as context attached to that
+escalation. The failure mode measured in this row therefore requires a
+document whose text layer was produced by *someone else's* OCR — a real
+scenario in an ops inbox, and the reason the row stays in this document, but
+not a path our own pipeline can walk into.
 
-Two smaller findings inside the same row, and neither is as good as it first
-looks.
+**The `container_count` finding is closed.** It used to read 72 unchanged /
+90 changed / 20 lost, and the 90 were the bad ones: `1 x 40'HC` damaged to
+`I x 40'HC` left the *box size* as the first number and the count came back as
+**40** — a confident wrong integer on a compared field, and the common case
+rather than the rare one. The digit guard makes that value unparseable. The
+triple is now 72 / 54 / 56: the same 72 legible counts, and every count we can
+no longer trust escalated instead of guessed.
 
-**`container_count` is misread far more often than it is lost.** The triple is
-72 unchanged / **90 changed** / 20 lost on dev, and 102 / 59 / 5 held out. The
-20 losses are the safe outcome — a missing number escalates, per rule 4 in
-`CLAUDE.md` — but the field is misread 90 times, 4.5× more often than it is
-safely lost on dev and nearly 12× on the held-out draw. The mechanism is
-not "the count stops parsing": `container_count` takes the first number in the
-value, so `10 x 20'FCL` → `I0 x 20'FCL` leaves a bare `0`, out of range, and
-the read is lost — but `1 x 40'HC` → `I x 40'HC` leaves the *box size* as the
-first number and the count comes back as **40**. That is a confident wrong
-integer on a compared field, and it is the common case here, not the rare one.
-
-**The escalation gain does not replicate.** 17 dev documents gained an
-escalation they did not have before, but only 4 on the held-out seed (§3). It
-is one draw's number.
+**The escalation-gain number was never sound and is now moot.** 17 dev
+documents gained an escalation they did not have before, against 4 on the
+held-out seed — one draw's number, quoted here only so nobody rediscovers it
+and believes it.
 
 ### 5.2 One masked discrepancy in `wrapped_value` — unfixable by this repair
 

@@ -69,6 +69,28 @@ also merges the two pairs above — and a planted discrepancy silently disappear
 Fuzzy matching would make the system *look* more tolerant while making it
 *quietly* worse.
 
+**The one amendment, and why it is not an exception.** `compare.ocr_confusable`
+treats two values that are the same length and differ only where both
+characters sit in one OCR confusion class (`O`/`0`, `I`/`1`, `S`/`5`, `B`/`8`)
+as a case for a human. That is not a threshold reopened by the back door,
+because of a property the tests pin: **it never produces `MATCH`.** A pair it
+fires on becomes `UNCOMPARABLE` and ends in `NEEDS_REVIEW` with both readings
+attached.
+
+The asymmetry is the whole argument. A similarity threshold's worst case is a
+cleared bill of lading; this veto's worst case is a human looking at a pair
+that was fine. The first loses a defect silently, the second costs an
+escalation visibly, and the second is the direction every other decision in
+this system already leans.
+
+It is also falsifiable rather than asserted: across the entity pools of all
+four datasets, none of 804 pairs of genuinely different parties and ports is
+confusable, and none is even within two characters at equal length — the
+planted defects swap whole entities. `backend/tests/test_ocr_confusion.py`
+re-runs that sweep, so a future pool that does contain such a pair fails the
+build rather than quietly losing a defect. Measured effect:
+`docs/ADVERSARIAL.md` §4.4.
+
 ---
 
 ## D3 · PDFs are read from word coordinates, not from extracted text

@@ -4,6 +4,77 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-21 — Claude session 6 · the evidence gate measured, and the OCR row closed
+
+**Done**
+- **Ablated the evidence gate** instead of continuing to argue for it
+  (`scripts/ablate_gate.py`, `ADVERSARIAL.md` §6). Layered arms, one veto at a
+  time, scored by the organisers' own scorer. The result is not flattering and
+  is written up as it came out: `final_score` cannot move, because Stage 3
+  excludes gold `NEEDS_REVIEW` emails and end-to-end counts only gold defect
+  emails — so a veto whose job is to stop us auto-deciding an uncertain case
+  has nowhere to appear in the headline number. The effect lands on escalation
+  recall (1.000 → 0.750 without the blank veto), which the organisers report
+  and deliberately leave unweighted. **The untraceable veto — the distinctive
+  half — fires on zero of 520 emails.** On this inbox it is untested, not
+  proven.
+- **Closed the worst row in the adversarial suite** (`ADVERSARIAL.md` §4.4),
+  which turned out to be two different defects wearing one name.
+  - The numeric half was a *parsing* bug and worse than the row implied:
+    `normalize._NUM_RE` is a prefix match, so `216,9S0 KG` parsed as **2169
+    kg** and `13B MT` as 13,000 instead of 138,000 — confident wrong numbers on
+    a field whose planted defects are ±500 kg, and nothing downstream could
+    tell a truncated number from a short one. `normalize.digits_contaminated`
+    now refuses a number whose own edges touch a digit lookalike.
+  - The text half needed a judgement call: `compare.ocr_confusable` sends two
+    equal-length values that differ only where both characters sit in one OCR
+    confusion class to a human rather than reporting a discrepancy.
+  - Measured on the dev bundle: silent wrong values **982 → 0**, invented
+    defects **151 → 0**, masked defects 0 → 0, readable container counts
+    unchanged at 72. Held-out seed agrees (949 → 0, 150 → 0). All four
+    datasets still score **1.0000** with escalation precision and recall both
+    1.000, and the veto fires on none of the 520 graded emails.
+- Narrowed the digit guard after measuring it, not before. Checking the whole
+  value instead of the parsed number's edges cost 72 readable container counts
+  and bought no accuracy — in `6 x 4O'HC` the damage is in the box size.
+- **Falsified the veto before shipping it** rather than reasoning about it:
+  across the entity pools of all four datasets, none of 804 pairs of genuinely
+  different parties and ports is confusable, and none is even within two
+  characters at equal length. `backend/tests/test_ocr_confusion.py` (41 tests)
+  re-runs that sweep so a future pool containing such a pair fails the build.
+  Suite is 573 passing.
+- **Fixed a trap in `scripts/evaluate.py` that nearly cost this change.** It
+  hardcoded `data/_grader/ground_truth.json` while `--data` accepted any
+  dataset, so re-scoring the three held-out draws returned 0.0998 / 0.0672 /
+  0.0844 — a catastrophic-looking regression that was entirely the wrong
+  answer key. It now prefers the dataset's own key and prints which one it
+  used. The held-out re-run in `SCORING.md` §4.1 is exactly the step where a
+  good change is most likely to be rolled back for the wrong reason.
+
+**Next**
+- The (T) items are the whole remaining critical path: slide deck, ≤5-min demo
+  video, project description, Google Form by 22 Sep 12:00. Nothing in the code
+  is blocking them.
+- `ROADMAP.md` 3d's open decision (curated `demo_data/` vs the whole
+  participant bundle) is still open and still (T).
+
+**Careful**
+- **The amendment in `CLAUDE.md` rule 3 has exactly one justification and it
+  must survive any future edit: `ocr_confusable` never produces `MATCH`.** It
+  escalates. The moment someone widens it into something distance-based, or
+  lets it return a match on a "close enough" pair, it becomes the similarity
+  threshold `DECISIONS.md` §D2 bans, and it will swallow a planted defect. The
+  trap tests in `test_ocr_confusion.py` are there to fail first.
+- The gate ablation says the gate costs nothing *on this inbox*. It does not
+  say the gate earns the score, and §6 is worded to stop anyone quoting it
+  that way. The untraceable veto's value is argued in §1, on documents this
+  generator cannot produce — not measured on the graded set.
+- `ADVERSARIAL.md`'s headline pass rate **did not move** (88.4%) and will not:
+  the reads still change because the document genuinely changed. Only the
+  consequence columns moved. Quote both or neither.
+
+---
+
 ## 2026-09-19 — Claude session 5 · Phase 3b (`web/` dashboard) built and verified
 
 **Done**

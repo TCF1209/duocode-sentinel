@@ -137,6 +137,7 @@ Keep this table updated every time the number moves — it is the evidence for
 | 2026-09-19 | `a6a09c2` | 1.000 | 1.000 | 1.000 | **1.0000** | 100% | row-based value column; regression fixed |
 | 2026-09-19 | (Phase 2 close) | 1.000 | 1.000 | 1.000 | **1.0000** | 100% | robustness fixes: alt separators, wrap repair, short-synonym fuzzy guard |
 | 2026-09-21 | (Phase 3 close) | 1.000 | 1.000 | 1.000 | **1.0000** | 100% | API review propagation + retry; nothing in `backend/sdoc/` changed |
+| 2026-09-21 | (OCR defences) | 1.000 | 1.000 | 1.000 | **1.0000** | 100% | digit guard + confusion veto: the decision path changed, the number did not |
 
 The Phase 3 row is here for completeness rather than news: the reviewer
 correction path and the retry endpoint live in `backend/api/` and the CLI that
@@ -150,6 +151,24 @@ end-to-end axis counts only gold defect emails. The effect lands on escalation
 recall — 1.000 with the blank veto, 0.750 without — which the organisers report
 and deliberately leave unweighted. Read the two together: this table says the
 gate costs nothing, §6 says what it is buying.
+
+The last row is the one to read carefully, because it is the only change in
+this project that touched the **decision path** — what the system is willing
+to call a discrepancy. Two values that differ only on OCR-confusable glyphs now
+go to a human, and a number whose digits are glued to a digit lookalike is
+refused rather than parsed short. The score is unchanged on all four datasets
+and so is escalation precision and recall, which is the result that had to
+hold before the change could ship: it fires on none of the 520 graded emails.
+What it is worth is measured somewhere this table cannot see — under
+adversarial OCR noise, silent wrong values fall 982 → 0 and invented defects
+151 → 0 (`ADVERSARIAL.md` §4.4).
+
+Re-running the three held-out draws for that row also exposed a trap in
+`scripts/evaluate.py`: it graded every dataset against `data/_grader/`, so the
+held-out sets came back at 0.0998, 0.0672 and 0.0844 — a regression that was
+entirely the wrong answer key. Fixed to prefer the dataset's own
+`ground_truth.json` and to print which one it used. Worth knowing about,
+because §4.1 below is precisely where someone would meet it.
 
 The Phase 2 row is the other kind of entry worth keeping: behaviour changed in
 three places — `readers/rows.py`, `compare.py` and `labels.py` — and the number

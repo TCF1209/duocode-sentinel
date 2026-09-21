@@ -41,10 +41,21 @@ const CARD_STYLE: Record<Verdict, string> = {
   UNCOMPARABLE: "border-warn/30 bg-warn-bg/60",
 };
 
+// Most uncomparable reasons are a state ("BL missing") and read fine as a
+// label. This one is a claim about the two values, and "Ocr confusable" tells
+// a reviewer nothing about what to do -- they need to know that both readings
+// are there and that the difference is in glyphs a scanner mixes up.
+const REASON_TEXT: Record<string, string> = {
+  ocr_confusable:
+    "Same length, differing only in characters OCR confuses (O/0, I/1, S/5, B/8) -- likely one value read two ways. Check both against the pages.",
+};
+
 // "bl_missing" -> "BL missing", not "Bl missing" -- si/bl are the document
 // acronyms this whole app is built around, so a generic capitalize-first-
 // letter reads like a typo of them.
 function formatReason(reason: string) {
+  const override = REASON_TEXT[reason];
+  if (override) return override;
   const words = reason.split("_").map((w) => (w === "si" || w === "bl" ? w.toUpperCase() : w));
   const joined = words.join(" ");
   return joined.charAt(0).toUpperCase() + joined.slice(1);

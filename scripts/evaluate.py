@@ -62,7 +62,17 @@ def main() -> int:
 
     # ---- 2. score it --------------------------------------------------
     score_cli = GRADER / "score_cli.py"
-    truth = GRADER / "ground_truth.json"
+
+    # The dataset's own answer key wins over the grader's copy. `--data` takes
+    # any dataset, and a held-out draw carries its own `ground_truth.json`;
+    # grading it against `data/_grader/` — which answers for the dev bundle
+    # only — produces a number near 0.08 that looks exactly like a catastrophic
+    # regression. That is a trap worth closing rather than documenting: the
+    # held-out re-runs in `docs/SCORING.md` §4.1 are the step where a good
+    # change is most likely to be rolled back for the wrong reason.
+    truth = (ROOT / args.data) / "ground_truth.json"
+    if not truth.is_file():
+        truth = GRADER / "ground_truth.json"
     if not (score_cli.exists() and truth.exists()):
         print("\nNo local grader found — skipping scoring.")
         print("See docs/SCORING.md for how self-evaluation works.")
@@ -72,6 +82,8 @@ def main() -> int:
         print("\n--limit produces a partial submission; the scorer counts every "
               "missing email as wrong. Treat the numbers below as a smoke test only.")
 
+    print()
+    print("  scoring against " + str(truth.relative_to(ROOT)))
     proc = run([py, str(score_cli), str(submission),
                 "--ground-truth", str(truth), "--json"])
     if proc.returncode != 0:

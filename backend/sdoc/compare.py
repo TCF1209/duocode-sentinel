@@ -66,6 +66,7 @@ UNCOMPARABLE_REASONS: tuple[str, ...] = (
     "bl_blank",
     "si_unparseable",
     "bl_unparseable",
+    "ocr_confusable",
 )
 
 # Absolute tolerance for gross weight, in kilograms.
@@ -280,6 +281,79 @@ def _side_of(doc: Optional[DocFields], field: str) -> FieldValue:
 
 
 # --------------------------------------------------------------------------
+# OCR confusion
+#
+# `NANT0NG` against `NANTONG` is not a different port. It is the same port
+# read by an engine that cannot tell O from 0, and reporting it as a port
+# discrepancy sends an operator to look for a routing error that does not
+# exist. The adversarial harness measures the cost: injecting one confusable
+# character per field into one document of each pair invents **151** defects
+# on the dev bundle.
+#
+# This is the one place in the module that does not decide by exact equality,
+# so it is worth being precise about what it is and is not:
+#
+#   * It never returns MATCH. Two values that differ only on confusable
+#     characters are `UNCOMPARABLE`, which becomes `NEEDS_REVIEW` upstream
+#     with both readings side by side. The worst case is therefore a
+#     *spurious escalation* — a human looks at a pair that was fine — and
+#     never a masked defect. That asymmetry is why this does not violate the
+#     "no fuzzy value matching" rule in `docs/DATA_NOTES.md` §4: a similarity
+#     threshold is dangerous because it can *clear* a BL, and this cannot.
+#   * The test is not a distance. Both values must be the same length and
+#     every differing position must hold two characters from the **same**
+#     confusion class. `215950` vs `218950` is not confusable (5 and 8 are in
+#     different classes), and `NANTONG, CHINA` vs `RUGAO/NANTONG/SHANGHAI,
+#     CHINA` is not confusable (different lengths).
+#   * It is applied to party and port names only. A damaged number does not
+#     reach this point: `normalize.digits_contaminated` already makes it
+#     unparseable, which is the safer treatment for a field whose defects are
+#     small integers.
+#
+# Checked against the entity pools of all four datasets: of 804 pairs of
+# genuinely different parties and ports, **zero** are confusable under this
+# test — and none is even within two characters at equal length. The planted
+# defects swap whole entities, so there is no defect in this data that this
+# veto could swallow. `backend/tests/test_ocr_confusion.py` re-runs that sweep
+# over the dev bundle, so a future entity pool that does contain a confusable
+# pair fails the suite instead of quietly losing a defect.
+#
+# There is deliberately no cap on how many characters may differ. A cap would
+# add no safety here (nothing is close) and would make the veto miss a badly
+# scanned document, which is the case it exists for.
+# --------------------------------------------------------------------------
+_OCR_CLASSES: tuple[frozenset[str], ...] = (
+    frozenset("O0"),
+    frozenset("I1"),
+    frozenset("S5"),
+    frozenset("B8"),
+)
+
+#: Fields the veto applies to. Numbers are excluded on purpose — see above.
+_OCR_CHECKED = PARTY_FIELDS + PORT_FIELDS
+
+
+def _same_confusion_class(a: str, b: str) -> bool:
+    return any(a in cls and b in cls for cls in _OCR_CLASSES)
+
+
+def ocr_confusable(a: str, b: str) -> bool:
+    """Do these two canonical values differ *only* where OCR confuses glyphs?
+
+    >>> ocr_confusable("NANTONG CHINA", "NANT0NG CHINA")
+    True
+    >>> ocr_confusable("NANTONG CHINA", "NANTONG INDIA")
+    False
+    >>> ocr_confusable("APRIL FINE PAPER", "APRIL FINE PAPER MIDDLE EAST")
+    False
+    """
+    if a == b or len(a) != len(b):
+        return False
+    differing = [(x, y) for x, y in zip(a, b) if x != y]
+    return bool(differing) and all(_same_confusion_class(x, y) for x, y in differing)
+
+
+# --------------------------------------------------------------------------
 # Public API
 # --------------------------------------------------------------------------
 def compare_field(field: str, si_value: FieldValue, bl_value: FieldValue) -> FieldComparison:
@@ -298,6 +372,11 @@ def compare_field(field: str, si_value: FieldValue, bl_value: FieldValue) -> Fie
                                si=si_out, bl=bl_out, reason=reason)
 
     same = _RULES[field].equal(_source(si_value), _source(bl_value))
+    if not same and field in _OCR_CHECKED and ocr_confusable(si_key or "", bl_key or ""):
+        # Same value, different glyphs. Hand it to a human with both readings
+        # rather than calling it a discrepancy or calling it clean.
+        return FieldComparison(field=field, verdict=UNCOMPARABLE,
+                               si=si_out, bl=bl_out, reason="ocr_confusable")
     return FieldComparison(
         field=field,
         verdict=MATCH if same else MISMATCH,
@@ -466,6 +545,7 @@ def _display_value(field: str, fv: FieldValue) -> str:
 
 __all__ = [
     "compare_documents",
+    "ocr_confusable",
     "compare_field",
     "defect_fields",
     "uncomparable_fields",

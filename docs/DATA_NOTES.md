@@ -130,6 +130,22 @@ planted discrepancy disappears. So:
   punctuation removed, UN/LOCODE stripped).
 * **labels** → fuzzy is fine and necessary (see Trap 3b).
 
+**One narrow amendment, added after the adversarial suite measured the cost of
+not having it.** Two canonical values of the same length that differ only
+where both characters sit in one OCR confusion class — `O`/`0`, `I`/`1`,
+`S`/`5`, `B`/`8` — go to a human instead of being reported as a discrepancy.
+`NANT0NG, CHINA` is not a second port, it is a bad scan, and reporting it sent
+an operator hunting for a routing error that does not exist 151 times on the
+dev bundle.
+
+This does not reopen the door this section closes, and the distinction is
+exactly the one that matters here: **the veto never produces a match.** It
+produces `NEEDS_REVIEW` with both readings attached. A similarity threshold
+can clear a bad BL; this can only cost an extra pair of eyes. None of the
+three pairs in the table above is confusable under it — two differ in length,
+and `TOPKOPY` against `EAST BRIGHT` differs in every way — and neither is any
+other pair in the pools (`docs/DECISIONS.md` §D2 has the sweep).
+
 ### Addresses are deliberately not compared
 
 When the generator swaps a consignee name it leaves the old address block in
@@ -143,6 +159,15 @@ entity name only — the first line / the part before the `|`.
 * `gross_weight_kg`: `"131,058 KG"`, `"215,950"`, and a bare integer `216950`
   (xlsx stores it as a number) all mean the same thing. `MT`/`tonnes` are
   converted to kg.
+* **A number whose digits are glued to a digit lookalike is refused, not
+  read.** The number regex is a prefix match, so `216,9S0 KG` used to parse as
+  **2169 kg** and `13B MT` as 13,000 instead of 138,000 — a confident wrong
+  quantity on a field whose planted defects are ±500 kg.
+  `normalize.digits_contaminated` now makes those unparseable, which is the
+  `missing_value` path in §5 and the behaviour rule 4 already asks for. The
+  check looks at the edges of the number it parsed, not the whole value:
+  in `6 x 4O'HC` the damage is in the box size and the count is still a
+  legible 6.
 
 ---
 

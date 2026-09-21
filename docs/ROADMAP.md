@@ -65,11 +65,20 @@ unfamiliar label wording, an unseen layout, a real scan. That is Phase 2.
       is the evidence enough for an operator to act on? **Still open, and it is a
       human's job**: a score cannot tell us whether a reason reads sensibly.
 
-**Result.** Three findings, two closed. Missing colons / dashes / indented labels
-cost every field on the page (safe, but useless) — fixed in `readers/rows.py`.
-Party names wrapped across two lines produced 74 *silent wrong values* — fixed in
-`compare.py`, false discrepancies 64 → 0, and provably inert on real data. OCR
-character confusion remains open and is stated plainly in `ADVERSARIAL.md` §5.
+**Result.** Three findings, all three now closed. Missing colons / dashes /
+indented labels cost every field on the page (safe, but useless) — fixed in
+`readers/rows.py`. Party names wrapped across two lines produced 74 *silent
+wrong values* — fixed in `compare.py`, false discrepancies 64 → 0, and provably
+inert on real data. OCR character confusion was the last and the worst: 982
+silent wrong values and 151 invented defects, both now **zero** — fixed in
+`normalize.py` (a damaged number is refused rather than parsed short) and
+`compare.py` (a value differing only on confusable glyphs escalates rather than
+being reported), written up in `ADVERSARIAL.md` §4.4.
+
+What §5.1 still says, and should: the *reads* still change, because the
+document genuinely says something else. The pass rate did not move and was
+never going to. What moved is the consequence — fail-safe instead of
+fail-silent.
 
 The review also found a hole the harness structurally *cannot* see: short synonyms
 ("POL", "POD") fuzzy-matched inside long strings, so `NAPOLI CENTRALE` resolved to
