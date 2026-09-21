@@ -5,157 +5,172 @@ number and the list of things **not** to say are in
 [`VIDEO_SCRIPT.md`](VIDEO_SCRIPT.md) — read that once before the first take,
 not during.
 
-**Target 4:50. Hard limit 5:00, one mark per 30 seconds over.**
+**Target 4:46. Hard limit 5:00, one mark per 30 seconds over.**
+The spoken text is **597 words — 4:11 at a normal 145 wpm** — and the section marks
+below already include 35 seconds for clicking, page loads and the run itself,
+which leaves **14 seconds of margin**. If you still run long, slide 3 is the one
+to tighten: it is prose describing what is already on screen. Do not drop a beat
+to save time — each is scoring a different rubric criterion.
 
 > **Before you press record:** wake <https://sdoc-sentinel-api.onrender.com>,
-> then start a run and let it finish and throw it away. A cold first run is
-> 41.6 s; the next is 12.7 s, and 12.7 s is what "thirteen seconds" below is
-> describing. Window 1280×720, on `/pitch` slide 1.
+> then start a run, let it finish, and throw it away. A cold first run is
+> 41.6 s; the next is 12.7 s, and 12.7 s is what "thirteen seconds" below
+> describes. Window 1280×720, on `/pitch` slide 1.
+
+**Three rules this script is built on.** A judge is watching a dozen of these.
+So: the first fifteen seconds have to earn the next four minutes; nothing is
+said twice, because the rubric tells judges not to credit the same evidence
+twice; and never read a number the screen is already showing — say what it
+*means* instead.
 
 ---
 
-### 0:00 – 0:20 · slide 1
+### 0:00 – 0:16 · slide 1 · **the hook**
 
-> We're DuoCode — Tang Chye Fong and Lim Yee Teng, from Asia Pacific
-> University. Our project is **Sentinel**, and its one promise is the line on
-> the screen: every answer comes with its evidence.
-
-*Don't read the team cards out. They're on screen.*
-
-**→ next slide**
-
-### 0:20 – 1:00 · slide 2
-
-> A shipping desk gets five kinds of mail in one inbox. When someone asks them
-> to check a document, a person opens the Shipping Instruction next to the
-> draft Bill of Lading and compares seven fields — shipper, consignee, notify
-> party, load port, discharge port, containers, gross weight — before the draft
-> is finalised.
+> A document checker that is confidently wrong is worse than no checker at
+> all — because nobody goes back and looks.
 >
-> Three things make that slow. Finding the right emails is manual. Comparing by
-> hand is repetitive, and a missed discrepancy becomes a correction, a delay and
-> rework. And the same field is printed differently on the two documents — one
-> says *Port of Loading*, the other says *Load Port*, and nothing in the text
-> says they're the same thing.
+> We're DuoCode. Sentinel is built on one rule: **it never reports anything it
+> cannot prove.**
+
+*Slow down on the last seven words. That sentence is the whole video, and
+everything after it is evidence for it. Don't read the team cards — they're on
+screen.*
+
+**→ slide 2**
+
+### 0:16 – 0:47 · slide 2 · the problem
+
+> A shipping desk gets five kinds of mail in one inbox. For a document check,
+> someone compares the Shipping Instruction against the draft Bill of Lading —
+> seven fields, by hand. Miss one and it's a correction, a delay, rework.
 >
-> There's a fourth case, and it's the one we built around: **sometimes the check
-> can't be done at all.** An unreadable scan, a blank field, the wrong document
-> attached. That has to reach a person with the reason attached — not be guessed
-> at, and not fail quietly.
+> And sometimes the check **can't be done at all**: an unreadable scan, a blank
+> field, the wrong document. That has to reach a person with the reason — not be
+> guessed at.
 
-**→ next slide**
+**→ slide 3**
 
-### 1:00 – 1:40 · slide 3
+### 0:47 – 1:29 · slide 3 · three decisions
 
-> The core is deterministic and runs with no API key and no network. pdfplumber
-> rebuilds a PDF's rows and columns from word coordinates rather than reading
-> flattened text. Labels resolve in three passes — exact, then regex, then fuzzy
-> with a minimum-length guard. Values are canonicalised and compared **exactly**
-> — never by similarity score, because a threshold loose enough to forgive a
-> scanning artefact also merges two genuinely different companies.
+*Not a list of libraries — a list of choices, each with its reason.*
+
+> Three decisions. **We read structure, not text** — word coordinates rebuild
+> the form's rows and columns, because a flattened PDF loses which value belongs
+> to which label. **Labels match by meaning, values exactly** — never by
+> similarity, because a threshold that forgives a scan artefact also merges two
+> real companies. And **the model goes only where the rules admit they can't
+> read**, with nothing adopted until it's found again in the source.
 >
-> A model tier sits behind that for three jobs the rules can't do: classifying
-> an ambiguous email, reading a field label we've never seen, and transcribing
-> an image-only PDF with no text layer.
+> Then the **evidence gate** overrules all three: a value nobody can trace to a
+> real line becomes a question for a person, never a discrepancy.
+
+**→ slide 4**
+
+### 1:29 – 2:24 · slide 4 · **the part nobody else has**
+
+*The longest beat in the video, on purpose. It is the one claim a team that
+didn't do the work cannot make.*
+
+> A perfect score on the dataset you were handed proves you didn't memorise it.
+> It doesn't prove the reader works.
 >
-> And after both of them, the **evidence gate** — a value nobody can trace back
-> to a real line in the document is never reported as a discrepancy. It goes to
-> a person instead.
+> So we attacked it ourselves — three thousand perturbed documents, sixteen
+> kinds of damage, **no answer key**. The reference is how that same document
+> read before we damaged it.
 >
-> Python and FastAPI in Docker on Render; Next.js 16 on Vercel; 574 tests — one
-> of them deliberately failing, and that's worth coming back to.
+> Thirteen of the sixteen don't move at all. On labels we've never seen, the
+> model turns a hundred and sixty-eight forced escalations into two — with false
+> discrepancies still at zero.
+>
+> And on the right is the one we didn't have to show you. One masked
+> discrepancy — a real mismatch reported as a match. **A defect we hide is worse
+> than one we miss**, so one of our 574 tests is pinned to fail until we fix it.
 
-**→ next slide**
-
-### 1:40 – 1:55 · slide 4
-
-> This isn't just the dev set — the same rules score 1.0000 on three more
-> datasets we never trained against. And on labels we've never seen, the model
-> turns a hundred and sixty-eight forced escalations into two, without a single
-> wrong answer. The one thing we haven't fixed yet is up there too.
-
-*Don't read the two callout cards word for word — they're dense enough to be
-read off the screen.*
-
-**→ next slide, then click the button through to `/runs`**
+**→ slide 5, then the button through to `/runs`**
 
 ---
 
-### 1:55 – 2:20 · press **Start a run**
+### 2:24 – 2:48 · press **Start a run**
 
-> This is the real inbox — 520 emails, the organisers' full bundle, running on a
+> This is the real inbox — 520 emails, the organisers' full bundle, on a
 > free-tier container.
 
-*Let the progress panel fill. It holds for a couple of seconds after the run
-finishes — point at the final tally while it's up:*
+*While it fills — don't read the tally off the screen:*
 
-> Thirteen seconds. 220 document checks, 125 instruction requests, 75 invoice
-> queries, 60 general, 40 spam. 45 mismatches, and 21 cases it refused to
-> decide.
+> Every one classified, every document pair compared, on rules alone. No model
+> call, no network. Thirteen seconds.
 
-### 2:20 – 2:55 · open a **MISMATCH** case
+### 2:48 – 3:10 · open a **MISMATCH** case
 
-> Here's the Shipping Instruction on the left, the draft Bill of Lading on the
-> right, seven fields, and the ones that disagree are flagged. The part that
-> matters is underneath each value — **the line it was read from**. A reviewer
-> doesn't have to go back to the source document to trust this; the source is
-> already here. That's what lets us tell "the document genuinely says something
-> different" apart from "we read the document wrong".
+> Seven fields, and the two that disagree are flagged. But look underneath each
+> value — **the line it was read from**. That's the promise from the first
+> slide, on screen: a reviewer never has to open the source document to trust
+> this.
 
-### 2:55 – 3:15 · open a **NEEDS_REVIEW** case
+### 3:10 – 3:27 · open a **NEEDS_REVIEW** case
 
-> And this is the other half. No confident guess — the reason it stopped, and
-> the evidence a person needs to settle it. When the reviewer corrects it, the
-> correction goes into the report, and the system's own answer stays visible
-> beside it rather than being overwritten.
+> And here's the other half. No confident guess: the reason it stopped, and the
+> evidence a person needs to settle it. The reviewer's correction goes into the
+> report, beside the system's own answer.
 
-### 3:15 – 4:00 · go to `/compare` — **this is the AI beat**
+### 3:27 – 4:18 · go to `/compare` — **the AI beat**
 
-> Judges shouldn't have to take our word for it, so anyone can drop in two
-> documents of their own.
+> You shouldn't have to take our word for it — anyone can drop in two documents
+> of their own.
 
-*Load the `unfamiliar-labels` pair. Run it with the toggle **OFF** first:*
+*Load the `unfamiliar-labels` pair. Run with the toggle **OFF** first:*
 
-> This pair uses wording our label table has never seen — *Sender of Goods*
-> instead of *Shipper*, *Deliver To* instead of *Consignee*. On rules alone the
-> honest answer is that we can't read it, so it escalates.
+> This pair says *Sender of Goods* where our table says *Shipper*. On rules
+> alone the honest answer is that we can't read it — so it escalates rather than
+> guessing.
 
 *Now turn the toggle **ON** and re-run:*
 
-> With the model tier on, it reads the unfamiliar labels, every value gets
-> re-located in the source document before it's adopted — and there's a real
-> discrepancy in here on the notify party that it surfaces, with the evidence.
-> The badge says **model answered**. That's the model earning its place on the
-> case the rules admitted they couldn't do.
+> With the model on it reads those labels, every value re-located in the source
+> before it's adopted — and it surfaces a real discrepancy on the notify party,
+> with the evidence. The badge says **model answered**: the model earning its
+> place on exactly the case the rules couldn't do.
 
 ---
 
-### 4:00 – 4:40 · back to `/pitch`, slide 5
+### 4:18 – 4:40 · back to `/pitch`, slide 5 · impact
 
-> Scored on the organisers' own scorer across four draws of their generator, at
-> three different sizes: **1.0000**. 225 planted defects, every one caught with
-> the exact set of fields wrong, no false alarms, and all 80 escalations
-> correct.
->
-> One inbox is 520 emails to triage and 124 document pairs to compare. At a
-> conservative estimate that's around eleven hours of desk work. Sentinel does
-> it in thirteen seconds, and **every decision on that inbox was made by rules —
-> it costs nothing to run.** The model is thirteen hundredths of a cent per
-> document, spent only on the tail the rules can't read.
+*Everything here is new. The 1.0000 was slide 4's job — don't say it again.*
+
+> 520 emails and 124 document pairs — at a conservative estimate, about eleven
+> hours of desk work. Sentinel does it in thirteen seconds, and **every decision
+> there was made by rules, so it costs nothing to run.**
 >
 > Cheap because the model is *aimed*, not because it's absent.
 
-### 4:40 – 4:50 · close
+### 4:40 – 4:46 · close
 
 > Sentinel, by DuoCode. Every answer comes with its evidence. Thank you.
 
 ---
 
-## Three sentences to get right
+## Four sentences to get right
 
+- **"it never reports anything it cannot prove"** — the hook. Land it slowly;
+  every later beat is evidence for that one line.
 - **"at a conservative estimate"** before the eleven hours. It is an estimate,
-  not a measurement, and slide 5 says so in print.
-- **"thirteen seconds"** only works on a warm container. See the note at the
+  not a measurement, and the slide says so in print.
+- **"thirteen seconds"** is true of a warm container only. See the note at the
   top.
-- Never **"our pipeline is 89% AI"**. It isn't — the model does no work on the
+- Never **"our pipeline is 89% AI."** It isn't — the model does no work on the
   graded inbox. `VIDEO_SCRIPT.md` has the other two traps.
+
+## What changed from the previous cut, and why
+
+Ordered against the judges' own rubric, which tells them to score each
+criterion independently and **not to credit the same evidence twice**.
+
+| | |
+|---|---|
+| A hook at 0:00 | The old opening spent its first minute on our names and on the problem statement the judges wrote themselves. Nothing in it separated us from the eleven videos before ours. |
+| Slide 3 is decisions, not libraries | Technology Integration's *Weak* band is "integration is superficial… primarily cosmetic" and *Developing* is "relies heavily on boilerplate". A list of library names sounds like both, even when the work isn't. |
+| Slide 4 grew from 15s to 37s | Attacking our own reader with no answer key, and publishing the defect it found, is the one claim here that a team which didn't do the work cannot make. It had five words. |
+| 1.0000 is said once | It was in slide 4 *and* in Impact. In a five-minute budget that is a wasted beat, and the rubric will not pay for it twice. |
+| The run beat stopped reading the screen | "220, 125, 75, 60, 40" is already visible. Saying what it means costs the same seconds and adds something. |
+| It now actually fits | The previous cut was **866 spoken words**. Read at a normal pace that is 5:46 before a single click is counted — over the hard limit, and nobody had added it up. This one is 597 words and 4:46 including the waits, measured section by section. |
