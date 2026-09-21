@@ -21,6 +21,15 @@ Built by **DuoCode** for the Averis × Monash Hackathon 2026.
 > `render.yaml` and `web/vercel.json`; the runbook is
 > [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
+![The discrepancy report: Shipping Instruction and draft Bill of Lading side by side, with the document, line number, printed label and raw text under every value](docs/img/report.png)
+
+*One case out of 520. `Consignee` and `Notify Party` disagree — and under every
+value, matched or not, is the document it came from, the line number, the label
+as it was printed there, and the raw text. The line above the fields is the
+evidence gate reporting that all 14 compared values were located in their
+source; had one of them not been, this case would have gone to a person instead
+of being reported as a discrepancy.*
+
 | | |
 |---|---|
 | **Accuracy** | **1.0000** final score on the dev set **and** on three held-out draws, generated from the organisers' own generator with seeds we never developed against — 225 planted defects, every one caught with the **exact** field set, no false alarms, all 80 escalations correct. Not four *independent* tests, and `docs/SCORING.md` §4.1 says why. |
@@ -47,10 +56,23 @@ that brief asks for are listed here with the section that answers each:
 | **Challenges faced** | [Challenges faced](#challenges-faced) — five defects found by measurement, what each cost, and the one still open |
 | **Future roadmap** | [Future roadmap](#future-roadmap) — five items in build order, and the one thing we would deliberately not do |
 
-Two more that the brief does not ask for and a reader should have anyway:
-[What the evidence shows, and what it does
-not](#what-the-evidence-shows-and-what-it-does-not), and [Where the data comes
-from](#where-the-data-comes-from).
+### Two sections that argue against this page
+
+The brief asks for neither. They are the two we would open first if we were
+marking this, because they are where a submission usually stops being honest.
+
+- [**What the evidence shows, and what it does
+  not**](#what-the-evidence-shows-and-what-it-does-not) — 1.0000 on four
+  datasets is evidence about *one generator*, and this page says so before a
+  judge has to ask. Then the harness we built to break ourselves: 16
+  perturbation modes over 3,008 perturbed documents and 20,496 field reads,
+  with **no answer key** — the unperturbed reading is the reference — and the
+  one row that still bends, reported as it came out.
+- [**Where the data comes from**](#where-the-data-comes-from) — the organisers'
+  package reached us containing the answer key and the dataset generator, which
+  their own README says it should not have. What we did with each, and the one
+  command that checks it: `grep -rn ground_truth backend/ --include=*.py`
+  returns nothing.
 
 ---
 
@@ -145,6 +167,13 @@ replace, not a rewrite of the routes.
 `/runs/[runId]` · `/runs/[runId]/cases/[emailId]` — the side-by-side report
 with the source line under every value, which is the screen the project exists
 to produce · `/runs/[runId]/metrics` · `/compare` · `/pitch`.
+
+![The run view: 520 of 520 emails processed, filterable by category and status, each row showing the category, the outcome, which fields are defective and whether a rule or the model decided it](docs/img/inbox.png)
+
+*`/runs/[runId]` on the deployed demo. Every row records which tier answered —
+`decided_by` is `rule` for all 520 on this inbox, which is the cost argument in
+[§2.1 of the architecture](docs/ARCHITECTURE.md) made visible rather than
+claimed.*
 
 **Deployment.** Committed, not clicked into a dashboard: the root `Dockerfile`
 and `render.yaml` build the API, `web/vercel.json` the frontend. Runbook and
