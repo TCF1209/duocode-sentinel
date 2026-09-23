@@ -94,19 +94,67 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
   reader used everywhere `.docx` is read is not a change to rush two days
   before a live pitch.
 
+**Later the same day — the two disclosed gaps above, closed, plus what
+closing them cost in bookkeeping**
+
+Asked explicitly to close every finding from the external-validation pass
+rather than leave both disclosed. Both turned out safe to fix once actually
+scoped:
+
+- **`readers/office.py`** now recognises a container-manifest table (3+
+  columns, header row names a container column) and derives
+  `container_count` from the row count, fed into `extract/fields.py`'s
+  existing scoring as an ordinary chunk — no change to that module at all.
+  `gross_weight_kg` from such a table is still left open on purpose: summing
+  per-container weights into a shipment total is a domain judgement call,
+  not a parsing gap. 7 new tests
+  (`test_office_container_manifest.py`), and the original CMA CGM document
+  re-run to confirm `container_count` now reads `1` and `MATCH`s the BL.
+- **`compare._extend`** now anchors on `evidence.locator` when it names a
+  line, instead of `text.find`'s first occurrence — the last known,
+  deliberately-pinned gap, `docs/ADVERSARIAL.md` §5.4. The strict `xfail`
+  pinning it was run first with the marker still in place to see the XPASS
+  happen, then removed per the test's own documented instruction.
+- **Both are provably inert on the graded data**, same standard as the
+  `labels.py` fix earlier the same day: `adversarial.py` against
+  `bundle_data/` reports all 16 modes byte-identical to the run before each
+  fix, because neither triggering shape occurs in the real 520-email set.
+- **Found something to fix in the bookkeeping, not the pipeline**: these two
+  fixes, on top of the `labels.py` one, meant three commits had now touched
+  `backend/sdoc/` since `4c852a7` — which made the README's own literal
+  claim, "no commit since has touched `backend/sdoc/`", false, with a `git
+  log` command a judge could run and get a non-empty result from. Not a
+  claim the score moved; a specific, checkable sentence that stopped being
+  checkable-true. Rewrote it as a table (commit, why the score can't have
+  moved) and fixed every other place quoting the now-stale `574`/`1 xfail`
+  figures or the §5.4 framing — including a mix-up predating this session,
+  not introduced by it: the real `1 masked discrepancy` `bundle_data/` has
+  always belonged to §5.2 (`email_145`, unfixable by the repair *by
+  construction*, still open), not §5.4, which fired on zero real documents
+  both before today's fix and after it.
+- Final count: **440 passed, 0 failed, 0 xfailed** locally (582 total,
+  reasoned from `574 + 8 new`, arithmetic explained in the README rather
+  than asserted as a fresh clone's own output — this checkout is not a
+  fresh clone and its skip count does not match the documented 142 for
+  reasons that predate this session).
+
 **Careful**
 - **`data/_grader/` is not on this machine**, so the literal `1.0000` score
-  could not be re-verified here — what *was* verified, on the real
-  committed `bundle_data/`, is that the adversarial harness's full set of
-  safety numbers (false discrepancies, silent wrong values, masked
-  discrepancies — the things this session's `labels.py` change could
-  plausibly have moved) are byte-for-byte what `docs/ADVERSARIAL.md`
-  already states. Different evidence than re-running the scorer, not
-  weaker evidence for what this session actually changed.
+  could not be re-verified here for any of today's four `backend/sdoc/`
+  commits — what *was* verified, on the real committed `bundle_data/`, is
+  that the adversarial harness's full set of safety numbers (false
+  discrepancies, silent wrong values, masked discrepancies) are
+  byte-for-byte identical before and after every one of them. Different
+  evidence than re-running the scorer, not weaker evidence for what changed.
 - **The `shipper` API field is additive and read-only**, but it is still a
   boundary crossed on purpose after a specific ask to keep it in check —
   worth another look before it is taken for granted on the next feature
   that wants "just one more field."
+- **The README's fresh-clone test counts (440 passed / 142 skipped) are
+  computed, not re-observed** — re-run `pytest backend/tests` on an actual
+  fresh clone before quoting that split as measured; the pass count and
+  zero `xfailed` are what every commit message above verified directly, the
+  142 is carried over from before `4c852a7`.
 - Two local servers (`uvicorn` on `:8000` against `bundle_data/`, the
   dashboard on `:3000`) were left running through this whole session for
   live verification. Stop whatever owns those ports before starting your
