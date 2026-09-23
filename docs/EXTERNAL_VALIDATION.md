@@ -53,17 +53,33 @@ in `bundle_data/`, the committed 520-email set, and a full re-run of
 documents, 20,496 field reads — matches `docs/ADVERSARIAL.md` exactly,
 zero movement.
 
-**Open, not fixed.** CMA CGM's real container table is six columns, one
-row per container (`Nr`, `Container Nr`, `Seal Nr`, packages, description,
-gross weight). `readers/office.py`'s `.docx` table reader assumes a
-two-column label:value table — the module's own docstring says so — so
-neither `container_count` nor `gross_weight_kg` was read from it. The
-failure was safe: both came back `missing`, not guessed, and the case
+**Found, then fixed the same day.** CMA CGM's real container table is six
+columns, one row per container (`Nr`, `Container Nr`, `Seal Nr`, packages,
+description, gross weight). `readers/office.py`'s `.docx` table reader
+assumed a two-column label:value table — the module's own docstring said
+so — so neither `container_count` nor `gross_weight_kg` was read from it.
+The failure was safe: both came back `missing`, not guessed, and the case
 correctly escalated rather than reporting a fabricated comparison.
-Generalising the table reader to recognise a multi-column data table is a
-real change to a reader used everywhere `.docx` is read, and was left open
-rather than rushed two days before a live pitch — the same choice already
-made once for the truncation-repair `xfail` in `docs/ADVERSARIAL.md` §5.4.
+
+Fixed the narrower, safer half: `read_docx` now recognises a table whose
+header row names a "container" column and has 3+ columns as a manifest —
+one row per container — and derives `container_count` from the row count,
+emitted as an ordinary `Chunk(label="Container Count", ...)` that flows
+through the existing scoring in `extract/fields.py` completely unchanged.
+Detection requires 3+ columns, so it is unreachable from any 2-column
+label:value table — the shape every table in the graded 520-email set
+actually uses — which a full re-run of `backend/tools/adversarial.py`
+against `bundle_data/` confirms directly: all 16 modes, zero movement,
+identical to the run before this fix. Re-run against this same CMA CGM
+document: `container_count` now reads `1`, `MATCH` against the BL side.
+
+**Still open, deliberately not fixed:** `gross_weight_kg`. Extracting it
+from a manifest table means deciding whether a real form ever needs
+per-container weights *summed* into one shipment total, which is a
+domain judgement call, not a parsing gap — the wrong guess there is worse
+than the `missing` it produces today. Left open rather than decided alone
+under a two-day clock; the same choice already made once for the
+truncation-repair `xfail` in `docs/ADVERSARIAL.md` §5.4.
 
 **Also noted.** `doctype.py` scored this document `UNKNOWN` at 0.00
 confidence for every known type. `POST /compare` does not gate on
