@@ -262,7 +262,13 @@ whole participant bundle. **(T) to decide.**
 - Confidence calibration: show *why* a case was escalated, with a score
 - Reviewer corrections feed back into the synonym table (a learning loop)
 - Batch view: "12 emails from this carrier all mismatch on POD" — pattern alerts
-- Throughput/cost projection at real inbox volume
+- **Built** (24 Sep): throughput/cost projection at real inbox volume —
+  `web/components/metrics-page-view.tsx`, the metrics page. Two figures, both
+  grounded rather than guessed: processing time scales the run's own measured
+  `mean_ms_per_email`, and cost shows both "at today's mix" (the run's own
+  measured $/email) and a worst-case ceiling at $0.0013/document
+  (`docs/ADVERSARIAL.md` §8, the rate measured when every field is unfamiliar
+  wording).
 - Multi-tenant: per-desk rules (AIE / AFPTME / AFRT / AFEMY)
 
 ---

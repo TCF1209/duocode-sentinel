@@ -468,9 +468,12 @@ Beyond the hackathon, in the order we would actually build them:
    discharge" is a different and more valuable statement than twelve separate
    reports. The data is already in `report.json`; this is an aggregation the
    dashboard does not yet do.
-4. **Throughput and cost at real inbox volume.** We measure ~3 ms per email and
-   $0 on the graded set. A desk needs the projection at its own volume, with
-   the model tier's cost as a function of how unfamiliar its documents are.
+4. **Throughput and cost at real inbox volume — built.** The metrics page now
+   projects both onto a desk's own volume: processing time scales the run's
+   own measured ms/email, and cost shows two figures rather than one guess —
+   "at today's mix" (this run's own measured $/email, $0 on the graded set)
+   and a worst-case ceiling at $0.0013/document, the rate measured when every
+   field carries wording the rules have never seen (§8 below).
 5. **Per-desk rules.** The four desks in this dataset (AIE, AFPTME, AFRT,
    AFEMY) have different forms and different tolerances. The stage boundaries
    already allow a per-desk label table and a per-desk escalation policy; the
