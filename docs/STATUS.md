@@ -73,16 +73,27 @@ higher here than earlier the same day, not lower.
   instead. Verified passively, not by re-triggering it manually:
   corrected a case via the API with the browser left alone, waited past
   one 20s tick untouched, watched the stat strip move on its own.
+- **Pattern-level batch draft, the other half of the mailto: ask.** "N
+  cases from this shipper, one summary email instead of N separate ones."
+  `buildPatternDraft()` (`lib/reply-draft.ts`) reuses the same
+  `{subject, body}` shape `buildReplyDraft` already returns; the "To"
+  line collects every *distinct* sender across the cases in that pattern
+  group, not one picked arbitrarily. Verified this was not a
+  hypothetical before trusting it: a real 6-case pattern in
+  `bundle_data/` (APRIL FINE PAPER TRADING (MIDDLE EAST) FZE, Container
+  Count) turned up 6 different individual senders at the same company,
+  confirming live the same "a real thread can carry more than one
+  signature" reasoning the per-case mailto: work was already built on.
+  Kept as its own small component rather than generalising
+  `ReplyDraftPanel` — that panel was already fully verified earlier the
+  same night, and reopening it to save a dozen duplicated form lines
+  was the wrong trade under the same time pressure.
 - All of the above: build, `tsc --noEmit`, `lint` clean after every
   commit; the sender-threading backend change additionally re-verified
   against `bundle_data/` the same way as the day's earlier backend
   changes (full suite, adversarial harness byte-identical).
 
 **Next**
-- **The pattern-level batch draft** ("N cases from this shipper, one
-  summary email instead of N separate ones") — approved, not yet built.
-  Natural extension of `lib/reply-draft.ts`'s now-structured
-  `{subject, body}` shape.
 - **Continue the critical design pass** — explicitly asked not to assume
   the current design is already right, and to keep looking rather than
   stop at the items already found. In progress; not a fixed backlog.
