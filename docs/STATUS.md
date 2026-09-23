@@ -94,9 +94,18 @@ higher here than earlier the same day, not lower.
   changes (full suite, adversarial harness byte-identical).
 
 **Next**
-- **Continue the critical design pass** — explicitly asked not to assume
-  the current design is already right, and to keep looking rather than
-  stop at the items already found. In progress; not a fixed backlog.
+- **The critical design pass stopped deliberately, not because time ran
+  out.** Looked fresh at the home page and `/compare` after the pattern-
+  draft work; found nothing else worth the same bar of confidence the
+  items above were held to. Padding this list with marginal nitpicks to
+  look busy was exactly the failure mode worth naming and not doing —
+  see this file's own long-standing rule about not adding complexity
+  beyond what a change actually needs. `/compare`'s upload flow itself
+  is still only verified through the API directly (`docs/STATUS.md`
+  session 5 already flagged this once): this session's browser tool has
+  no way to drive a native OS file picker, so the actual click-to-upload
+  interaction remains the one thing about that page nobody has watched
+  happen in a live browser.
 - Slide deck, the branch push/merge decision and the Mentor Session
   email reply are all still exactly where the last entry left them —
   human tasks, untouched by anything overnight.
@@ -114,10 +123,20 @@ higher here than earlier the same day, not lower.
   `OK`) purely to verify the sync/staleness fixes end to end. In-memory
   only — gone on the next backend restart, never touched real data or
   anything committed.
-- Local servers (`uvicorn` on `:8000` against `bundle_data/`, dashboard
-  on `:3000`) are still up from earlier the same session, now serving
-  the fully current code. Same standing note as every prior entry: stop
-  whatever owns those ports before starting your own.
+- **Session ended clean**: full backend suite re-run one more time after
+  every change tonight — 440 passed, 0 failed, 0 xfailed, same as the
+  last checkpoint. Frontend `build` + `tsc --noEmit` + `lint` re-run
+  together on the accumulated state, not just per-commit — all clean.
+  Both local servers stopped (not left running this time — there is no
+  next step queued that needs them up). To look at any of this live:
+  `SENTINEL_DATA_ROOT=bundle_data .venv/Scripts/python.exe -m uvicorn
+  backend.api.main:app --port 8000`, then `npm --prefix web run dev`,
+  then `POST /runs` to get a fresh run (the store is in-memory and empty
+  on every restart, same as every prior session's note on this).
+- **22 commits total on `feat/final-round-differentiators` for the whole
+  2026-09-24 session**, counted with `git log main..HEAD --oneline` just
+  now rather than estimated — that command is the complete, literal list
+  if a summary here or in chat ever disagrees with the branch.
 
 ---
 
