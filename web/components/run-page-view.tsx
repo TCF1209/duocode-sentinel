@@ -238,6 +238,40 @@ export function RunPageView({ runId }: { runId: string }) {
         )}
       </AnimatePresence>
 
+      {/* The shape of the whole run, without scrolling a 520-row list or
+          leaving for /metrics to find it -- landing on this page from Runs
+          is exactly the moment "how did this one go" is the first question,
+          and the cost/rule-share half is the product's own cost argument
+          (docs/DECISIONS.md D1), put where the first click after Runs
+          actually lands instead of one tab away. */}
+      {run?.metrics && (
+        <motion.div
+          className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border bg-card px-4 py-3 text-sm"
+          variants={fadeUp}
+        >
+          <span className="flex items-center gap-1.5">
+            <span className="size-1.5 rounded-full bg-ok" />
+            {STATUS_LABELS.OK} <span className="font-medium tabular-nums">{run.metrics.by_status?.OK ?? 0}</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="size-1.5 rounded-full bg-danger" />
+            {STATUS_LABELS.MISMATCH}{" "}
+            <span className="font-medium tabular-nums">{run.metrics.by_status?.MISMATCH ?? 0}</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="size-1.5 rounded-full bg-warn" />
+            {STATUS_LABELS.NEEDS_REVIEW}{" "}
+            <span className="font-medium tabular-nums">{run.metrics.by_status?.NEEDS_REVIEW ?? 0}</span>
+          </span>
+          <span className="text-muted-foreground sm:ml-auto">
+            {Math.round(run.metrics.rule_share * 100)}% resolved by rules
+            {run.metrics.llm_calls === 0
+              ? ", 0 model calls"
+              : `, ${run.metrics.llm_calls} model call${run.metrics.llm_calls === 1 ? "" : "s"}`}
+          </span>
+        </motion.div>
+      )}
+
       <PatternAlerts runId={runId} cases={cases} />
 
       <motion.div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border bg-card px-4 py-3" variants={fadeUp}>
