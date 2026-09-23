@@ -4,6 +4,116 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-24 — Claude session 8 · final round: three differentiators shipped, one real bug found along the way
+
+**Done**
+- **Team advanced to the Top 10 finalists.** New deadline **26 Sep 2026,
+  00:05**, submitted through the hackathon's own website (not the old Google
+  Form). Requirements changed: (1) repository, accessible — already true;
+  (2) **presentation slides — the one real gap**, last round's "README
+  counts as the slide deck" answer does not apply to a live Final Pitch Day;
+  (3) no video this round. Final Pitch Day itself is the same morning,
+  10:30 AM, Monash University Malaysia — live, in person, with Q&A.
+- **Evaluated connecting Agenticcs (a separate DuoCode product) into
+  Sentinel, verified against its actual code, and did not.** Six reasons,
+  written up in memory rather than here since it is a decision about scope,
+  not a change to this repo: it is a whole multi-service platform (Convex,
+  Stripe, OpenAI File Search, GCP), hard-depends on network/API keys
+  (`CLAUDE.md` rule 5 exists specifically against this), solves a
+  differently-shaped problem (RAG question-answering vs. structured
+  field comparison), and adds a new external-dependency failure surface
+  two days before a live pitch for no rubric points. What shipped instead:
+  a one-line credit + link in this README's byline (real visibility, the
+  team's actual goal, zero engineering risk) — no code integration.
+- **Tested against a real carrier's own document, not just our generator.**
+  CMA CGM's public SI template — see
+  [`docs/EXTERNAL_VALIDATION.md`](EXTERNAL_VALIDATION.md) for the full
+  write-up. Found and fixed a real bug: `Shipper/Forwarders Reference` (a
+  tracking-number label) was read into the `shipper` field because it
+  contains the word "Shipper," producing a false `MISMATCH` — same trap
+  `Booking Reference` already guarded against, one field over. Fixed in
+  `labels.py`'s `IGNORE_LABELS`, pinned by a new test. Verified two ways:
+  the added strings appear nowhere in `bundle_data/`, and a full
+  `adversarial.py` re-run against it — 16 modes, 94 pairs, 20,496 reads —
+  matches `docs/ADVERSARIAL.md` exactly, zero movement. Left open and
+  disclosed, not rushed: the container table's six real columns don't fit
+  `readers/office.py`'s two-column label:value assumption, so
+  `container_count`/`gross_weight_kg` came back `missing` rather than
+  guessed — safe, but a real reader-architecture gap.
+- **Built two items straight from this file's own "Future roadmap" list**,
+  both requested in substance by the organisers' final-round prompt to show
+  additional value: throughput/cost projection on the metrics page
+  (`web/components/metrics-page-view.tsx` — processing time scales this
+  run's own measured ms/email, cost shows "today's mix" next to a worst-case
+  ceiling at `docs/ADVERSARIAL.md` §8's $0.0013/document, never a single
+  invented blended number); and batch pattern alerts on the run page
+  (`web/components/pattern-alerts.tsx` — groups `MISMATCH` cases by
+  shipper + field, 2+ only, largest first). The second needed one
+  deliberate, scoped exception to "don't touch the backend": `shipper` is
+  now a field on the case-list API response, projected from a comparison
+  `pipeline.py` already computes — no new extraction, nothing in
+  `backend/sdoc/` touched. Verified against the real 520-email
+  `bundle_data/`, not a demo fixture: 21 real patterns exist, largest is
+  six cases on one shipper's container count, independently cross-checked
+  in a one-off script before trusting the UI, then confirmed the UI matches
+  it exactly in a live browser, including the expand interaction and a
+  followed link into the real case detail underneath it.
+- **Found and fixed a real bug in the reply-draft feature while extending
+  it**, not the extension itself: `buildReplyDraft` read `report.status` /
+  `report.defect_fields` directly, which `lib/api.ts`'s own comment says
+  deliberately stay the system's original answer everywhere on this page
+  so a card can show both. Every other use of that has a human on screen
+  with the full context; the drafted reply is the one artifact that leaves
+  it. A reviewer correcting a false mismatch, then drafting a reply, would
+  have sent the counterparty an email about a discrepancy a human had just
+  said does not exist. Now reads `report.effective` when present, falls
+  back to the system's own answer when absent (always true on `/compare`,
+  where nothing is stored and nothing can be reviewed). Verified live, not
+  just read: drafted a real mismatch, corrected it to "Matched" through the
+  actual review UI, drafted again — the draft changed from listing two
+  false fields to "No mismatch was found."
+- All of the above is on branch `feat/final-round-differentiators`,
+  committed, **not pushed**. Full backend suite 432 passed / 0 failed after
+  every backend-touching commit; frontend `build` + `tsc --noEmit` + `lint`
+  clean after every frontend-touching commit.
+
+**Next**
+- **The slide deck is the only mandatory piece still missing**, and unlike
+  last round, the README cannot stand in for it — Final Pitch Day is live
+  and in person. Nothing in this session's work is blocking it; if
+  anything, `docs/EXTERNAL_VALIDATION.md` and this entry are exactly the
+  raw material a deck needs.
+- **(T) Decide whether/when to push and merge this branch.** Same
+  Vercel constraint as last round applies again if it matters before the
+  deadline: the Hobby plan only builds a commit pushed by the project
+  owner, so whoever merges should be the one who also triggers the deploy.
+- **(T) Reply to the Mentor Session email** — a human task, not a coding
+  one, mentioned here only so it doesn't get lost.
+- The container-table reader gap (`docs/EXTERNAL_VALIDATION.md`) is a real,
+  disclosed limitation, not a to-do for the next 24 hours — generalising a
+  reader used everywhere `.docx` is read is not a change to rush two days
+  before a live pitch.
+
+**Careful**
+- **`data/_grader/` is not on this machine**, so the literal `1.0000` score
+  could not be re-verified here — what *was* verified, on the real
+  committed `bundle_data/`, is that the adversarial harness's full set of
+  safety numbers (false discrepancies, silent wrong values, masked
+  discrepancies — the things this session's `labels.py` change could
+  plausibly have moved) are byte-for-byte what `docs/ADVERSARIAL.md`
+  already states. Different evidence than re-running the scorer, not
+  weaker evidence for what this session actually changed.
+- **The `shipper` API field is additive and read-only**, but it is still a
+  boundary crossed on purpose after a specific ask to keep it in check —
+  worth another look before it is taken for granted on the next feature
+  that wants "just one more field."
+- Two local servers (`uvicorn` on `:8000` against `bundle_data/`, the
+  dashboard on `:3000`) were left running through this whole session for
+  live verification. Stop whatever owns those ports before starting your
+  own, same as every prior session's note on this.
+
+---
+
 ## 2026-09-21 — Claude session 7 · Phase 4, and the numbers re-measured
 
 **Done**
