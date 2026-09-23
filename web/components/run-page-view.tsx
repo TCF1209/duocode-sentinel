@@ -274,7 +274,14 @@ export function RunPageView({ runId }: { runId: string }) {
         </div>
       </motion.div>
 
-      <motion.div className="rounded-md border bg-card" variants={fadeUp}>
+      {/* Two renderings of the same `cases`, CSS-switched at `md` rather than
+          picked in JS: a table this wide has no reflow that keeps it a table,
+          and the alternative — measuring viewport width in an effect — would
+          paint the desktop table first on every phone and swap it a frame
+          later. `hidden md:block` / `md:hidden` costs one extra copy of 520
+          rows in the DOM, half of them display:none and so never laid out or
+          painted; that is cheaper than a visible layout swap on first load. */}
+      <motion.div className="hidden rounded-md border bg-card md:block" variants={fadeUp}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -358,6 +365,64 @@ export function RunPageView({ runId }: { runId: string }) {
           </TableBody>
         </Table>
       </motion.div>
+
+      {/* Below `md`: the table's own column count is the problem, not its
+          styling, so this is not a narrower table -- one card per case,
+          the two things worth a glance (which email, what it decided) up
+          top, the fields it actually flagged front and center underneath.
+          That second part is not decoration: it is the evidence-gated
+          verdict that is Sentinel's actual claim, put where a thumb
+          scrolling past 500 rows will still see it without a tap. */}
+      <motion.div className="flex flex-col rounded-md border bg-card md:hidden" variants={fadeUp}>
+        <AnimatePresence mode="popLayout" initial={false}>
+          {cases.length === 0 ? (
+            <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-8 text-center text-sm text-muted-foreground">
+              {run?.status === "running" ? "Processing…" : "No cases match this filter."}
+            </motion.div>
+          ) : (
+            cases.map((c) => <CaseRowCard key={c.email_id} runId={runId} c={c} />)
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function CaseRowCard({ runId, c }: { runId: string; c: CaseSummary }) {
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      className="border-b last:border-0"
+    >
+      <Link href={`/runs/${runId}/cases/${c.email_id}`}>
+        <motion.div whileTap={TAP} transition={TAP_TRANSITION} className="flex flex-col gap-1.5 p-3 active:bg-muted/50">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-mono text-sm">{c.email_id}</span>
+            <div className="flex items-center gap-1.5">
+              <StatusBadge status={c.status} />
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <CategoryBadge category={c.category} />
+            <span>{Math.round(c.category_confidence * 100)}%</span>
+            <DecidedByBadge decidedBy={c.decided_by} />
+            {c.outcome_source === "review" && (
+              <span title={`Sentinel said ${c.system_status}; corrected by a reviewer`}>corrected</span>
+            )}
+            {c.outcome_source === "system" && c.reviewed && <span>confirmed</span>}
+          </div>
+          {c.defect_fields.length > 0 && (
+            <div className="text-sm text-danger">
+              {c.defect_fields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}
+            </div>
+          )}
+        </motion.div>
+      </Link>
     </motion.div>
   );
 }
