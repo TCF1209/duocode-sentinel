@@ -4,6 +4,112 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-24 (night) — Claude session 8, continued · overnight autonomous pass: real-time sync, mailto, discoverability, a design critique acted on
+
+Explicitly asked to keep working unattended overnight and have it "done to
+the best it can be" by morning. Everything below is closed-loop the same
+way the rest of this session has been -- built, verified, committed,
+written up here -- but with nobody available to redirect a wrong call
+until this is read, so the bar for "verified before committing to it" is
+higher here than earlier the same day, not lower.
+
+**Done**
+- **Investigated "can Sentinel email the counterparty for real" properly
+  instead of just saying no.** Found that `EmailRecord.sender` (the
+  inbox record's own "from" address) was parsed and then discarded before
+  reaching the API -- nothing under `backend/api/` or the dashboard could
+  see who actually sent an email. Threaded it through
+  (`backend/sdoc/schema.py`, `pipeline.py`, `backend/api/main.py`) as a
+  plain read-only field; never read by `backend/sdoc/` itself, not part
+  of `to_submission()`'s shape. **Did not build real sending** — no email
+  infrastructure exists in this project, and standing up SMTP/an email
+  API plus credentials with nobody available overnight to configure or
+  approve them was the wrong tradeoff two days out. Built a `mailto:`
+  link instead (`lib/reply-draft.ts`'s `mailtoHref`, wired into
+  `reply-draft-panel.tsx`): opens the operator's own mail client with
+  To/Subject/Body pre-filled, editable, and the actual send click still
+  happens in their own already-authenticated app — Sentinel never
+  transmits anything itself, same rule the review panel already holds
+  to. `buildReplyDraft` now returns `{subject, body}` instead of one
+  flat string so this never has to re-parse a "Subject: ..." line back
+  out of the textarea.
+- **Moved the reply-draft button next to Review, not after every field.**
+  User's own words: "if I hadn't discussed this with you today, I really
+  wouldn't have noticed this feature existed." It sat after every field
+  comparison, a long scroll on a real multi-field mismatch. Now sits
+  right below Confirm outcome / Correct it, same reasoning the review
+  panel's own placement already used.
+- **Fixed a typography complaint, diagnosed rather than guessed at.**
+  "The text all feels chaotic, not clearly expressed" turned out to have
+  a specific, checkable cause: `field-comparison-row.tsx` set both the
+  extracted value and its own supporting evidence quote in the same
+  `font-mono`, and the source data is almost always an already-upper-case
+  name or address — monospace on a long upper-case run is a genuinely
+  hard combination to scan, and with the value and its proof in identical
+  type there was no visual way to tell them apart. Fixed typographically
+  only: the text and its case are untouched (the case is part of what
+  "exact evidence" means here), the value moved to a plain proportional
+  font, and the snippet gained a left border instead of relying on
+  typeface to read as a quote. Checked across MATCH and MISMATCH cards
+  and numeric fields, not just the one card that prompted it.
+- **Real-time sync, the explicit ask, and two real bugs it took to get
+  there safely.** The run page used to stop polling entirely once a run
+  was "done," on the (previously correct, now stale) premise that a done
+  run's cases never change — a review can happen well after. Re-enabled
+  polling unconditionally (2s running / 20s done), but only after fixing
+  *why* it was disabled: added a same-data no-op guard (compare the
+  fetch against current state, hand back the same reference if unchanged)
+  so a 20s "nothing happened" tick no longer re-renders and re-animates
+  all 520 rows. Testing that surfaced two more bugs, not introduced by
+  it: (1) the case list was always fetched pre-filtered, so the pattern
+  alerts and this session's own new stat strip silently meant "of the
+  filtered subset" the instant a filter was active — refactored to fetch
+  the whole run once (`allCases`) and filter client-side
+  (`visibleCases`) for the visible table/cards only; (2) `run.metrics.by_status`
+  is a snapshot `finish_run` writes once and never recomputes — confirmed
+  by correcting a real case and watching it not move — so the stat strip
+  this session added earlier was already stale by the same bug. Switched
+  it to count `allCases` (which already carries effective status)
+  instead. Verified passively, not by re-triggering it manually:
+  corrected a case via the API with the browser left alone, waited past
+  one 20s tick untouched, watched the stat strip move on its own.
+- All of the above: build, `tsc --noEmit`, `lint` clean after every
+  commit; the sender-threading backend change additionally re-verified
+  against `bundle_data/` the same way as the day's earlier backend
+  changes (full suite, adversarial harness byte-identical).
+
+**Next**
+- **The pattern-level batch draft** ("N cases from this shipper, one
+  summary email instead of N separate ones") — approved, not yet built.
+  Natural extension of `lib/reply-draft.ts`'s now-structured
+  `{subject, body}` shape.
+- **Continue the critical design pass** — explicitly asked not to assume
+  the current design is already right, and to keep looking rather than
+  stop at the items already found. In progress; not a fixed backlog.
+- Slide deck, the branch push/merge decision and the Mentor Session
+  email reply are all still exactly where the last entry left them —
+  human tasks, untouched by anything overnight.
+
+**Careful**
+- **Nobody was available to redirect a wrong call while this ran.** Every
+  design opinion acted on tonight (typography, button placement, the
+  mailto: vs. real-send judgment call) is defensible and was checked
+  before committing to it, but "defensible" is not the same bar as
+  "the user explicitly signed off on this exact choice" — worth a second
+  look in the morning specifically because of *when* it was made, not
+  because anything specific is suspected wrong.
+- **Two scratch corrections were made on the live local test run**
+  (`run_000002_1790189003`, `email_004` and `email_013`, both flipped to
+  `OK`) purely to verify the sync/staleness fixes end to end. In-memory
+  only — gone on the next backend restart, never touched real data or
+  anything committed.
+- Local servers (`uvicorn` on `:8000` against `bundle_data/`, dashboard
+  on `:3000`) are still up from earlier the same session, now serving
+  the fully current code. Same standing note as every prior entry: stop
+  whatever owns those ports before starting your own.
+
+---
+
 ## 2026-09-24 — Claude session 8 · final round: three differentiators shipped, one real bug found along the way
 
 **Done**
