@@ -47,7 +47,32 @@ export function RunPageView({ runId }: { runId: string }) {
     STATUSES.includes(statusParam as CaseStatus) ? (statusParam as CaseStatus) : null,
   );
   const [run, setRun] = useState<RunStatus | null>(null);
-  const [cases, setCases] = useState<CaseSummary[]>([]);
+  // Always the whole run, never filtered server-side any more -- see
+  // visibleCases below for why, and refresh() for how it stays that way.
+  const [allCases, setAllCases] = useState<CaseSummary[]>([]);
+
+  // The one place a filter actually narrows what's shown. Everything that
+  // used to read the old server-filtered `cases` for a *count of the whole
+  // run* (the pattern alerts, the stat strip, "how many cases total") reads
+  // allCases instead now: computing those from a filtered fetch meant they
+  // silently meant "of the filtered subset" the moment a filter was active,
+  // which nothing on screen said out loud.
+  const visibleCases = useMemo(
+    () =>
+      allCases.filter(
+        (c) => (!categoryFilter || c.category === categoryFilter) && (!statusFilter || c.status === statusFilter),
+      ),
+    [allCases, categoryFilter, statusFilter],
+  );
+
+  // Feeds the stat strip below. Counted from allCases (effective status,
+  // always the whole run) rather than trusted from run.metrics.by_status --
+  // see the stat strip's own comment for why that field cannot be used here.
+  const statusCounts = useMemo(() => {
+    const counts: Record<CaseStatus, number> = { OK: 0, MISMATCH: 0, NEEDS_REVIEW: 0 };
+    for (const c of allCases) counts[c.status]++;
+    return counts;
+  }, [allCases]);
 
   // Not wrapped in useCallback: the React Compiler in this project memoizes
   // call sites automatically, and a manual dependency array here previously
@@ -67,35 +92,40 @@ export function RunPageView({ runId }: { runId: string }) {
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
 
+  // Always fetches the whole run, no category/status params -- visibleCases
+  // above does the narrowing client-side instead. Each setState compares
+  // against what's already there and hands back the *same* reference when
+  // a poll tick fetched back exactly what was already there, so React bails
+  // out of re-rendering (and every layout-animated row re-measuring) on a
+  // no-op tick. That comparison is what makes the interval below safe to
+  // run indefinitely instead of stopping once the run is done -- a
+  // reviewer can correct a case well after the run finishes, and this page
+  // needs to notice on its own, not just on a manual reload.
   const refresh = useCallback(() => {
     getRun(runId)
-      .then(setRun)
+      .then((r) => setRun((prev) => (prev && JSON.stringify(prev) === JSON.stringify(r) ? prev : r)))
       .catch((e) => toast.error(e.message));
-    listCases(runId, {
-      category: categoryFilter ?? undefined,
-      status: statusFilter ?? undefined,
-    })
-      .then((r) => setCases(r.cases))
+    listCases(runId, {})
+      .then((r) => setAllCases((prev) => (JSON.stringify(prev) === JSON.stringify(r.cases) ? prev : r.cases)))
       .catch((e) => toast.error(e.message));
-  }, [runId, categoryFilter, statusFilter]);
+  }, [runId]);
 
-  // Stops polling once the run reaches a terminal state — a done run's
-  // cases never change again, so refetching every 2s forever was pure
-  // waste: each tick set fresh array/object references even when nothing
-  // actually changed, and every case row is a layout-animated motion.tr, so
-  // Framer Motion re-measured every row's position on each of those
-  // no-op refreshes. That's exactly the kind of per-tick layout thrash
-  // that reads as jank if it lands mid-scroll.
+  // Slows down once the run itself is no longer running, but never stops
+  // any more -- see refresh()'s own comment for why a done run still needs
+  // to be polled, just rarely. 20s is deliberately not 2s: a review is a
+  // human action on a timescale of "the reviewer moved to the next tab and
+  // came back", not "the pipeline just finished another email".
   //
   // Depends on the plain `runStatus` string, not `run` itself: the object
-  // gets a new reference every poll even while status stays "running", and
+  // can get a new reference every poll even while status stays "running"
+  // (the no-op guard above only skips a poll that changed *nothing*), and
   // this effect must not tear down and recreate the interval on every one
   // of those ticks — only when the status value actually changes.
   const runStatus = run?.status;
   useEffect(() => {
     refresh();
-    if (runStatus && runStatus !== "running") return;
-    const id = setInterval(refresh, 2000);
+    const intervalMs = runStatus === "running" ? 2000 : 20000;
+    const id = setInterval(refresh, intervalMs);
     return () => clearInterval(id);
   }, [refresh, runStatus]);
 
@@ -156,11 +186,12 @@ export function RunPageView({ runId }: { runId: string }) {
 
   // Emails finish in strict file order and the backend records that order
   // separately from the case data itself (backend/api/store.py's `_order`
-  // list), so the last entry in an UNFILTERED case list is genuinely "the
-  // most recently completed email" — not a guess from array position. Gated
-  // on no filter being active because a filtered list's last row is just the
-  // last row that happens to match, not the most recent one overall.
-  const lastCompleted = !categoryFilter && !statusFilter && cases.length > 0 ? cases[cases.length - 1].email_id : null;
+  // list), so the last entry in allCases is genuinely "the most recently
+  // completed email" — not a guess from array position. No filter guard
+  // needed any more: allCases is never the server-filtered list a stale
+  // comment here used to warn about, so its last entry is always the
+  // run's, regardless of what visibleCases is currently narrowed to.
+  const lastCompleted = allCases.length > 0 ? allCases[allCases.length - 1].email_id : null;
 
   return (
     <motion.div className="flex flex-col gap-4" initial="hidden" animate="show" variants={stagger()}>
@@ -231,7 +262,7 @@ export function RunPageView({ runId }: { runId: string }) {
             key="progress"
             processed={run.processed}
             total={run.total_emails}
-            cases={cases}
+            cases={visibleCases}
             filtered={Boolean(categoryFilter || statusFilter)}
             done={run.status === "done"}
           />
@@ -243,25 +274,37 @@ export function RunPageView({ runId }: { runId: string }) {
           is exactly the moment "how did this one go" is the first question,
           and the cost/rule-share half is the product's own cost argument
           (docs/DECISIONS.md D1), put where the first click after Runs
-          actually lands instead of one tab away. */}
-      {run?.metrics && (
+          actually lands instead of one tab away.
+
+          The three counts are computed from allCases, not read off
+          run.metrics.by_status: that field is a snapshot written once when
+          the run finishes (backend/api/store.py's finish_run) and never
+          recomputed, so it does not move when a reviewer corrects a case
+          afterwards -- confirmed live, not assumed, by correcting a real
+          case and watching metrics.by_status stay exactly what it was.
+          allCases carries each case's *effective* status already (the
+          list endpoint reads store.effective_outcome, same as the table
+          below), so counting it client-side is the version that is
+          actually still true after a review. rule_share/llm_calls stay
+          sourced from run.metrics on purpose -- which tier decided a case
+          is a system fact a review never changes. */}
+      {allCases.length > 0 && run?.metrics && (
         <motion.div
           className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border bg-card px-4 py-3 text-sm"
           variants={fadeUp}
         >
           <span className="flex items-center gap-1.5">
             <span className="size-1.5 rounded-full bg-ok" />
-            {STATUS_LABELS.OK} <span className="font-medium tabular-nums">{run.metrics.by_status?.OK ?? 0}</span>
+            {STATUS_LABELS.OK} <span className="font-medium tabular-nums">{statusCounts.OK}</span>
           </span>
           <span className="flex items-center gap-1.5">
             <span className="size-1.5 rounded-full bg-danger" />
-            {STATUS_LABELS.MISMATCH}{" "}
-            <span className="font-medium tabular-nums">{run.metrics.by_status?.MISMATCH ?? 0}</span>
+            {STATUS_LABELS.MISMATCH} <span className="font-medium tabular-nums">{statusCounts.MISMATCH}</span>
           </span>
           <span className="flex items-center gap-1.5">
             <span className="size-1.5 rounded-full bg-warn" />
             {STATUS_LABELS.NEEDS_REVIEW}{" "}
-            <span className="font-medium tabular-nums">{run.metrics.by_status?.NEEDS_REVIEW ?? 0}</span>
+            <span className="font-medium tabular-nums">{statusCounts.NEEDS_REVIEW}</span>
           </span>
           <span className="text-muted-foreground sm:ml-auto">
             {Math.round(run.metrics.rule_share * 100)}% resolved by rules
@@ -272,7 +315,7 @@ export function RunPageView({ runId }: { runId: string }) {
         </motion.div>
       )}
 
-      <PatternAlerts runId={runId} cases={cases} />
+      <PatternAlerts runId={runId} cases={allCases} />
 
       <motion.div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border bg-card px-4 py-3" variants={fadeUp}>
         <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
@@ -294,7 +337,7 @@ export function RunPageView({ runId }: { runId: string }) {
         />
         <div className="flex items-center gap-3 text-xs text-muted-foreground sm:ml-auto">
           <span>
-            {cases.length} case{cases.length === 1 ? "" : "s"}
+            {visibleCases.length} case{visibleCases.length === 1 ? "" : "s"}
           </span>
           {(categoryFilter || statusFilter) && (
             <button
@@ -330,14 +373,14 @@ export function RunPageView({ runId }: { runId: string }) {
           </TableHeader>
           <TableBody>
             <AnimatePresence mode="popLayout" initial={false}>
-              {cases.length === 0 ? (
+              {visibleCases.length === 0 ? (
                 <motion.tr key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                     {run?.status === "running" ? "Processing…" : "No cases match this filter."}
                   </TableCell>
                 </motion.tr>
               ) : (
-                cases.map((c) => (
+                visibleCases.map((c) => (
                   <motion.tr
                     key={c.email_id}
                     layout
@@ -409,12 +452,12 @@ export function RunPageView({ runId }: { runId: string }) {
           scrolling past 500 rows will still see it without a tap. */}
       <motion.div className="flex flex-col rounded-md border bg-card md:hidden" variants={fadeUp}>
         <AnimatePresence mode="popLayout" initial={false}>
-          {cases.length === 0 ? (
+          {visibleCases.length === 0 ? (
             <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-8 text-center text-sm text-muted-foreground">
               {run?.status === "running" ? "Processing…" : "No cases match this filter."}
             </motion.div>
           ) : (
-            cases.map((c) => <CaseRowCard key={c.email_id} runId={runId} c={c} />)
+            visibleCases.map((c) => <CaseRowCard key={c.email_id} runId={runId} c={c} />)
           )}
         </AnimatePresence>
       </motion.div>
