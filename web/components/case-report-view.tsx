@@ -95,12 +95,26 @@ export function CaseReportView({
 
       {/* Right under the "why", not after every field — a reviewer landing
           here should see what to do before they see the evidence, not after
-          scrolling past all of it. */}
+          scrolling past all of it. The reply draft is the same kind of
+          thing for the same reason: on a real case with several fields,
+          each carrying an SI card and a BL card, "draft a reply" used to
+          sit below a long scroll of evidence a reviewer had often already
+          decided not to read line by line -- easy to never notice it was
+          there at all, not just easy to reach late. */}
       {onReview && (
         <motion.div variants={fadeUp}>
           <ReviewPanel report={report} onSubmit={onReview} />
         </motion.div>
       )}
+
+      <motion.div variants={fadeUp}>
+        <ReplyDraftPanel report={report} />
+      </motion.div>
+
+      {(readableNotes.length > 0 ||
+        signalNotes.length > 0 ||
+        report.errors.length > 0 ||
+        report.fields.length > 0) && <Separator />}
 
       {readableNotes.length > 0 && (
         <motion.ul className="list-inside list-disc text-sm text-muted-foreground" variants={fadeUp}>
@@ -150,12 +164,6 @@ export function CaseReportView({
             BL: {report.documents.bl.path} ({report.documents.bl.doc_type}, {report.documents.bl.n_bytes}b)
           </div>
         )}
-      </motion.div>
-
-      <Separator />
-
-      <motion.div variants={fadeUp}>
-        <ReplyDraftPanel report={report} />
       </motion.div>
     </motion.div>
   );
