@@ -100,9 +100,44 @@ export function formatReplyDraft(draft: ReplyDraft): string {
 /** A `mailto:` URL a human still has to review and press send on, in their
  *  own already-authenticated mail client — Sentinel never transmits
  *  anything itself. `undefined` when there is no known recipient (e.g. a
- *  /compare upload, which has no inbox record to read a sender from). */
+ *  /compare upload, which has no inbox record to read a sender from).
+ *  `to` may already be a comma-joined list (RFC 6068 allows it) — the
+ *  pattern-level draft below passes several addresses this way. */
 export function mailtoHref(to: string | undefined | null, draft: ReplyDraft): string | undefined {
   if (!to) return undefined;
   const params = new URLSearchParams({ subject: draft.subject, body: draft.body });
   return `mailto:${encodeURIComponent(to)}?${params.toString()}`;
+}
+
+/**
+ * One summary email for a whole pattern — "N cases from this shipper all
+ * mismatch on the same field" — instead of N near-identical ones.
+ * docs/ROADMAP.md's own backlog line for the pattern view already framed
+ * the value this way; this is the same idea applied to the reply-draft
+ * feature next to it, not a new one.
+ *
+ * `emailIds` are Sentinel's own internal case references, the same
+ * convention `buildReplyDraft` already uses in its own subject line above
+ * — kept for consistency with the single-case draft rather than invented
+ * fresh here, not because it is necessarily the ideal thing to show an
+ * external reader.
+ */
+export function buildPatternDraft(shipper: string, fieldLabel: string, emailIds: string[]): ReplyDraft {
+  return {
+    subject: `Recurring mismatch: ${fieldLabel} across ${emailIds.length} shipments`,
+    body: [
+      "Hello,",
+      "",
+      `Across ${emailIds.length} recent shipments from ${shipper}, we've found the same field does not ` +
+        `match between the Shipping Instruction and the draft Bill of Lading: ${fieldLabel}.`,
+      "",
+      "Affected bookings:",
+      ...emailIds.map((id) => `  - ${id}`),
+      "",
+      "Could you help us understand whether this is a process issue on your end? Flagging it once, rather " +
+        "than case by case, in case it points at something worth fixing at the source.",
+      "",
+      "Regards,",
+    ].join("\n"),
+  };
 }
