@@ -115,7 +115,7 @@ class Pipeline:
         # used the model, instead of a run-wide total in which the handful of
         # hard cases are indistinguishable from the hundreds of cheap ones.
         calls_before = self._llm_calls_so_far()
-        result = CaseResult(email_id=email.email_id, category="GENERAL")
+        result = CaseResult(email_id=email.email_id, category="GENERAL", sender=email.sender)
         try:
             self._process(email, result)
         except Exception as exc:                    # never lose an email

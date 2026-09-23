@@ -176,7 +176,17 @@ class TestRunLifecycle:
         assert by_shipper["email_001"] == "TEST EXPORT COMPANY LTD"
         assert by_shipper["email_002"] == "TEST EXPORT COMPANY LTD"
 
+        # The inbox record's own "from" address, carried through for a
+        # mailto: link -- never read by backend/sdoc/ itself, never sent
+        # anywhere by Sentinel. _write_email's fixture puts the same address
+        # on every email, which is realistic: one contact often sends a
+        # whole thread of comparison requests.
+        by_sender = {c["email_id"]: c["sender"] for c in cases["cases"]}
+        assert by_sender["email_001"] == "ops@example.com"
+        assert by_sender["email_002"] == "ops@example.com"
+
         case_detail = client.get(f"/cases/{run_id}:email_002").json()
+        assert case_detail["sender"] == "ops@example.com"
         assert case_detail["defect_fields"] == ["consignee"]
         assert case_detail["review"] is None
 

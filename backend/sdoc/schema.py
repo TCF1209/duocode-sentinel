@@ -181,6 +181,11 @@ class CaseResult:
 
     email_id: str
     category: str
+    # The inbox record's own "from" address. Carried through for the API/
+    # dashboard layer only (a mailto: link, never an auto-send) -- never
+    # read by anything under backend/sdoc/ itself, and not part of
+    # to_submission()'s shape, so it cannot touch what the scorer sees.
+    sender: str = ""
     category_confidence: float = 0.0
     decided_by: str = "rule"                 # rule | llm  (scorer reads this)
     category_rationale: list[str] = field(default_factory=list)
@@ -219,6 +224,7 @@ class CaseResult:
         """Rich record for the dashboard / audit trail."""
         return {
             "email_id": self.email_id,
+            "sender": self.sender,
             "category": self.category,
             "category_confidence": round(self.category_confidence, 3),
             "decided_by": self.decided_by,

@@ -231,6 +231,7 @@ def list_cases(
         out.append({
             "case_id": f"{run_id}:{c.email_id}",
             "email_id": c.email_id,
+            "sender": c.sender,
             "category": c.category,
             "category_confidence": round(c.category_confidence, 3),
             "status": eff["status"],

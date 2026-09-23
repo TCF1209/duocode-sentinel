@@ -61,6 +61,10 @@ export interface ReviewRecord {
 
 export interface CaseReport {
   email_id: string;
+  /** The inbox record's own "from" address, empty on /compare (no email
+   *  there — a direct upload). Never sent anywhere by Sentinel itself; a
+   *  mailto: link is as far as this goes. */
+  sender: string;
   category: Category;
   category_confidence: number;
   decided_by: DecidedBy;
@@ -99,6 +103,8 @@ export interface EffectiveOutcome {
 export interface CaseSummary {
   case_id: string;
   email_id: string;
+  /** The inbox record's own "from" address. See CaseReport.sender. */
+  sender: string;
   category: Category;
   category_confidence: number;
   /** The effective status — a corrected case leaves the queue it was in. */
