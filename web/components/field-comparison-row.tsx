@@ -15,7 +15,16 @@ function Side({ value, side }: { value: FieldValueReport; side: "SI" | "BL" }) {
   return (
     <div className="flex-1 rounded-md border p-3">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{side}</div>
-      <div className="mt-1 font-mono text-sm">{value.raw}</div>
+      {/* Not font-mono: the source data is almost always an already-
+          upper-case company name, and monospace on a long upper-case run
+          is one of the harder combinations to actually read at a glance —
+          it is built for fixed-width tokens (an email id, a line number),
+          not a party name. A proportional font reads names the way a
+          person reading the real document would. The text itself is
+          untouched either way — only the typeface changes, never the
+          case, since the case is part of what "exact evidence" means
+          here. */}
+      <div className="mt-1 text-sm font-medium">{value.raw}</div>
       {value.evidence && (
         <div className="mt-2 border-t pt-2 text-xs text-muted-foreground">
           <div>
@@ -24,7 +33,15 @@ function Side({ value, side }: { value: FieldValueReport; side: "SI" | "BL" }) {
               <span className="ml-1 rounded bg-ai-bg px-1 py-0.5 text-ai">{value.extractor}</span>
             )}
           </div>
-          <div className="mt-1 font-mono italic">&ldquo;{value.evidence.snippet.trim()}&rdquo;</div>
+          {/* A left border reads as "this is a quote" on its own, so the
+              snippet no longer needs a distinct typeface to tell it apart
+              from the value above — freeing it from font-mono fixes the
+              same crowding here, and the two are visually distinct now by
+              role (bordered quote vs. plain value) rather than by both
+              fighting for attention in the same dense typeface. */}
+          <div className="mt-1.5 border-l-2 border-muted-foreground/25 pl-2 italic">
+            &ldquo;{value.evidence.snippet.trim()}&rdquo;
+          </div>
         </div>
       )}
     </div>
