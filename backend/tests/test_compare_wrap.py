@@ -598,26 +598,17 @@ def test_a_wrap_is_still_repaired_when_a_later_field_shares_its_first_line():
     assert consignee.si.extractor == "rule+wrap"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="`_extend` does text.find(value.raw), so the notify party is "
-           "completed from the consignee's block three lines above the one its "
-           "evidence points at; the fix is to anchor on the evidence locator",
-)
 def test_a_continuation_is_read_from_the_block_the_evidence_points_at():
-    """The half that is wrong, stated as the behaviour we want.
+    """Fixed 2026-09-24: `_extend` now anchors on the evidence locator.
 
     The notify party's evidence says line 6, and line 6 continues
     `EAST ASIA) PTE LTD` — a different company from the `(MIDDLE EAST) FZE` on
-    the BL, so nothing there completes the BL's name and the value should come
-    back untouched and MISMATCH. What happens instead is that the search finds
-    the consignee's identical first line on line 3, adopts *its* continuation,
-    and reports MATCH.
-
-    Asserted the right way round on purpose. The day `_extend` anchors on the
-    evidence locator this passes, and strict xfail turns that into a loud
-    "remove the marker" rather than either a silent green or a red suite
-    blaming the repair for fixing a defect.
+    the BL, so nothing there completes the BL's name and the value comes back
+    untouched and MISMATCH. Before the fix, `text.find(value.raw)` found the
+    consignee's identical first line on line 3 instead, adopted *its*
+    continuation, and reported a false MATCH — this test used to pin that as
+    a strict `xfail`, and XPASSed the day `_line_start_offset` started
+    anchoring the search on `evidence.locator` instead.
     """
     si, bl = _shared_first_line_pair()
     notify = _by_field(si, bl)["notify_party"]
