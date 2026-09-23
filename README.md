@@ -3,7 +3,10 @@
 > **Every answer comes with its evidence.**
 
 *From email inbox to discrepancy report.*
-Built by **DuoCode** for the Averis × Monash Hackathon 2026.
+Built by **DuoCode** for the Averis × Monash Hackathon 2026. DuoCode also
+builds [**Agenticcs**](https://agenticcs.net), an auditable AI
+customer-service platform — the same evidence-first discipline shows up in
+both, independently.
 
 > ### ▶ [duocode-sentinel.vercel.app](https://duocode-sentinel.vercel.app)
 >
