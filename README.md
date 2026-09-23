@@ -464,10 +464,12 @@ Beyond the hackathon, in the order we would actually build them:
    correction into `labels.py`. That is the learning loop, and it is the one
    place this system should learn — the label vocabulary, never the value
    comparison.
-3. **Batch patterns.** "Twelve emails from this carrier all mismatch on port of
-   discharge" is a different and more valuable statement than twelve separate
-   reports. The data is already in `report.json`; this is an aggregation the
-   dashboard does not yet do.
+3. **Batch patterns — built.** The run page now groups `MISMATCH` cases by
+   shipper and field, surfacing any group of two or more, largest first, each
+   expandable to the affected emails. Real signal on the graded inbox, not a
+   demo fixture: 21 such patterns, the largest six cases from one shipper's
+   container count. No new extraction — the shipper name was already read by
+   the pipeline; the API just started including it in the case list.
 4. **Throughput and cost at real inbox volume — built.** The metrics page now
    projects both onto a desk's own volume: processing time scales the run's
    own measured ms/email, and cost shows two figures rather than one guess —

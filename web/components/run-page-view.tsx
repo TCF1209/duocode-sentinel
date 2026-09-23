@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CategoryBadge, DecidedByBadge, RunStatusPill, StatusBadge } from "@/components/status-badges";
 import { BackLink } from "@/components/back-link";
 import { RunProgress } from "@/components/run-progress";
+import { PatternAlerts } from "@/components/pattern-alerts";
 import { cn } from "@/lib/utils";
 import { fadeUp, stagger, TAP, TAP_TRANSITION } from "@/lib/motion";
 import { FIELD_LABELS, STATUS_LABELS } from "@/lib/labels";
@@ -236,6 +237,8 @@ export function RunPageView({ runId }: { runId: string }) {
           />
         )}
       </AnimatePresence>
+
+      <PatternAlerts runId={runId} cases={cases} />
 
       <motion.div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border bg-card px-4 py-3" variants={fadeUp}>
         <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">

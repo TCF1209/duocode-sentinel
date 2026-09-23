@@ -261,7 +261,14 @@ whole participant bundle. **(T) to decide.**
 
 - Confidence calibration: show *why* a case was escalated, with a score
 - Reviewer corrections feed back into the synonym table (a learning loop)
-- Batch view: "12 emails from this carrier all mismatch on POD" — pattern alerts
+- **Built** (24 Sep): batch view / pattern alerts — `web/components/pattern-alerts.tsx`,
+  on the run page. Groups MISMATCH cases by (shipper, defect field) from data
+  the case-list API already returns; surfaces groups of 2+, sorted by size,
+  each expandable to the affected email IDs. `backend/api/main.py` gained one
+  read-only field (`shipper`, projected from a comparison already computed —
+  no new extraction, no decision touched) so the frontend does not need an
+  extra request per case. Verified against the real 520-email `bundle_data/`:
+  21 real patterns, largest is 6 cases on one shipper's container count.
 - **Built** (24 Sep): throughput/cost projection at real inbox volume —
   `web/components/metrics-page-view.tsx`, the metrics page. Two figures, both
   grounded rather than guessed: processing time scales the run's own measured

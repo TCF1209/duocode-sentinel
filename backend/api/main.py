@@ -193,6 +193,20 @@ def get_run(run_id: str) -> RunStatusResponse:
     return _record_to_status(_run_or_404(run_id))
 
 
+def _shipper_name(c) -> Optional[str]:
+    """The shipper's name as read off whichever side has it.
+
+    Read-only projection of a value `pipeline.py` already computed — no new
+    extraction, no new comparison, nothing that touches a decision. Exists so
+    the dashboard's pattern view (docs/ROADMAP.md backlog) can group cases by
+    counterparty without an extra request per case.
+    """
+    for comp in c.comparisons:
+        if comp.field == "shipper":
+            return comp.si.raw or comp.bl.raw
+    return None
+
+
 @app.get("/runs/{run_id}/cases")
 def list_cases(
     run_id: str,
@@ -223,6 +237,7 @@ def list_cases(
             "review_reason": eff["review_reason"],
             "has_defect": eff["has_defect"],
             "defect_fields": eff["defect_fields"],
+            "shipper": _shipper_name(c),
             "decided_by": c.decided_by,
             # Both halves stay visible. A row the system called NEEDS_REVIEW
             # and a person corrected to OK is not the same thing as a row the

@@ -106,6 +106,10 @@ export interface CaseSummary {
   review_reason: ReviewReason | null;
   has_defect: boolean;
   defect_fields: string[];
+  /** The shipper's name, read off whichever side of the comparison has it.
+   *  `null` when the field was never extracted (e.g. an escalated case with
+   *  no readable SI or BL). */
+  shipper: string | null;
   decided_by: DecidedBy;
   reviewed: boolean;
   outcome_source: "system" | "review";

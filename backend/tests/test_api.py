@@ -168,6 +168,14 @@ class TestRunLifecycle:
         }, by_status
         assert all(0.0 <= c["category_confidence"] <= 1.0 for c in cases["cases"])
 
+        # The case-list summary carries the shipper's name too, read off the
+        # same comparison the pipeline already produced -- no extra request
+        # per case, so the dashboard's pattern view can group by counterparty
+        # without doing an N+1 fetch over the whole run.
+        by_shipper = {c["email_id"]: c["shipper"] for c in cases["cases"]}
+        assert by_shipper["email_001"] == "TEST EXPORT COMPANY LTD"
+        assert by_shipper["email_002"] == "TEST EXPORT COMPANY LTD"
+
         case_detail = client.get(f"/cases/{run_id}:email_002").json()
         assert case_detail["defect_fields"] == ["consignee"]
         assert case_detail["review"] is None
