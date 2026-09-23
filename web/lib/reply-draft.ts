@@ -1,6 +1,11 @@
 import type { CaseReport } from "@/lib/api";
 import { FIELD_LABELS, reviewReasonClause } from "@/lib/labels";
 
+export interface ReplyDraft {
+  subject: string;
+  body: string;
+}
+
 /**
  * A plain-text reply draft listing the discrepancies found, built entirely
  * from data already in the report — no extra API call, no model call. This
@@ -19,39 +24,46 @@ import { FIELD_LABELS, reviewReasonClause } from "@/lib/labels";
  * (`GET /cases/{id}`); on `/compare`, where nothing is stored and nothing
  * can be reviewed, it is always absent, and this falls back to the system's
  * own answer exactly as before.
+ *
+ * Returns `{subject, body}` rather than one flat string so a caller can feed
+ * either half to a `mailto:` link without parsing a "Subject: ..." line back
+ * out of it; `ReplyDraftPanel` joins them for the on-screen textarea, which
+ * is the only place the combined form is what's actually wanted.
  */
-export function buildReplyDraft(report: CaseReport, reference = report.email_id): string {
+export function buildReplyDraft(report: CaseReport, reference = report.email_id): ReplyDraft {
   const status = report.effective?.status ?? report.status;
   const reviewReason = report.effective?.review_reason ?? report.review_reason;
   const defectFields = report.effective?.defect_fields ?? report.defect_fields;
 
   if (status === "OK") {
-    return [
-      `Subject: Re: ${reference} — SI/BL checked, no discrepancy`,
-      "",
-      "Hello,",
-      "",
-      "We compared the draft Bill of Lading against the Shipping Instruction for " +
-        `${reference} across all seven fields. No mismatch was found.`,
-      "",
-      "Regards,",
-    ].join("\n");
+    return {
+      subject: `Re: ${reference} — SI/BL checked, no discrepancy`,
+      body: [
+        "Hello,",
+        "",
+        "We compared the draft Bill of Lading against the Shipping Instruction for " +
+          `${reference} across all seven fields. No mismatch was found.`,
+        "",
+        "Regards,",
+      ].join("\n"),
+    };
   }
 
   if (status === "NEEDS_REVIEW") {
     const reason = reviewReason
       ? reviewReasonClause(reviewReason)
       : "we could not complete an automated check";
-    return [
-      `Subject: Re: ${reference} — action needed before we can check this`,
-      "",
-      "Hello,",
-      "",
-      `We were not able to complete an automated comparison because ${reason}. ` +
-        "Could you please re-send the affected document(s) so we can complete the check?",
-      "",
-      "Regards,",
-    ].join("\n");
+    return {
+      subject: `Re: ${reference} — action needed before we can check this`,
+      body: [
+        "Hello,",
+        "",
+        `We were not able to complete an automated comparison because ${reason}. ` +
+          "Could you please re-send the affected document(s) so we can complete the check?",
+        "",
+        "Regards,",
+      ].join("\n"),
+    };
   }
 
   const lines = report.fields
@@ -61,18 +73,36 @@ export function buildReplyDraft(report: CaseReport, reference = report.email_id)
       return `  - ${label}: SI says "${f.si.raw ?? "?"}", draft BL says "${f.bl.raw ?? "?"}"`;
     });
 
-  return [
-    `Subject: Re: ${reference} — discrepancy found between SI and draft BL`,
-    "",
-    "Hello,",
-    "",
-    `We compared the draft Bill of Lading against the Shipping Instruction for ${reference} ` +
-      `and found ${defectFields.length} field(s) that do not match:`,
-    "",
-    ...lines,
-    "",
-    "Could you please confirm which value is correct so we can finalise the Bill of Lading?",
-    "",
-    "Regards,",
-  ].join("\n");
+  return {
+    subject: `Re: ${reference} — discrepancy found between SI and draft BL`,
+    body: [
+      "Hello,",
+      "",
+      `We compared the draft Bill of Lading against the Shipping Instruction for ${reference} ` +
+        `and found ${defectFields.length} field(s) that do not match:`,
+      "",
+      ...lines,
+      "",
+      "Could you please confirm which value is correct so we can finalise the Bill of Lading?",
+      "",
+      "Regards,",
+    ].join("\n"),
+  };
+}
+
+/** `Subject: ...\n\n<body>` — the form the on-screen textarea has always
+ *  shown, kept as one function so the two callers (the panel's initial
+ *  value, and re-deriving it is never needed elsewhere) can't drift. */
+export function formatReplyDraft(draft: ReplyDraft): string {
+  return `Subject: ${draft.subject}\n\n${draft.body}`;
+}
+
+/** A `mailto:` URL a human still has to review and press send on, in their
+ *  own already-authenticated mail client — Sentinel never transmits
+ *  anything itself. `undefined` when there is no known recipient (e.g. a
+ *  /compare upload, which has no inbox record to read a sender from). */
+export function mailtoHref(to: string | undefined | null, draft: ReplyDraft): string | undefined {
+  if (!to) return undefined;
+  const params = new URLSearchParams({ subject: draft.subject, body: draft.body });
+  return `mailto:${encodeURIComponent(to)}?${params.toString()}`;
 }
