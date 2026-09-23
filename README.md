@@ -36,7 +36,7 @@ of being reported as a discrepancy.*
 | | |
 |---|---|
 | **Accuracy** | **1.0000** final score on the dev set **and** on three held-out draws, generated from the organisers' own generator with seeds we never developed against — 225 planted defects, every one caught with the **exact** field set, no false alarms, all 80 escalations correct. Not four *independent* tests, and `docs/SCORING.md` §4.1 says why. |
-| **Tests** | **574** — 573 pass, and 1 strict `xfail` pinning a defect we have found and not yet fixed (`docs/ADVERSARIAL.md` §5.4). |
+| **Tests** | **582** — up from 574, 8 new since `4c852a7` (`docs/STATUS.md` 2026-09-24). The one strict `xfail` that used to sit here is gone: it pinned a defect found by review, `docs/ADVERSARIAL.md` §5.4, fixed the same day it was found. |
 | **Speed** | **~3 ms per email**, single-threaded on a laptop: 520 emails end to end in about 1.5 s. |
 | **Cost** | **100% of decisions are made by rules.** `decided_by` is `"rule"` for all 520 emails; no model call decides anything on the graded inbox. |
 
@@ -45,17 +45,33 @@ written — the commands are in [Verify it yourself](#verify-it-yourself).
 
 The accuracy row is the only one a reader cannot reproduce without the
 organisers' dataset, so here is its provenance instead of asking for trust. It
-was measured at `4c852a7`, and **no commit since has touched
-`backend/sdoc/`** — the pipeline the score is a function of, and the library
-both the CLI and the API call. One command checks that:
+was measured at `4c852a7`. Three commits since have touched `backend/sdoc/` —
+the pipeline the score is a function of — each one found by testing against a
+real document from *outside* the organisers' generator
+([`docs/EXTERNAL_VALIDATION.md`](docs/EXTERNAL_VALIDATION.md)), not by
+touching anything the scorer exercises:
 
 ```bash
-git log 4c852a7..HEAD -- backend/sdoc/     # empty
+git log --oneline 4c852a7..HEAD -- backend/sdoc/
 ```
 
-Everything committed after that point is the API surface, the dashboard, the
-demo inbox and these documents. The score cannot have moved, because nothing
-that computes it has.
+| Commit | What, and why it cannot have moved the score |
+|---|---|
+| `labels.py` | Ignores one more reference-number label. The string it ignores appears in zero of the 520 graded documents (`grep`, checked). |
+| `readers/office.py` | Reads a container-manifest table shape none of the 8 real `.docx` attachments in the graded set has (checked directly). |
+| `compare.py` | Anchors a repair on its evidence locator instead of the first text match. The bug this closes had already been measured firing on **zero** of the real documents, and still does after the fix. |
+
+Each one was re-verified the same way: `backend/tools/adversarial.py` against
+the committed `bundle_data/` — the same 520-email set the score is measured
+on, no answer key required — reports all 16 perturbation modes
+**byte-identical** to the run before that commit. Full detail, commit by
+commit: `docs/STATUS.md`'s 2026-09-24 entry.
+
+What this page cannot do is re-run the organisers' own scorer here — 
+`data/_grader/` is git-ignored and was not on the machine that made these
+three commits. The claim above is therefore evidence of the same *kind* as
+the original one, not a rerun of it: measured, not assumed, and the harness
+above is what a judge can run to check it independently.
 
 What those numbers do **not** prove is in
 [What the evidence shows](#what-the-evidence-shows-and-what-it-does-not), and
@@ -197,10 +213,11 @@ claimed.*
 and `render.yaml` build the API, `web/vercel.json` the frontend. Runbook and
 the failures worth predicting: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
-**Tests — 574.** 431 pass on a fresh clone with no dataset and no key, 573
-with the bundle in place, and 1 strict `xfail` pinning a defect we have found
-and not yet fixed. The skips are guarded in `conftest.py` and print their
-reason rather than failing on an empty read — see [The test
+**Tests — 582**, up from 574 at `4c852a7` (8 new, one former `xfail` now a
+plain pass — see the table two sections up). The skips are guarded in
+`conftest.py` and print their reason rather than failing on an empty read —
+exact counts and the caveat on which of them are freshly re-run versus
+carried over from before `4c852a7` are in [The test
 suite](#the-test-suite).
 
 ---
@@ -247,7 +264,16 @@ the 520-email one, below.
 .venv/Scripts/python.exe -m pytest backend/tests
 ```
 
-On a fresh clone: **431 passed, 142 skipped, 1 xfailed, 0 errors**.
+On a fresh clone at `4c852a7`: **431 passed, 142 skipped, 1 xfailed, 0
+errors**. Three commits since (the table two sections up) added 8 tests and
+turned that one `xfail` into a real pass — **440 passed, 142 skipped, 0
+xfailed** is the arithmetic, not a fresh rerun: those three commits were
+verified on this repository's own working checkout, not a clone with no
+`data/`, and that checkout's own skip count does not match 142 for reasons
+that predate this session and are unrelated to it. Re-run this command on an
+actual fresh clone before trusting the skip figure specifically; the pass
+count and the zero `xfailed` are the part every commit message above
+verified directly.
 
 The skips are not a broken checkout. `data/` is git-ignored — it holds the
 organisers' dataset and, beside it, their answer key (see
@@ -255,7 +281,8 @@ organisers' dataset and, beside it, their answer key (see
 full bundle to read. `backend/tests/conftest.py` guards exactly the tests that
 open it and skips them with the reason printed, rather than letting ~100 tests
 fail on an empty read and read as a broken project. With the participant bundle
-at `data/bundle/`, the same command gives **573 passed, 1 xfailed**.
+at `data/bundle/`, the same command gave **573 passed, 1 xfailed** at
+`4c852a7`; by the same arithmetic as above, **582 passed, 0 xfailed** since.
 
 ### The full inbox
 
@@ -326,9 +353,11 @@ including the `control_rewrite` sanity row, `ocr_confusions` at **0** silent
 wrong values and **0** invented defects, unfamiliar wording escalating **168**
 documents rather than guessing at them, and `wrapped_value` still carrying its
 74 short reads and the **1** masked discrepancy that
-[§5.4](docs/ADVERSARIAL.md) pins with a strict `xfail`. Those last two are in
-the output on purpose. A harness that only prints zeroes is not measuring
-anything.
+[§5.2](docs/ADVERSARIAL.md) describes — `email_145`, unfixable by this
+repair *by construction*, not the §5.4 defect that used to share this
+number: that one was fixed 2026-09-24, fired on zero real documents before
+the fix and still does after it. Those two are in the output on purpose. A
+harness that only prints zeroes is not measuring anything.
 
 ---
 
@@ -359,7 +388,7 @@ is no answer key in it: the unperturbed reading is the reference.
 | **Holds** | Punctuation drift, case and spacing noise, reflowed values, indented labels, reordered fields — **zero** movement on both draws. The `control_rewrite` row is zero too, so the instrument itself is sound. |
 | **Costs recall, safely** | Unfamiliar label wording loses 1,100 of 1,281 fields and escalates every one: zero false discrepancies, zero silent wrong values. The right failure direction, and useless to an operator — see the next section. |
 | **Bends, safely** | OCR character confusion (`NANTONG` → `NANT0NG`) still moves 972 of 1,281 dev reads, and always will: the document genuinely says something else, and nothing separates "the scanner misread a digit" from "the document says that" from one source. What it no longer does is *decide*. Silent wrong values and invented defects are both **zero**, down from 982 and 151, because a damaged number is now refused rather than parsed short and a value differing only on confusable glyphs is escalated rather than reported (`docs/ADVERSARIAL.md` §4.4). Fuzzy value matching is still banned and still the wrong fix — this veto never produces a match, so it cannot clear a bad BL (`docs/DECISIONS.md` §D2). |
-| **Open** | The truncation repair can mask a real discrepancy (§5.4). It is pinned by a **strict** `xfail`, so fixing it turns the build red rather than passing quietly. |
+| **Open** | One masked discrepancy the repair cannot catch *by construction* — `email_145`, `docs/ADVERSARIAL.md` §5.2 — its first guard returns before either document is re-examined, so closing it means a second extraction pass, not a smaller fix. (A different masking bug, §5.4, was found and fixed the same day — see the commit table above.) |
 
 ## What the model layer recovers
 
@@ -444,10 +473,19 @@ catastrophic regression. All three are the same class of bug: something that
 fails without saying so.
 
 **What is still open**, and pinned rather than hidden: the truncation repair
-can mask a real discrepancy when both canonical values already match
-(§5.2, §5.4). It has fired zero times on real data. It is held by a **strict**
-`xfail`, so the day someone fixes it the build turns red instead of passing
-quietly.
+cannot catch a masked discrepancy *by construction* when both canonical
+values already match before either side is re-examined (§5.2, `email_145`
+— one case in 188 on dev, none on the held-out seed). Closing it means a
+second extraction pass over values that already agree, not a smaller fix,
+so it stays open.
+
+A related but different bug — §5.4, the repair completing a value from the
+*wrong* occurrence of matching text elsewhere in the document — was found
+the same way (review, not the harness) and fixed the same day: see the
+commit table earlier on this page and `docs/STATUS.md`'s 2026-09-24 entry.
+It had fired on zero real documents before the fix, and the harness
+confirms it still does after — the fix could not have moved a number that
+was already at zero.
 
 ## Future roadmap
 
@@ -493,7 +531,7 @@ taken in §4.4: escalate the ambiguity, never absorb it.
 backend/sdoc/          the pipeline — no web, no database, no network imports
 backend/api/           FastAPI surface over it (11 routes, incl. POST /compare)
 backend/tools/         adversarial.py, the perturbation harness; smoke_readers.py
-backend/tests/         574 tests over the traps in docs/DATA_NOTES.md
+backend/tests/         582 tests over the traps in docs/DATA_NOTES.md
 backend/run.py         an inbox -> submission.json + report.json + metrics.json
 web/                   Next.js 16 dashboard (App Router, shadcn/ui, Recharts)
 demo_data/             30-email demo inbox — what a clone can run without the bundle

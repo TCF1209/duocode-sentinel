@@ -583,14 +583,20 @@ entire inbox to a human. The assisted path (`extract/llm.py`) is wired and is
 meant for exactly this, but every number on this page is the deterministic
 pipeline, so none of them describes what it recovers.
 
-### 5.4 The truncation repair can mask a real discrepancy — found by review
+### 5.4 The truncation repair could mask a real discrepancy — found by review, fixed 2026-09-24
 
-§4.2 says the repair "cannot invent agreement". In the ordinary case that is
-true, and the harness agrees: false discrepancies went to zero and stayed
-there on both draws. But there is a case where it does invent one, and it
-comes from the mechanism named in §4.2 — `text.find(value.raw)` locates the
-**first** textual occurrence of the value, not the span the evidence locator
-points at.
+**Resolved**, the same day it was found reachable by a second review (below).
+Left here rather than deleted, same reason every other row on this page stays
+even after its number goes to zero: a reader checking this page against
+`docs/STATUS.md`'s 2026-09-24 entry should find the same story, not a page
+quietly edited to look like the gap was never there.
+
+§4.2 says the repair "cannot invent agreement". In the ordinary case that was
+true, and the harness agreed: false discrepancies were zero and stayed there
+on both draws. But there was a case where it invented one, and it came from
+the mechanism named in §4.2 — `text.find(value.raw)` located the **first**
+textual occurrence of the value, not the span the evidence locator pointed
+at.
 
 In this dataset the consignee and the notify party are frequently the same
 company, so a document can carry the same first line twice with *different*
@@ -603,11 +609,31 @@ Notify:       APRIL FINE PAPER TRADING (MIDDLE
                 EAST ASIA) PTE LTD
 ```
 
-Repairing the notify party reads from the consignee's block three lines above,
-completes it to `...(MIDDLE EAST) FZE`, and reports `MATCH` against a BL that
-says exactly that — while the document's own notify party is a different
-company. A real discrepancy is masked, and unlike §5.2 this one is
+Repairing the notify party read from the consignee's block three lines above,
+completed it to `...(MIDDLE EAST) FZE`, and reported `MATCH` against a BL that
+said exactly that — while the document's own notify party is a different
+company. A real discrepancy was masked, and unlike §5.2 this one was
 manufactured *by* the repair rather than missed by it.
+
+**The fix**: `compare._extend` now anchors on `evidence.locator` when it
+names a line (`"line N"`, the format a plain-text or PDF-derived reader
+produces), and only falls back to the old whole-document search for any
+other locator shape or none. `backend/tests/test_compare_wrap.py`'s
+`test_a_continuation_is_read_from_the_block_the_evidence_points_at` pinned
+the wanted behaviour as a strict `xfail` for exactly this reason — the day
+the anchor landed it turned into a loud `XPASS`, not a silent green, and the
+marker came off only after that was seen to happen.
+
+**Why this is safe on the graded data, not just plausible**: the harness
+already recorded that this bug "fired 0 times on real data" before the fix
+(`docs/STATUS.md`), because the triggering shape — two fields sharing an
+identical first line before either wraps, within one document — never
+occurs in `bundle_data/` or its perturbations. A full re-run of this harness
+after the fix confirms it: all 16 modes, byte-identical to the run before,
+including `wrapped_value`'s own `masked_discrepancies` staying at exactly
+**1** — that is §5.2's `email_145` case, a different mechanism this fix does
+not touch and was never meant to (§5.2's repair returns before `_extend` is
+ever called, so no locator anchoring reaches it).
 
 It is pinned as a strict `xfail` at
 `backend/tests/test_compare_wrap.py::test_a_continuation_is_read_from_the_block_the_evidence_points_at`,

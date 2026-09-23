@@ -78,8 +78,10 @@ from a manifest table means deciding whether a real form ever needs
 per-container weights *summed* into one shipment total, which is a
 domain judgement call, not a parsing gap — the wrong guess there is worse
 than the `missing` it produces today. Left open rather than decided alone
-under a two-day clock; the same choice already made once for the
-truncation-repair `xfail` in `docs/ADVERSARIAL.md` §5.4.
+under a two-day clock; the same kind of call `docs/ADVERSARIAL.md` §5.2
+also leaves open, for the same reason. (§5.4, referenced here in an
+earlier version of this page, was a different defect and was fixed later
+the same day — see `docs/STATUS.md`'s 2026-09-24 entry.)
 
 **Also noted.** `doctype.py` scored this document `UNKNOWN` at 0.00
 confidence for every known type. `POST /compare` does not gate on
