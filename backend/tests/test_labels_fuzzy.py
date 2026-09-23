@@ -143,6 +143,24 @@ def test_the_labels_that_must_stay_ignored_stay_ignored():
     assert labels.resolve("Description of Goods") is None
 
 
+def test_a_reference_number_field_is_not_the_shipper():
+    """Found on a real carrier's own SI template, not our own generator.
+
+    CMA CGM's public "Standard Shipping Instructions Template" has a
+    "Shipper/Forwarders Reference" field for a tracking number. It contains
+    the word "Shipper", so without the `IGNORE_LABELS` entry the pass-2 rule
+    `\\b(SHIPPER|EXPORTER|CONSIGNOR)\\b` reads a reference code into the
+    shipper field — and because it appears earlier in the document than the
+    real "Shipper" party block, `extract/fields.py` keeps it as the winning
+    candidate. Comparing a reference number against the other document's real
+    company name produced a false MISMATCH on an otherwise-matching shipper.
+    The same trap "Booking Reference" already guards against, one field over.
+    """
+    assert labels.resolve("Shipper/Forwarders Reference") is None
+    assert labels.resolve("Shipper's Reference") is None
+    assert labels.resolve("Forwarder's Reference") is None
+
+
 def test_the_fuzzy_pass_is_what_reaches_the_unseen_wording():
     """Guards the reason pass 3 is allowed to exist at all.
 

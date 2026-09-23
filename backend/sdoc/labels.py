@@ -81,6 +81,14 @@ IGNORE_LABELS: list[str] = [
     "Booking Reference", "Booking No.", "Booking Ref", "B/L No.", "BL No.",
     "Bill of Lading No.", "B/L Number", "HS Code", "Freight", "OC No.",
     "Order No.", "Invoice No.", "Place of Delivery", "Place of Receipt",
+    # Reference-number fields, not the party itself — the same trap as
+    # "Booking Reference" above, but for the shipper. Found on a real
+    # carrier's own SI template (CMA CGM), where "Shipper/Forwarders
+    # Reference" contains the word "Shipper" and, without this entry, the
+    # pass-2 rule `\b(SHIPPER|EXPORTER|CONSIGNOR)\b` reads a tracking number
+    # into the shipper field instead of the party's name.
+    "Shipper/Forwarders Reference", "Shipper's Reference",
+    "Forwarder's Reference", "Forwarders Reference",
 ]
 
 # Build the reverse lookup once.
