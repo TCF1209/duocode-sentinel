@@ -571,6 +571,31 @@ if we do take it on: the reader, not the comparison, should mark a value it
 truncated at a wrap, and the comparison should refuse to auto-decide a *match*
 that depends on a truncated value — escalate, do not guess.
 
+**Checked, 2026-09-24, before deciding whether to take that on: the mitigation
+as stated would cost far more than it buys.** The only signal available for
+"this value might have been truncated at a wrap" is the same signal that
+already exists for the ordinary case a value is *not* truncated: does a
+line with no label of its own follow it. Measured directly against
+`bundle_data/` — every `Shipper`/`Consignee`/`Notify` label line, and
+whether the next line looks like a labelless continuation — **485 of 530
+(92%)** do. That is not a rare shape to guard against; it is what a party
+field looks like on this dataset's forms almost every time, because a name
+is almost always followed by its address block. A reader that flagged
+"possibly truncated" on that signal would flag 92% of real party fields,
+and a comparison stage that refused to auto-match a flagged value would
+send the overwhelming majority of genuinely correct matches to
+`NEEDS_REVIEW` instead — trading one masked discrepancy in 188 for a false
+escalation on nearly every comparison email, unmeasurable against the real
+score on this machine because `data/_grader/` is not on it.
+
+So the mitigation needs a sharper signal than "is there a continuation" —
+something closer to "would completing the value from that continuation
+still fail to reproduce the other side," which is a second extraction pass
+in substance, not a flag. That is real design work, not a two-day fix
+under a submission clock, and the wrong version of it risks the score this
+page exists to protect. Left open on purpose, not for lack of a fix
+attempt.
+
 ### 5.3 Unseen label wording — safe, and still useless
 
 `unseen_labels` loses 1,100 of 1,281 fields (1,003 of 1,169 held out), escalates
