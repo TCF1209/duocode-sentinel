@@ -6,9 +6,26 @@ import { FIELD_LABELS, reviewReasonClause } from "@/lib/labels";
  * from data already in the report — no extra API call, no model call. This
  * is a formatting convenience for an operator, not a generated decision:
  * every figure it quotes is the field extraction already shown on the page.
+ *
+ * Reads the *effective* outcome when the case has been reviewed, not the
+ * system's original call. `report.status`/`defect_fields` deliberately stay
+ * the system's own answer everywhere else on this page — lib/api.ts's own
+ * comment on `effective` says so, "so a card can show both" — but this
+ * draft is the one artifact that leaves that context and goes to someone
+ * outside the review queue. They have no way to see that a reviewer already
+ * corrected what the system said, so the draft has to say what is actually
+ * true now, not what the system guessed before a human looked at it.
+ * `effective` is only ever present once a case has been reviewed
+ * (`GET /cases/{id}`); on `/compare`, where nothing is stored and nothing
+ * can be reviewed, it is always absent, and this falls back to the system's
+ * own answer exactly as before.
  */
 export function buildReplyDraft(report: CaseReport, reference = report.email_id): string {
-  if (report.status === "OK") {
+  const status = report.effective?.status ?? report.status;
+  const reviewReason = report.effective?.review_reason ?? report.review_reason;
+  const defectFields = report.effective?.defect_fields ?? report.defect_fields;
+
+  if (status === "OK") {
     return [
       `Subject: Re: ${reference} — SI/BL checked, no discrepancy`,
       "",
@@ -21,9 +38,9 @@ export function buildReplyDraft(report: CaseReport, reference = report.email_id)
     ].join("\n");
   }
 
-  if (report.status === "NEEDS_REVIEW") {
-    const reason = report.review_reason
-      ? reviewReasonClause(report.review_reason)
+  if (status === "NEEDS_REVIEW") {
+    const reason = reviewReason
+      ? reviewReasonClause(reviewReason)
       : "we could not complete an automated check";
     return [
       `Subject: Re: ${reference} — action needed before we can check this`,
@@ -38,7 +55,7 @@ export function buildReplyDraft(report: CaseReport, reference = report.email_id)
   }
 
   const lines = report.fields
-    .filter((f) => f.verdict === "MISMATCH")
+    .filter((f) => defectFields.includes(f.field))
     .map((f) => {
       const label = FIELD_LABELS[f.field] ?? f.field;
       return `  - ${label}: SI says "${f.si.raw ?? "?"}", draft BL says "${f.bl.raw ?? "?"}"`;
@@ -50,7 +67,7 @@ export function buildReplyDraft(report: CaseReport, reference = report.email_id)
     "Hello,",
     "",
     `We compared the draft Bill of Lading against the Shipping Instruction for ${reference} ` +
-      `and found ${report.defect_fields.length} field(s) that do not match:`,
+      `and found ${defectFields.length} field(s) that do not match:`,
     "",
     ...lines,
     "",
