@@ -4,6 +4,82 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-24 (night, continued again) — Claude session 8 · view the original SI/BL, not just its evidence snippet
+
+The previous entry below closed the session out and stopped both local
+servers. This is a fresh ask that came in after that close: "when I click
+into a case, can the original SI and BL be attached right there so they're
+easy to look at?" One feature, built and verified the same way as
+everything else tonight — not batched with the entry below because that
+entry's own "Careful" section already declared itself finished and
+shouldn't be edited after the fact.
+
+**Done**
+- **`GET /cases/{case_id}/attachments/{side}`** (`backend/api/main.py`):
+  serves the literal file a run read off disk — the same `si_doc`/`bl_doc`
+  path the pipeline already resolved, re-contained under `data_root` as a
+  cheap correctness habit rather than a real trust boundary (the path
+  comes from the inbox JSON, not the request). 404s on an unknown case, an
+  unknown side, or a file no longer on disk; only ever wired up for a run
+  (`caseId` is `<run_id>:<email_id>`) — `/compare` holds its upload in
+  memory and persists nothing, so there is nothing this route could point
+  at there, and no link renders on that page (checked live, not just by
+  reading the prop-drilling).
+- **Served `inline`, not `FileResponse`'s own `attachment` default.**
+  Caught before it shipped, not after: the framework default forces a
+  save-as dialog, which is the opposite of "easy to look at." Checked what
+  that actually costs against `docs/DATA_NOTES.md`'s own attachment count
+  — 192 `.txt` + 28 `.pdf` of 250 total render directly in a browser tab
+  under `inline`; the remaining `.xlsx`/`.docx` have no in-browser renderer
+  either way and download regardless of the header, so `inline` has no
+  downside for those. Locked in with a header assertion in the new test,
+  not just eyeballed once.
+- **Frontend**: `attachmentUrl()` (`lib/api.ts`), a "View original" link
+  next to the existing "SI: {path}…" / "BL: {path}…" line
+  (`case-report-view.tsx`, gated on a new optional `caseId` prop),
+  wired from `case-detail-page-view.tsx` as `` `${runId}:${emailId}` ``.
+- **A real, pre-existing test bug this surfaced, not introduced by it**:
+  `_write_attachment`'s `Path.write_text()` writes CRLF on Windows while
+  the fixture's own text constants are plain `\n` — invisible until a test
+  did a byte-exact comparison against the served file, which nothing did
+  before this route existed. Fixed in the test's assertion
+  (`.replace("\r\n", "\n")`), not the route: the route serving the literal
+  on-disk bytes is correct behaviour, the fixture/OS mismatch is not.
+
+**Verification**
+- `backend/tests`: full suite re-run after the fix, zero failures (exit
+  0; every progress character is `.`/`s`, none `F`/`E` — the run's own
+  final summary line did not print to this shell for reasons unrelated to
+  the tests themselves, so pass/fail was confirmed by exit code and the
+  absence of any failure marker instead of by that line). New test covers
+  byte-for-byte content, the `inline` header, and all three 404 paths.
+- `npx tsc --noEmit`, `npm run lint`, `npm run build`: all clean.
+- Live, against real data, not the synthetic fixture: restarted the
+  backend (it had been stopped per the prior entry) with
+  `SENTINEL_DATA_ROOT=bundle_data`, ran a fresh 520-email pass, opened
+  `email_004` (a real MISMATCH) in the browser, clicked "View original,"
+  and watched the actual shipping-instruction text — including fields no
+  other part of the UI shows, like vessel/voyage/HS code — render in the
+  tab with no download prompt. Confirmed `/compare` shows no such link
+  after running a sample comparison there.
+- Committed (`2332f96`) on `feat/final-round-differentiators`, five files,
+  nothing untracked swept in alongside it (`git status` checked before and
+  after staging).
+
+**Next**
+- Servers left running this time (backend on the real `bundle_data/`,
+  frontend dev server) since the user may want to look at this directly
+  rather than re-verify it themselves from a cold start.
+- Same open items as the entry below: slide deck, branch push/merge
+  decision, Mentor Session reply — all still untouched.
+
+**Careful**
+- The in-memory run created to verify this (`run_000002_1790218514`) is
+  local test state only, gone on the next backend restart, same as every
+  prior session's note on this.
+
+---
+
 ## 2026-09-24 (night) — Claude session 8, continued · overnight autonomous pass: real-time sync, mailto, discoverability, a design critique acted on
 
 Explicitly asked to keep working unattended overnight and have it "done to
