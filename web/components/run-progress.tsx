@@ -113,6 +113,7 @@ export function RunProgress({
   cases,
   filtered,
   done = false,
+  llmEnabled = false,
 }: {
   processed: number;
   total: number;
@@ -127,6 +128,15 @@ export function RunProgress({
    * rather than leaving stale process-in-progress language on screen.
    */
   done?: boolean;
+  /**
+   * Whether this run was started with the model tier available. The sentence
+   * below used to say "on rules alone -- no model call, no network"
+   * unconditionally, which was true of every run until the dashboard gained a
+   * switch to enable the model. Ticking that switch on stage and then pointing
+   * at a panel denying it is the kind of contradiction a judge reads as
+   * carelessness, so the copy now follows the run.
+   */
+  llmEnabled?: boolean;
 }) {
   const count = useSmoothCount(processed);
   const rate = useRate(processed);
@@ -167,8 +177,9 @@ export function RunProgress({
               {done ? "Done reading the inbox" : "Reading the inbox"}
             </h2>
             <p className="text-sm text-muted-foreground">
-              Every email classified, every document pair compared, on rules alone — no
-              model call, no network.
+              {llmEnabled
+                ? "Every email classified, every document pair compared by rules first, with the model tier available for what they cannot read."
+                : "Every email classified, every document pair compared, on rules alone — no model call, no network."}
             </p>
           </div>
 

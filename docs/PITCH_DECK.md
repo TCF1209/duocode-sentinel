@@ -267,7 +267,7 @@ does not score more.
 | `email_145`, one masked discrepancy in 3,008; the guard flags 92% of real party fields | `ADVERSARIAL.md` §5.2 |
 | CMA CGM SI template: one bug found and fixed | `EXTERNAL_VALIDATION.md` |
 | 596 tests, 0 failing (454 passed, 142 skipped without the dataset) | `pytest --junitxml`, 24 Sep, after `61aa336` |
-| 21 pattern groups, largest 6 cases | run page over the real inbox, `STATUS.md` 24 Sep |
+| 21 pattern groups, largest 7 cases | run page over the real inbox, `STATUS.md` 24 Sep |
 | desk codes AFEMY 35 · AIE 30 · AFRT 29 · AFPTME 22 | counted from `bundle_data/inbox` subjects and recipients, 24 Sep |
 | 9.1% escalation rate, all correct | 20 of 220 comparison requests, gold `NEEDS_REVIEW` 20 |
 | ~11 hours of desk work | **an estimate** — 20 s per email, 4 min per pair; say "conservative estimate" |

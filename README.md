@@ -47,15 +47,23 @@ written — the commands are in [Verify it yourself](#verify-it-yourself).
 
 The accuracy row is the only one a reader cannot reproduce without the
 organisers' dataset, so here is its provenance instead of asking for trust. It
-was measured at `4c852a7`. Three commits since have touched `backend/sdoc/` —
-the pipeline the score is a function of — each one found by testing against a
-real document from *outside* the organisers' generator
-([`docs/EXTERNAL_VALIDATION.md`](docs/EXTERNAL_VALIDATION.md)), not by
-touching anything the scorer exercises:
+was measured at `4c852a7`. **Six** commits since have touched `backend/sdoc/`
+— the pipeline the score is a function of — and the run it produces today is
+**byte-identical** to the one measured then, `submission.json` at md5
+`1c08cd21`. Run the command, count the commits, re-run the pipeline and
+compare the hashes; the paragraph is checkable rather than asking for trust:
 
 ```bash
 git log --oneline 4c852a7..HEAD -- backend/sdoc/
 ```
+
+Three of the six change what is *reported* and cannot reach the scorer at all:
+the vision transcript is attached to `to_report()` only, the sender likewise,
+and the evidence gate's new sentence names which label was not recognised
+instead of saying the documents do not state it — a better message for the
+same escalation. The other three change reading or comparison, and each was
+found by testing against a real document from *outside* the organisers'
+generator ([`docs/EXTERNAL_VALIDATION.md`](docs/EXTERNAL_VALIDATION.md)):
 
 | Commit | What, and why it cannot have moved the score |
 |---|---|
@@ -521,8 +529,8 @@ Beyond the hackathon, in the order we would actually build them:
 3. **Batch patterns — built.** The run page now groups `MISMATCH` cases by
    shipper and field, surfacing any group of two or more, largest first, each
    expandable to the affected emails. Real signal on the graded inbox, not a
-   demo fixture: 21 such patterns, the largest six cases from one shipper's
-   container count. No new extraction — the shipper name was already read by
+   demo fixture: 21 such patterns, the largest seven cases from one shipper's
+   gross weight. No new extraction — the shipper name was already read by
    the pipeline; the API just started including it in the case list.
 4. **Throughput and cost at real inbox volume — built.** The metrics page now
    projects both onto a desk's own volume: processing time scales the run's

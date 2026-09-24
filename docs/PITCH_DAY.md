@@ -75,7 +75,7 @@ The deck's beats and timings are in `PITCH_DECK.md`. On the product:
    thirteen seconds, 6 model calls — all six are scans read out for the
    reviewer.**
 2. **Patterns worth a second look** — open the top group, say what it is
-   (six cases from one shipper wrong on the same field), click into one.
+   (seven cases from one shipper wrong on the same field), click into one.
 3. A **MISMATCH** case: the two documents side by side, the two fields that
    disagree, and under every value **the line it was read from**. This is the
    promise of the first slide, on screen.

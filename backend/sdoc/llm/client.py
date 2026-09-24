@@ -107,7 +107,22 @@ class LLMClient:
                 from openai import OpenAI
             except ImportError as exc:                    # pragma: no cover
                 raise LLMUnavailable("openai SDK is not installed") from exc
-            self._client = OpenAI(api_key=self.settings.api_key)
+            # Bounded on purpose. The SDK's defaults are a 600s timeout and
+            # two retries, so one call can hold a run thread for half an hour
+            # -- and a run thread that never returns is not just slow: with
+            # SENTINEL_MAX_ACTIVE_RUNS at 2, two stuck runs make `POST /runs`
+            # answer 429 for every run after them, including rules-only ones,
+            # until the container restarts (which empties the in-memory store).
+            # That is a demo-day failure mode, and the network that causes it
+            # is ordinary venue wifi: a dead network fails fast, a captive
+            # portal or black-holed packets is what hangs.
+            #
+            # 60s is well clear of a real call -- the measured model path on
+            # this workload is ~11s -- and caps the worst case at about two
+            # minutes instead of thirty.
+            self._client = OpenAI(
+                api_key=self.settings.api_key, timeout=60.0, max_retries=1
+            )
         return self._client
 
     def _check_budget(self) -> None:

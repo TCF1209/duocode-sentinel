@@ -89,9 +89,22 @@ function AttachmentDialog({ url, filename, kind, label }: { url: string; filenam
   const [open, setOpen] = useState(false);
   const [text, setText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pdfLoaded, setPdfLoaded] = useState(false);
 
   function onOpenChange(next: boolean) {
     setOpen(next);
+    // Closing clears a previous failure, so a second click actually retries.
+    // Without this the guard below -- which is right, it stops a re-fetch of
+    // a file already in hand -- also latched the error for the life of the
+    // component: one failed load on a cold container and that button was
+    // dead until a page reload. The retries are 200ms apart and Render's
+    // free tier wakes in 30-60s, so the first click on a sleeping API
+    // exhausts all three in under a second and is exactly the case that used
+    // to stick.
+    if (!next) {
+      setError(null);
+      return;
+    }
     // Fetched once per mount, on first open, not on every re-open of the
     // same dialog instance -- text/error already set is the guard.
     if (next && kind === "text" && text === null && error === null) {
@@ -117,7 +130,23 @@ function AttachmentDialog({ url, filename, kind, label }: { url: string; filenam
             <DialogTitle className="font-mono text-sm font-normal">{filename}</DialogTitle>
           </DialogHeader>
           {kind === "pdf" ? (
-            <iframe src={url} title={filename} className="h-[70vh] w-full rounded-md border bg-white" />
+            // The iframe paints nothing until the PDF is ready, and an empty
+            // white 70vh panel reads as broken rather than as loading -- on a
+            // cold free-tier container that is a 30-60s wait. The overlay says
+            // which it is, in the same words the text branch uses.
+            <div className="relative h-[70vh] w-full">
+              <iframe
+                src={url}
+                title={filename}
+                onLoad={() => setPdfLoaded(true)}
+                className="h-full w-full rounded-md border bg-white"
+              />
+              {!pdfLoaded && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md border bg-muted/30">
+                  <p className="text-sm text-muted-foreground">Loading…</p>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="max-h-[70vh] overflow-y-auto rounded-md border bg-muted/30 p-3">
               {error && <p className="text-sm text-danger">Could not load the file: {error}</p>}

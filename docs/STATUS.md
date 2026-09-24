@@ -872,7 +872,7 @@ higher here than earlier the same day, not lower.
   `pipeline.py` already computes — no new extraction, nothing in
   `backend/sdoc/` touched. Verified against the real 520-email
   `bundle_data/`, not a demo fixture: 21 real patterns exist, largest is
-  six cases on one shipper's container count, independently cross-checked
+  seven cases on one shipper's gross weight, independently cross-checked
   in a one-off script before trusting the UI, then confirmed the UI matches
   it exactly in a live browser, including the expand interaction and a
   followed link into the real case detail underneath it.

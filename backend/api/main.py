@@ -551,7 +551,17 @@ async def recheck_one_case(
 
     # Same rule `retry_case` applies: the model is offered exactly when the
     # run it belongs to was allowed it, never because a re-check asked.
-    client = build_client(enabled=run.llm_enabled)
+    #
+    # The SHARED client, not a fresh one -- for the reason written out ninety
+    # lines below, where the same mistake was found and fixed for /compare:
+    # SENTINEL_RUN_BUDGET_USD lives on the client's own usage counter, so a new
+    # client per request resets the ceiling every time and bounds nothing. This
+    # route is public, unauthenticated and takes uploads, and `render.yaml` now
+    # sets SENTINEL_ALLOW_LLM_RUNS=1, so an unshared client here is an
+    # unbounded spend path. `build_client(enabled=False)` returns None and so
+    # does `_shared_compare_client()` with no key configured, so the
+    # model-disabled behaviour is unchanged.
+    client = _shared_compare_client() if run.llm_enabled else None
     fresh = compare_uploads(*inputs["si"], *inputs["bl"], llm=client)
     # What the run decided about the *email* is carried over untouched;
     # only what the documents say has changed. `decided_by` is left as the
