@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { FileCheck2, Loader2, Sparkles, Upload, X } from "lucide-react";
+import { ArrowRight, FileCheck2, Loader2, Sparkles, Upload, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -105,6 +105,24 @@ export default function ComparePage() {
         </p>
       </motion.div>
 
+      {/* "When we land on this page, what do we have to do?" -- the mentor's
+          own question on 24 Sep. Three numbered steps answer it before the
+          visitor has to work it out from the controls. */}
+      <motion.ol variants={fadeUp} className="grid gap-2 sm:grid-cols-3">
+        {[
+          ["Pick a sample pair below, or upload your own SI and draft BL.", "1"],
+          ["Choose whether the model may read what the rules cannot.", "2"],
+          ["Press Compare. Then run the same pair with the switch the other way.", "3"],
+        ].map(([text, n]) => (
+          <li key={n} className="flex items-start gap-2.5 rounded-md border bg-card/60 px-3 py-2 text-sm">
+            <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+              {n}
+            </span>
+            <span>{text}</span>
+          </li>
+        ))}
+      </motion.ol>
+
       <motion.div variants={fadeUp}>
         <Card>
           <CardContent className="flex flex-col gap-5 p-6">
@@ -147,9 +165,15 @@ export default function ComparePage() {
       </motion.div>
 
       <motion.div variants={fadeUp} className="flex flex-col gap-2">
-        <p className="text-sm text-muted-foreground">
-          Or load a pair — then run each one twice, once with the model off and once on.
+        <p className="text-sm font-medium">
+          No documents to hand? Load a sample pair — then run it twice, once with the model off and
+          once on.
         </p>
+        {/* These read as descriptions, not controls, to a first-time visitor
+            (the mentor session of 24 Sep: "I'm not 100% sure it's clickable
+            until I click it"). A solid border, a pointer cursor, and an
+            explicit "Load this pair" footer with an arrow make the whole card
+            an obvious button; the hover lift is the confirmation. */}
         <div className="grid gap-3 sm:grid-cols-3">
           {SAMPLES.map((s) => (
             <button
@@ -157,7 +181,7 @@ export default function ComparePage() {
               type="button"
               onClick={() => loadSample(s)}
               disabled={loadingSample !== null}
-              className="flex flex-col gap-1.5 rounded-md border p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/40 disabled:opacity-60"
+              className="group flex cursor-pointer flex-col gap-1.5 rounded-lg border border-primary/30 bg-card p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-md disabled:cursor-default disabled:opacity-60"
             >
               <span className="flex items-center gap-1.5 text-sm font-medium">
                 {loadingSample === s.id && <Loader2 className="size-3.5 animate-spin" />}
@@ -167,6 +191,10 @@ export default function ComparePage() {
               {s.needsModel && (
                 <span className="mt-0.5 text-[11px] text-primary">needs the model to get past &ldquo;unreadable&rdquo;</span>
               )}
+              <span className="mt-auto flex items-center gap-1 pt-2 text-xs font-medium text-primary">
+                Load this pair
+                <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+              </span>
             </button>
           ))}
         </div>

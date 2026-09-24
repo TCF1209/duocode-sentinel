@@ -9,15 +9,16 @@ import { cn } from "@/lib/utils";
 import { EASE_OUT, SPRING, TAP } from "@/lib/motion";
 import { ThemeToggle } from "@/components/theme-toggle";
 
+// Order and names follow the mentor session of 24 Sep: a first-time visitor
+// should meet the one-pair check (Compare) before the whole-inbox run, and
+// "Pitch" told a judge nothing about what the page holds -- it is the five
+// screens of who/why/how, so it is called that. The route stays /pitch so
+// nothing that links to it changes.
 const LINKS = [
   { href: "/", label: "Home" },
-  // The pitch is five screens of who/why/how that used to live only in a slide
-  // file. It sits in the nav because the demo is recorded inside this app --
-  // one tab, no cutting to a deck -- and because a judge arriving cold gets
-  // the context before the dashboard rather than after it.
-  { href: "/pitch", label: "Pitch" },
-  { href: "/runs", label: "Runs" },
   { href: "/compare", label: "Compare" },
+  { href: "/runs", label: "Runs" },
+  { href: "/pitch", label: "How it works" },
 ];
 
 export function Nav() {
