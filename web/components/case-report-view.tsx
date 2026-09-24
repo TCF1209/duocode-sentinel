@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { AlertTriangle, Download, Eye } from "lucide-react";
-import { attachmentUrl, type CaseReport, type CaseStatus } from "@/lib/api";
+import { attachmentUrl, type CaseReport, type CaseStatus, type FieldComparisonReport } from "@/lib/api";
 import { CategoryBadge, DecidedByBadge, StatusBadge } from "@/components/status-badges";
-import { FieldComparisonRow } from "@/components/field-comparison-row";
+import { FieldComparisonRow, type ReviewerView } from "@/components/field-comparison-row";
 import { ReviewPanel } from "@/components/review-panel";
 import { ReplyDraftPanel } from "@/components/reply-draft-panel";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fadeUp, stagger } from "@/lib/motion";
-import { FIELD_LABELS, REVIEW_REASON_TEXT } from "@/lib/labels";
+import { FIELD_LABELS, REVIEW_REASON_TEXT, STATUS_LABELS } from "@/lib/labels";
+import { cn } from "@/lib/utils";
 
 // The backend computes `model_offered` and `model_used` so the page can say
 // which tier answered instead of the reader inferring it from extractor tags.
@@ -184,6 +185,30 @@ export function CaseReportView({
   const readableNotes = report.notes.filter((n) => n.includes(" "));
   const signalNotes = report.notes.filter((n) => !n.includes(" "));
 
+  // The reviewer's correction, when there is one that can differ from
+  // Sentinel's own answer. Only a "correct" decision produces one:
+  // "confirm" leaves `effective` identical to the system keys (store.py's
+  // effective_outcome, source stays "system"), and /compare never has an
+  // `effective` at all. Everything below that reads `correction` renders
+  // exactly as it always did when this is null -- the system's answer is
+  // never replaced, only joined by the person's where they differ.
+  const correction = report.effective?.source === "review" ? report.effective : null;
+
+  // Per field. NEEDS_REVIEW as a corrected status is "couldn't tell", which
+  // is not a claim about any one field in either direction, so it gets no
+  // per-field overlay -- only the header badge changes for it.
+  function reviewerViewFor(f: FieldComparisonReport): ReviewerView | null {
+    if (!correction || correction.status === "NEEDS_REVIEW") return null;
+    const flagged = correction.defect_fields.includes(f.field);
+    if (f.verdict === "MISMATCH" && !flagged) return "cleared";
+    if (f.verdict !== "MISMATCH" && flagged) return "flagged";
+    return null;
+  }
+
+  // Sentinel's review-reason banner, once a reviewer has moved the case off
+  // NEEDS_REVIEW (effective_outcome nulls the reason for any other status).
+  const reasonResolved = Boolean(report.review_reason && correction && correction.review_reason === null);
+
   return (
     <motion.div
       key={report.email_id}
@@ -195,7 +220,21 @@ export function CaseReportView({
       <motion.div className="flex flex-wrap items-center gap-2" variants={fadeUp}>
         <h2 className="font-heading text-lg font-semibold">{report.email_id}</h2>
         <CategoryBadge category={report.category} />
-        <StatusBadge status={report.status} />
+        {/* The outcome that currently stands leads; Sentinel's own is kept
+            beside it in words when the two differ. Same status corrected
+            (e.g. a mismatch trimmed to fewer fields) shows one badge --
+            "Sentinel said Mismatch" next to a Mismatch badge would only
+            be noise, and the review panel below already says "corrected". */}
+        {correction && correction.status !== report.status ? (
+          <>
+            <StatusBadge status={correction.status} />
+            <span className="text-xs text-muted-foreground" title="Sentinel's own outcome, before a reviewer corrected it">
+              Sentinel said {STATUS_LABELS[report.status]}
+            </span>
+          </>
+        ) : (
+          <StatusBadge status={report.status} />
+        )}
         <DecidedByBadge decidedBy={report.decided_by} />
         <ModelTier offered={report.model_offered} used={report.model_used} />
         <span className="text-xs text-muted-foreground">{report.duration_ms}ms</span>
@@ -204,16 +243,27 @@ export function CaseReportView({
 
       {report.review_reason && (
         <motion.div
-          className="flex items-start gap-2.5 rounded-md border border-warn/30 bg-warn-bg p-3 text-sm text-warn"
+          className={cn(
+            "flex items-start gap-2.5 rounded-md border p-3 text-sm",
+            // Kept, not removed, once a reviewer resolves it: what Sentinel
+            // flagged is still part of the record, it just no longer leads.
+            reasonResolved ? "border-border bg-muted/40 text-muted-foreground" : "border-warn/30 bg-warn-bg text-warn",
+          )}
           variants={fadeUp}
         >
           <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={2} />
           <div>
-            <div className="font-medium">{REVIEW_REASON_TEXT[report.review_reason]}</div>
+            <div className="font-medium">
+              {reasonResolved && <span className="font-normal">Sentinel had flagged: </span>}
+              {REVIEW_REASON_TEXT[report.review_reason]}
+            </div>
             {report.defect_fields.length > 0 && (
-              <div className="mt-0.5 text-warn/80">
+              <div className={cn("mt-0.5", !reasonResolved && "text-warn/80")}>
                 Flagged: {report.defect_fields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}
               </div>
+            )}
+            {reasonResolved && correction && (
+              <div className="mt-0.5">Resolved by a reviewer — corrected to {STATUS_LABELS[correction.status]}.</div>
             )}
           </div>
         </motion.div>
@@ -273,7 +323,7 @@ export function CaseReportView({
         <motion.div className="flex flex-col gap-2" variants={stagger(0, 0.05)}>
           {report.fields.map((f) => (
             <motion.div key={f.field} variants={fadeUp}>
-              <FieldComparisonRow comparison={f} />
+              <FieldComparisonRow comparison={f} reviewerView={reviewerViewFor(f)} reviewerNote={report.review?.note} />
             </motion.div>
           ))}
         </motion.div>
