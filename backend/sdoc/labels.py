@@ -89,6 +89,31 @@ IGNORE_LABELS: list[str] = [
     # into the shipper field instead of the party's name.
     "Shipper/Forwarders Reference", "Shipper's Reference",
     "Forwarder's Reference", "Forwarders Reference",
+    # The same trap in the wordings real carrier forms print beside their
+    # party boxes (docs/EXTERNAL_VALIDATION.md): each read a reference code or
+    # a declared value in as the party. Exact strings, as with the entries
+    # above; a general REF/PARTICULARS rule was reviewed and dropped real
+    # party boxes captioned "Shipper (Shipper's Reference No.)".
+    "Shipper's Reference Number", "Shipper's Reference No.", "Shipper's Ref. No.",
+    "Shipper's Ref", "Shipper - reference", "Shipper Reference",
+    "Consignee's Reference", "Consignee Reference", "Consignee's Ref",
+    "Shipper's declared value", "Shipper's declared value of",
+    "Above Particulars as declared by Shipper", "Particulars furnished by Shipper",
+    # Found testing real documents from outside the generator
+    # (docs/EXTERNAL_VALIDATION.md). Each resolved to one of the 7 through the
+    # fuzzy pass, and on a document that printed it above the real field, its
+    # value won:
+    # - an inland place of final delivery is not the port of discharge;
+    # - "Negotiable" / "Delivery" / "Complete" are fragments of real form
+    #   boxes that the partial scorer found inside long synonyms;
+    # - "Port of" is what python-docx returns for "Port of Loading" when the
+    #   last word sits in a Word smart tag, and it resolved to the loading
+    #   port whichever port the box was.
+    # ("Destination" and "Quantity" were tried here and withdrawn: reviewed,
+    # each let a later line win on a document that does use it for the POD or
+    # the container count. Left open.)
+    "Place of Final Delivery", "Port of Final Delivery", "Final Delivery", "Delivery",
+    "Negotiable", "Non-Negotiable", "Not Negotiable", "Complete", "Port of",
 ]
 
 # Build the reverse lookup once.
@@ -144,6 +169,9 @@ _RULES: list[tuple[Optional[str], re.Pattern[str]]] = [
     (None, re.compile(r"^CONTAINERS?\s+(NO|NOS|NUMBERS?)$")),
     # "Net Weight" would otherwise be swept up by the gross-weight rule.
     (None, re.compile(r"^(NET|TARE)\s+(WEIGHT|WT)")),
+    # Marks and numbers, and the container-number column of a cargo table
+    # ("MKS&NOS/CONTAINER NOS"), not the container count.
+    (None, re.compile(r"\b(MARKS|MKS)\b")),
 
     # ---- notify BEFORE consignee: it contains the word "consignee" -------
     ("notify_party", re.compile(r"\bNOTIFY\b")),
@@ -151,6 +179,9 @@ _RULES: list[tuple[Optional[str], re.Pattern[str]]] = [
     ("shipper", re.compile(r"\b(SHIPPER|EXPORTER|CONSIGNOR)\b")),
     ("consignee", re.compile(r"\b(CONSIGNEE|TO THE ORDER OF|TO ORDER OF)\b")),
 
+    # An agent's or endorsement box that mentions a port ("Carrier's agents
+    # endorsements (include agent at POD)") is not the port.
+    (None, re.compile(r"\b(AGENTS?|ENDORSEMENTS?)\b")),
     ("port_of_loading", re.compile(r"\b(PORT OF LOADING|LOADING PORT|LOAD PORT|POL)\b")),
     ("port_of_discharge",
      re.compile(r"\b(PORT OF DISCHARGE|DISCHARGE PORT|DISCHARGING PORT|POD)\b")),
@@ -183,6 +214,17 @@ _RULES: list[tuple[Optional[str], re.Pattern[str]]] = [
 ]
 
 
+# "Port of Unlading" is the US customs term for the port of discharge, and
+# "Unloading Port" means the same. Both fuzzy-matched the *loading* port
+# ("PORT OF LADING", "LOADING PORT"), the wrong field. Exact wordings only,
+# and kept out of the fuzzy pool: a keyword rule on UNLOADING was reviewed and
+# turned "Unloading address" and "Loading/Unloading terms" into the port.
+_EXACT_ONLY: dict[str, str] = {
+    basic(x): "port_of_discharge"
+    for x in ("Port of Unlading", "Port of Unloading", "Unloading Port")
+}
+
+
 def resolve(label: str, *, fuzzy_cutoff: int = 88) -> Optional[str]:
     """Map a raw document label onto one of COMPARE_FIELDS, or None.
 
@@ -202,6 +244,8 @@ def resolve(label: str, *, fuzzy_cutoff: int = 88) -> Optional[str]:
         return None
     if key in _EXACT:
         return _EXACT[key]
+    if key in _EXACT_ONLY:
+        return _EXACT_ONLY[key]
 
     # pass 2 — ordered rules
     for field_name, pattern in _RULES:

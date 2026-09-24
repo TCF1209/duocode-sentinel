@@ -38,7 +38,7 @@ of being reported as a discrepancy.*
 | | |
 |---|---|
 | **Accuracy** | **1.0000** final score on the dev set **and** on three held-out draws, generated from the organisers' own generator with seeds we never developed against — 225 planted defects, every one caught with the **exact** field set, no false alarms, all 80 escalations correct. Not four *independent* tests, and `docs/SCORING.md` §4.1 says why. |
-| **Tests** | **641** — forty-five added on 25 Sep for the reply drafts' wording pass (`backend/tests/test_reply_polish.py`), on top of the 596 of 24 Sep; re-run 25 Sep on a copy of the tree with no `data/` as **499 passed, 142 skipped, 0 failed, 0 xfailed**. The one strict `xfail` that used to sit here is gone: it pinned a defect found by review, `docs/ADVERSARIAL.md` §5.4, fixed the same day it was found. The same command runs on every push in [CI](.github/workflows/ci.yml). |
+| **Tests** | **727** — 131 added on 25 Sep: 45 for the reply drafts' wording pass (`backend/tests/test_reply_polish.py`) and 86 from testing on real external documents (`backend/tests/test_external_validation.py`, see [EXTERNAL_VALIDATION.md](docs/EXTERNAL_VALIDATION.md)); re-run 25 Sep on a copy of the tree with no `data/` as **585 passed, 142 skipped, 0 failed, 0 xfailed**. The one strict `xfail` that used to sit here is gone: it pinned a defect found by review, `docs/ADVERSARIAL.md` §5.4, fixed the same day it was found. The same command runs on every push in [CI](.github/workflows/ci.yml). |
 | **Speed** | **~3 ms per email**, single-threaded on a laptop: 520 emails end to end in about 1.5 s. |
 | **Cost** | **100% of decisions are made by rules.** `decided_by` is `"rule"` for all 520 emails; no model call decides anything on the graded inbox. |
 
@@ -280,11 +280,11 @@ the 520-email one, below.
 
 On a fresh clone at `4c852a7`: **431 passed, 142 skipped, 1 xfailed, 0
 errors**. Re-run on 25 Sep on a copy of the tree holding no `data/` — the same
-condition as a clone — the suite is **641 tests: 499 passed, 142 skipped, 0
+condition as a clone — the suite is **727 tests: 585 passed, 142 skipped, 0
 failed, 0 xfailed**, read off pytest's own summary line rather than
-remembered: sixty-seven tests added since `4c852a7` (forty-five of them on
-25 Sep, for the reply drafts' wording pass), and the former `xfail` now a
-plain pass.
+remembered: 153 tests added since `4c852a7` (131 of them on 25 Sep, for the
+reply drafts' wording pass and from testing on real external documents), and
+the former `xfail` now a plain pass.
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs this same command
 on every push, on a machine nobody on the team configured — the fresh-clone
 check made permanent rather than repeated by hand.
@@ -296,7 +296,7 @@ full bundle to read. `backend/tests/conftest.py` guards exactly the tests that
 open it and skips them with the reason printed, rather than letting ~100 tests
 fail on an empty read and read as a broken project. With the participant bundle
 at `data/bundle/`, the same command gave **573 passed, 1 xfailed** at
-`4c852a7`, and **641 passed, 0 xfailed** on 25 Sep.
+`4c852a7`, and **727 passed, 0 xfailed** on 25 Sep.
 
 ### The full inbox
 

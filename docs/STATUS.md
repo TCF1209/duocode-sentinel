@@ -4,6 +4,42 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-25 (early morning) — Claude session · the rules tested on real external data, and fixed only where three reviews agreed
+
+The user asked, before sleeping, whether the rules hold outside the
+generator, and for a complete test if suitable samples existed. Full record:
+`docs/EXTERNAL_VALIDATION.md`, second round.
+
+**Done**
+- Five tests on real data (8 carrier/industry forms, 14 NTSB-docket scans, 16
+  archived BLs/SIs, 2,000 real BL records, 14,326 real emails), every failure
+  re-run by a second agent (84 of 86 reproduced). Case level held: no real
+  document was auto-decided wrongly. Field level did not: real form layouts
+  are mostly unread (0 of 42 fields on the filled carrier forms).
+- Fixed, and pinned by 86 tests in `test_external_validation.py`: size-first
+  and number-word container counts, a set of labels that took the wrong field
+  (reference/declared-value boxes, marks, agent boxes, "Port of Final
+  Delivery", form fragments, "Port of :", "Port of Unlading"), and a PDF
+  reader crash that reported valid files as corrupt.
+- Everything else was reviewed old-against-new in three rounds and withdrawn
+  where it broke a real shape: every weight change, including pounds;
+  summing mixed equipment; a container cap; general REF and UNLOADING rules;
+  "Destination"/"Quantity" ignores; accent folding.
+- Six datasets and the adversarial harness identical field by field;
+  `submission.json` byte-identical; scorer 1.0000; 727 tests (585 passed /
+  142 skipped with no `data/`).
+
+**Next**
+- Pounds (read as kilograms today) is the most serious open item; it needs a
+  comparison that sees both sides' units, not a normaliser change.
+- Reading label-above-value boxed layouts is the largest gap on real forms.
+
+**Careful**
+- Downloaded samples live only in the session scratchpad; none is committed.
+  RealDoc-Bench and IDL documents are internal-testing only.
+
+---
+
 ## 2026-09-25 — Claude session · reply drafts that say the right thing, and AI wording that cannot touch a fact
 
 Designed with the user before any change (scans get a holding reply; a blank
