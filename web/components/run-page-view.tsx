@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { BarChart3, ChevronRight, Filter, Layers, ShipCargo } from "lucide-react";
+import { BarChart3, ChevronRight, Layers, ShipCargo, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,9 +14,19 @@ import { RunProgress } from "@/components/run-progress";
 import { PatternAlerts } from "@/components/pattern-alerts";
 import { cn } from "@/lib/utils";
 import { fadeUp, stagger, TAP, TAP_TRANSITION } from "@/lib/motion";
-import { FIELD_LABELS, STATUS_LABELS } from "@/lib/labels";
+import { CATEGORY_LABELS, FIELD_LABELS, STATUS_LABELS } from "@/lib/labels";
 import { getRun, listCases, type CaseSummary, type CaseStatus, type Category, type RunStatus } from "@/lib/api";
 import { useListMemory } from "@/lib/list-memory";
+import { pickShowcases, showcaseHref } from "@/lib/showcases";
+import { useViewMode } from "@/lib/view-mode";
+import { ViewModeSwitch } from "@/components/view-mode-switch";
+import {
+  formatHours,
+  formatSeconds,
+  manualWorkload,
+  MINUTES_TO_CHECK_ONE_PAIR,
+  SECONDS_TO_READ_ONE_EMAIL,
+} from "@/lib/manual-estimate";
 import { toast } from "sonner";
 
 /**
@@ -50,9 +60,49 @@ const ORDER_LABELS: Record<ListOrder, string> = {
   inbox: "Inbox order",
 };
 const ATTENTION_RANK: Record<CaseStatus, number> = { MISMATCH: 0, NEEDS_REVIEW: 1, OK: 2 };
+// The same three colours the outcome badges and the metrics charts use.
+const STATUS_DOT: Record<CaseStatus, string> = { OK: "bg-ok", MISMATCH: "bg-danger", NEEDS_REVIEW: "bg-warn" };
+// Table headers in the same small-caps style as every other section label
+// on the site (the Before table, the case page's field cards), instead of
+// the component's default body-size, body-colour header.
+const TH = "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
 function reviewStateOf(c: CaseSummary): ReviewFilter {
   if (c.outcome_source === "review") return "corrected";
   return c.reviewed ? "confirmed" : "pending";
+}
+
+/** The "classify five yourself" exercise (Before Sentinel): the visitor's
+ *  own calls and the wall-clock times of their first and last pick. Kept in
+ *  sessionStorage per run, so opening a case and coming back, or flipping
+ *  the switch, does not lose it mid-demo; a new tab starts fresh. */
+interface ClassifyFive {
+  guesses: Record<string, Category>;
+  startedAt: number | null;
+  endedAt: number | null;
+}
+const EMPTY_EXERCISE: ClassifyFive = { guesses: {}, startedAt: null, endedAt: null };
+const exerciseKey = (runId: string) => `sentinel:classify-five:${runId}`;
+function readExercise(runId: string): ClassifyFive {
+  if (typeof window === "undefined") return EMPTY_EXERCISE;
+  try {
+    const raw = window.sessionStorage.getItem(exerciseKey(runId));
+    if (!raw) return EMPTY_EXERCISE;
+    const parsed = JSON.parse(raw) as Partial<ClassifyFive>;
+    return {
+      guesses: parsed.guesses && typeof parsed.guesses === "object" ? parsed.guesses : {},
+      startedAt: typeof parsed.startedAt === "number" ? parsed.startedAt : null,
+      endedAt: typeof parsed.endedAt === "number" ? parsed.endedAt : null,
+    };
+  } catch {
+    return EMPTY_EXERCISE;
+  }
+}
+function writeExercise(runId: string, value: ClassifyFive) {
+  try {
+    window.sessionStorage.setItem(exerciseKey(runId), JSON.stringify(value));
+  } catch {
+    // Storage blocked: the exercise still works for this page.
+  }
 }
 
 export function RunPageView({ runId }: { runId: string }) {
@@ -93,6 +143,94 @@ export function RunPageView({ runId }: { runId: string }) {
   // as "clicking into a run looks empty for a few seconds".
   const [casesLoaded, setCasesLoaded] = useState(false);
 
+  // "Before Sentinel" shows the same inbox as it arrived -- subject lines,
+  // attachments, and what a person would have to do -- with none of
+  // Sentinel's columns, filters or patterns (lib/view-mode.ts). Same page
+  // skeleton either way; only the contents cross-fade.
+  const [mode, setMode] = useViewMode();
+  const before = mode === "before";
+  // The home page's "Patterns across the inbox" tile arrives with
+  // ?open=patterns: the box starts open and scrolls into view
+  // (pattern-alerts.tsx), in With mode whatever the switch was left on.
+  // Consumed once the box has read it (`onOpened`): the list memory
+  // (lib/list-memory.ts) remembers this page's URL, and a remembered ?open
+  // would re-open and re-scroll on every return from a case.
+  const openPatterns = searchParams.get("open") === "patterns";
+  useEffect(() => {
+    if (openPatterns && mode !== "with") setMode("with");
+  }, [openPatterns, mode, setMode]);
+  const consumeOpen = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("open");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
+  // "Classify five yourself": the visitor's own calls on the first five
+  // emails, timed from their first pick to their fifth, then compared with
+  // Sentinel's once they flip back -- and projected over the whole inbox at
+  // their own pace. Remembered per run for the visit (ClassifyFive above).
+  // Read lazily: nothing that shows it renders before the cases have
+  // loaded, so the server's empty first paint and the client's remembered
+  // one never disagree.
+  const [exercise, setExercise] = useState<ClassifyFive>(() => readExercise(runId));
+  useEffect(() => {
+    writeExercise(runId, exercise);
+  }, [runId, exercise]);
+  const guesses = exercise.guesses;
+  // Elapsed ms while the visitor is mid-way, advanced by the interval below
+  // -- the clock is read in the interval, never in render (react-hooks/purity).
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const firstFive = useMemo(() => allCases.slice(0, 5), [allCases]);
+  const answeredCount = firstFive.filter((c) => guesses[c.email_id]).length;
+  const guessStarted = exercise.startedAt !== null;
+  const guessDone = exercise.endedAt !== null;
+  useEffect(() => {
+    if (exercise.startedAt === null || exercise.endedAt !== null) return;
+    const start = exercise.startedAt;
+    const tick = () => setElapsedMs(Date.now() - start);
+    // The first tick straight away (a page change mid-exercise lands here
+    // with the clock already running), then once a second.
+    const first = setTimeout(tick, 0);
+    const id = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, [exercise.startedAt, exercise.endedAt]);
+  // `at` is the change event's own timestamp, on the performance clock; its
+  // origin turns it into wall-clock time that survives a page change. No
+  // clock is read here -- this function is render-scope to the lint.
+  function guess(emailId: string, category: Category, at: number) {
+    const now = performance.timeOrigin + at;
+    setExercise((prev) => {
+      const next = { ...prev.guesses, [emailId]: category };
+      const answered = firstFive.filter((c) => next[c.email_id]).length;
+      return {
+        guesses: next,
+        startedAt: prev.startedAt ?? now,
+        endedAt: answered >= firstFive.length ? (prev.endedAt ?? now) : null,
+      };
+    });
+  }
+  function startOver() {
+    setExercise(EMPTY_EXERCISE);
+    setElapsedMs(0);
+  }
+  const guessSeconds =
+    exercise.startedAt === null
+      ? 0
+      : ((exercise.endedAt ?? exercise.startedAt + elapsedMs) - exercise.startedAt) / 1000;
+  const agreed = firstFive.filter((c) => guesses[c.email_id] === c.category).length;
+  const workload = useMemo(() => manualWorkload(allCases), [allCases]);
+  const sentinelSeconds = run?.metrics ? run.metrics.total_ms / 1000 : null;
+  // The visitor's measured pace, projected: their own seconds per email
+  // over every email in the inbox -- classification only -- plus the pair
+  // checks at the team's estimated rate (lib/manual-estimate.ts), which no
+  // five-email exercise can measure. The two are kept apart on screen.
+  const perEmailSeconds = guessDone && firstFive.length > 0 ? guessSeconds / firstFive.length : 0;
+  const classifyAllSeconds = perEmailSeconds * allCases.length;
+  const pairCheckHours = (workload.comparisons * MINUTES_TO_CHECK_ONE_PAIR) / 60;
+
   // The one place a filter actually narrows what's shown. Everything that
   // used to read the old server-filtered `cases` for a *count of the whole
   // run* (the pattern alerts, the stat strip, "how many cases total") reads
@@ -130,6 +268,13 @@ export function RunPageView({ runId }: { runId: string }) {
   const statusCounts = useMemo(() => {
     const counts: Record<CaseStatus, number> = { OK: 0, MISMATCH: 0, NEEDS_REVIEW: 0 };
     for (const c of allCases) counts[c.status]++;
+    return counts;
+  }, [allCases]);
+  // How the inbox was sorted (step 1, Classify) -- shown on the category
+  // chips, which are the one place this page said it once a run had ended.
+  const categoryCounts = useMemo(() => {
+    const counts: Record<Category, number> = { BL_COMPARISON: 0, SI_REQUEST: 0, INVOICE_QUERY: 0, GENERAL: 0, SPAM: 0 };
+    for (const c of allCases) counts[c.category]++;
     return counts;
   }, [allCases]);
 
@@ -310,7 +455,9 @@ export function RunPageView({ runId }: { runId: string }) {
                 ? "Loading…"
                 : run.status === "failed"
                   ? `Failed after ${run.processed}/${run.total_emails} emails: ${run.error}`
-                  : `${run.processed}/${run.total_emails} emails processed`}
+                  : before
+                    ? `${run.total_emails} emails in the inbox`
+                    : `${run.processed}/${run.total_emails} emails processed`}
               {/* Answers "if it suddenly stops, where was I" directly, not
                   just with a count — naming the actual last email that
                   finished, whether the run is still going or has already
@@ -323,7 +470,9 @@ export function RunPageView({ runId }: { runId: string }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Wraps: with the Before/With switch beside Patterns and View
+            metrics this row is wider than a phone, and clipped there. */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* The percentage lives in the header while the run is going; the
               ring, rate and live tallies are in <RunProgress> below. Two
               progress bars on one screen is one too many. */}
@@ -332,6 +481,7 @@ export function RunPageView({ runId }: { runId: string }) {
           )}
           {run?.status === "done" && (
             <>
+              <ViewModeSwitch />
               {/* Patterns before metrics: metrics is how the run went, patterns
                   is what the inbox is like, and the second is the one a desk
                   supervisor opens. */}
@@ -369,132 +519,278 @@ export function RunPageView({ runId }: { runId: string }) {
         )}
       </AnimatePresence>
 
-      {/* The shape of the whole run, without scrolling a 520-row list or
-          leaving for /metrics to find it -- landing on this page from Runs
-          is exactly the moment "how did this one go" is the first question,
-          and the cost/rule-share half is the product's own cost argument
-          (docs/DECISIONS.md D1), put where the first click after Runs
-          actually lands instead of one tab away.
+      {/* The shape of the whole run, as the controls that narrow the list
+          -- one card where a stat strip and a separate filter bar used to
+          say the same things twice, one with numbers and one with buttons.
+          Row one is the inbox sorted into its five kinds (step 1, Classify:
+          the one result this page never showed once a run had ended, and
+          the reason the mentor could not find the classification; the chips
+          also said BL_COMPARISON). Row two is the three outcomes. Row three
+          is the reviewer's own two controls, as selects rather than eight
+          more chips.
 
-          The three counts are computed from allCases, not read off
-          run.metrics.by_status: that field is a snapshot written once when
-          the run finishes (backend/api/store.py's finish_run) and never
-          recomputed, so it does not move when a reviewer corrects a case
-          afterwards -- confirmed live, not assumed, by correcting a real
-          case and watching metrics.by_status stay exactly what it was.
-          allCases carries each case's *effective* status already (the
-          list endpoint reads store.effective_outcome, same as the table
-          below), so counting it client-side is the version that is
-          actually still true after a review. rule_share/llm_calls stay
-          sourced from run.metrics on purpose -- which tier decided a case
-          is a system fact a review never changes. */}
+          Every count is the whole run's, computed from allCases, not read
+          off run.metrics.by_status: that field is a snapshot written once
+          when the run finishes (backend/api/store.py's finish_run) and
+          never recomputed, so it does not move when a reviewer corrects a
+          case afterwards -- confirmed live by correcting a real case and
+          watching metrics.by_status stay exactly what it was. allCases
+          carries each case's *effective* status already (the list endpoint
+          reads store.effective_outcome, same as the table below).
+          rule_share/llm_calls stay sourced from run.metrics on purpose --
+          which tier decided a case is a system fact a review never
+          changes. */}
       {!casesLoaded && (
         <motion.div className="rounded-xl border bg-card px-4 py-3" variants={fadeUp}>
           <Skeleton className="h-5 w-72" />
         </motion.div>
       )}
-      {casesLoaded && allCases.length > 0 && run?.metrics && (
-        <motion.div
-          className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border bg-card px-4 py-3 text-sm"
-          variants={fadeUp}
-        >
-          <span className="flex items-center gap-1.5">
-            <span className="size-1.5 rounded-full bg-ok" />
-            {STATUS_LABELS.OK} <span className="font-medium tabular-nums">{statusCounts.OK}</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="size-1.5 rounded-full bg-danger" />
-            {STATUS_LABELS.MISMATCH} <span className="font-medium tabular-nums">{statusCounts.MISMATCH}</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="size-1.5 rounded-full bg-warn" />
-            {STATUS_LABELS.NEEDS_REVIEW}{" "}
-            <span className="font-medium tabular-nums">{statusCounts.NEEDS_REVIEW}</span>
-          </span>
-          {/* The review queue's progress, beside the outcome counts it
-              applies to. The hover breaks it down the same three ways the
-              Review filter below does, so the number and the filter can
-              never mean different things. */}
-          <span
-            className="flex items-center gap-1.5"
-            title={`${reviewCounts.confirmed} confirmed · ${reviewCounts.corrected} corrected · ${reviewCounts.pending} not reviewed yet`}
-          >
-            <span className="size-1.5 rounded-full bg-primary" />
-            Reviewed{" "}
-            <span className="font-medium tabular-nums">{reviewCounts.confirmed + reviewCounts.corrected}</span>
-            <span className="text-muted-foreground">/ {allCases.length}</span>
-          </span>
-          <span className="text-muted-foreground sm:ml-auto">
-            {Math.round(run.metrics.rule_share * 100)}% resolved by rules
-            {run.metrics.llm_calls === 0
-              ? ", 0 model calls"
-              : `, ${run.metrics.llm_calls} model call${run.metrics.llm_calls === 1 ? "" : "s"}`}
-          </span>
+      {/* Before Sentinel: the same strip, holding what a person would have
+          to do with this inbox instead of what Sentinel found. The rates are
+          the team's own estimates (lib/manual-estimate.ts) and say so. */}
+      {before && casesLoaded && allCases.length > 0 && (
+        <motion.div className="flex flex-col gap-1.5 rounded-xl border bg-card px-4 py-3 text-sm" variants={fadeUp}>
+          <div className="text-xs font-medium text-muted-foreground">What a person would do with this inbox</div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            <span>
+              <span className="font-medium tabular-nums">{workload.emails.toLocaleString()}</span> emails to read
+            </span>
+            <span>
+              <span className="font-medium tabular-nums">{workload.comparisons.toLocaleString()}</span> comparison requests to
+              find among them
+            </span>
+            <span>
+              <span className="font-medium tabular-nums">{workload.fields.toLocaleString()}</span> fields to check by eye
+            </span>
+            <span>
+              ≈ <span className="font-medium tabular-nums">{formatHours(workload.hours)}</span> of work
+            </span>
+            {sentinelSeconds !== null && (
+              <span className="text-muted-foreground sm:ml-auto">
+                Sentinel: <span className="font-medium tabular-nums text-foreground">{sentinelSeconds.toFixed(1)} s</span>
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Estimate: {SECONDS_TO_READ_ONE_EMAIL} s per email, {MINUTES_TO_CHECK_ONE_PAIR} min per pair.
+          </div>
+        </motion.div>
+      )}
+      {!before && casesLoaded && allCases.length > 0 && (
+        <motion.div className="flex flex-col gap-2.5 rounded-xl border bg-card px-4 py-3" variants={fadeUp} data-testid="run-filters">
+          <FilterGroup
+            label="Sorted into"
+            options={CATEGORIES}
+            value={categoryFilter}
+            onChange={(category) => setFilters({ category })}
+            renderLabel={(c) => CATEGORY_LABELS[c]}
+            counts={categoryCounts}
+            total={allCases.length}
+          />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <FilterGroup
+              label="Outcome"
+              options={STATUSES}
+              value={statusFilter}
+              onChange={(status) => setFilters({ status })}
+              renderLabel={(s) => STATUS_LABELS[s]}
+              counts={statusCounts}
+              total={allCases.length}
+              dot={(s) => STATUS_DOT[s]}
+            />
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground sm:ml-auto">
+              {/* The review queue's progress, beside the outcomes it applies
+                  to. The hover breaks it down the same three ways the Review
+                  select below does, so the number and the control can never
+                  mean different things. */}
+              <span title={`${reviewCounts.confirmed} confirmed · ${reviewCounts.corrected} corrected · ${reviewCounts.pending} not reviewed yet`}>
+                Reviewed{" "}
+                <span className="font-medium tabular-nums text-foreground">{reviewCounts.confirmed + reviewCounts.corrected}</span>{" "}
+                / {allCases.length}
+              </span>
+              {run?.metrics && (
+                <span>
+                  {Math.round(run.metrics.rule_share * 100)}% by rules · {run.metrics.llm_calls} model call
+                  {run.metrics.llm_calls === 1 ? "" : "s"}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            <label className="flex items-center gap-1.5 text-muted-foreground">
+              <span className="w-24 shrink-0">Review</span>
+              <select
+                value={reviewFilter ?? ""}
+                onChange={(e) => setFilters({ review: (e.target.value || null) as ReviewFilter | null })}
+                aria-label="Review state"
+                className="rounded-md border bg-background px-2 py-1 text-sm text-foreground"
+              >
+                <option value="">All</option>
+                {REVIEW_FILTERS.map((r) => (
+                  <option key={r} value={r}>
+                    {REVIEW_FILTER_LABELS[r]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-1.5 text-muted-foreground">
+              Order
+              <select
+                value={order}
+                onChange={(e) => setFilters({ order: e.target.value as ListOrder })}
+                aria-label="Row order"
+                className="rounded-md border bg-background px-2 py-1 text-sm text-foreground"
+              >
+                {LIST_ORDERS.map((o) => (
+                  <option key={o} value={o}>
+                    {ORDER_LABELS[o]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground sm:ml-auto">
+              <span>
+                {visibleCases.length === allCases.length
+                  ? `${allCases.length} cases`
+                  : `Showing ${visibleCases.length} of ${allCases.length}`}
+              </span>
+              {(categoryFilter || statusFilter || reviewFilter) && (
+                <button
+                  type="button"
+                  onClick={() => setFilters({ category: null, status: null, review: null })}
+                  className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          </div>
         </motion.div>
       )}
 
-      <PatternAlerts runId={runId} cases={allCases} />
-
-      <motion.div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border bg-card px-4 py-3" variants={fadeUp}>
-        <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-          <Filter className="size-3.5" />
-          Filters
-        </div>
-        <FilterGroup
-          label="Category"
-          options={CATEGORIES}
-          value={categoryFilter}
-          onChange={(category) => setFilters({ category })}
-        />
-        <FilterGroup
-          label="Status"
-          options={STATUSES}
-          value={statusFilter}
-          onChange={(status) => setFilters({ status })}
-          renderLabel={(s) => STATUS_LABELS[s]}
-        />
-        <FilterGroup
-          label="Review"
-          options={REVIEW_FILTERS}
-          value={reviewFilter}
-          onChange={(review) => setFilters({ review })}
-          renderLabel={(r) => REVIEW_FILTER_LABELS[r]}
-        />
-        <div className="flex items-center gap-1.5 text-sm" role="group" aria-label="Row order">
-          <span className="shrink-0 text-muted-foreground">Order:</span>
-          {LIST_ORDERS.map((o) => (
-            <motion.button
-              key={o}
-              whileTap={TAP}
-              transition={TAP_TRANSITION}
-              onClick={() => setFilters({ order: o })}
-              aria-pressed={order === o}
-              className={cn(
-                "shrink-0 rounded-full border px-2 py-0.5 text-xs transition-colors",
-                order === o
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:border-primary/40 hover:text-foreground",
-              )}
-            >
-              {ORDER_LABELS[o]}
-            </motion.button>
-          ))}
-        </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground sm:ml-auto">
-          <span>
-            {visibleCases.length} case{visibleCases.length === 1 ? "" : "s"}
-          </span>
-          {(categoryFilter || statusFilter || reviewFilter) && (
-            <button
-              type="button"
-              onClick={() => setFilters({ category: null, status: null, review: null })}
-              className="underline decoration-dotted underline-offset-2 hover:text-foreground"
-            >
-              Clear filters
-            </button>
+      {/* "Classify five yourself" -- the manual effort, felt rather than
+          quoted: the visitor's own five calls, timed, against Sentinel's
+          520 in under two seconds. Before mode shows the invitation and the
+          clock; With mode shows the score once they have flipped back. */}
+      {before && casesLoaded && firstFive.length > 0 && (
+        <motion.div
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm"
+          variants={fadeUp}
+        >
+          <Timer className="size-4 shrink-0 text-primary" strokeWidth={2} />
+          {!guessStarted ? (
+            <span>
+              Try it: classify the first {firstFive.length} emails (the <span className="font-medium">Your call</span>{" "}
+              column). The clock starts at your first pick.
+            </span>
+          ) : !guessDone ? (
+            <>
+              <span>
+                {answeredCount} of {firstFive.length} ·{" "}
+                <span className="font-mono tabular-nums">{Math.round(guessSeconds)} s</span>
+              </span>
+              <Button size="sm" variant="ghost" onClick={startOver} title="Clear your calls and the clock">
+                Start over
+              </Button>
+            </>
+          ) : (
+            <>
+              <span>
+                You classified {firstFive.length} in{" "}
+                <span className="font-medium tabular-nums">{Math.round(guessSeconds)} s</span>.
+                {sentinelSeconds !== null && (
+                  <>
+                    {" "}
+                    Sentinel classified {allCases.length} in{" "}
+                    <span className="font-medium tabular-nums">{sentinelSeconds.toFixed(1)} s</span>.
+                  </>
+                )}
+              </span>
+              <Button size="sm" onClick={() => setMode("with")}>
+                See what Sentinel said
+              </Button>
+              <Button size="sm" variant="ghost" onClick={startOver} title="Clear your calls and the clock">
+                Start over
+              </Button>
+            </>
           )}
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
+      {/* With Sentinel, once they have done the five: their own pace, what
+          the inbox costs at that pace, and Sentinel's time beside it. The
+          measured part (classification) and the estimated part (pair
+          checks) are said separately, and the estimate is called one. */}
+      {!before && casesLoaded && guessDone && firstFive.length > 0 && (
+        <motion.div
+          className="flex flex-col gap-1.5 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm"
+          variants={fadeUp}
+          data-testid="pace-banner"
+        >
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Timer className="size-4 shrink-0 text-primary" strokeWidth={2} />
+            <span>
+              Your pace: <span className="font-medium tabular-nums">{perEmailSeconds.toFixed(1)} s per email</span>{" "}
+              <span className="text-muted-foreground">
+                ({firstFive.length} in {Math.round(guessSeconds)} s)
+              </span>
+              .
+            </span>
+          </div>
+          <div className="pl-6">
+            All {allCases.length.toLocaleString()} at that pace:{" "}
+            <span className="font-medium tabular-nums">≈ {formatSeconds(classifyAllSeconds)}</span>. Plus{" "}
+            {workload.comparisons.toLocaleString()} pair checks at {MINUTES_TO_CHECK_ONE_PAIR} min each:{" "}
+            <span className="font-medium tabular-nums">+ {formatHours(pairCheckHours)}</span>{" "}
+            <span className="text-muted-foreground">(estimate)</span>.
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-6">
+            <span>
+              Sentinel:{" "}
+              {sentinelSeconds !== null && (
+                <>
+                  <span className="font-medium tabular-nums">{sentinelSeconds.toFixed(1)} s</span>.{" "}
+                </>
+              )}
+              Agreed with you on{" "}
+              <span className="font-medium">
+                {agreed} of {firstFive.length}
+              </span>
+              .
+            </span>
+            {/* Listed here, not left to be found in the table: the list is
+                ordered "needs attention first", so the first five emails of
+                the inbox are rarely its first five rows. Each is marked
+                beside its row as well. */}
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs">
+              {firstFive.map((c) => {
+                const right = guesses[c.email_id] === c.category;
+                return (
+                  <span
+                    key={c.email_id}
+                    className={right ? "text-ok" : "text-danger"}
+                    title={`You said ${CATEGORY_LABELS[guesses[c.email_id]!]}; Sentinel said ${CATEGORY_LABELS[c.category]}`}
+                  >
+                    {c.email_id} {right ? "✓" : "✗"}
+                  </span>
+                );
+              })}
+            </span>
+          </div>
+        </motion.div>
+      )}
+
+      {!before && <WorthOpening runId={runId} cases={allCases} />}
+
+      {!before && <PatternAlerts runId={runId} cases={allCases} openRequested={openPatterns} onOpened={consumeOpen} />}
+
+      {/* Before Sentinel: the toolbar's place is kept, so the list does not
+          jump when the mode flips; its controls all filter on things
+          Sentinel produced. */}
+      {before && (
+        <motion.div className="flex items-center rounded-xl border bg-card px-4 py-3 text-sm text-muted-foreground" variants={fadeUp}>
+          Filters, ordering and patterns come with Sentinel.
+        </motion.div>
+      )}
 
       {/* Two renderings of the same `cases`, CSS-switched at `md` rather than
           picked in JS: a table this wide has no reflow that keeps it a table,
@@ -507,16 +803,29 @@ export function RunPageView({ runId }: { runId: string }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Email</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Confidence</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Mismatched fields</TableHead>
-              <TableHead>Decided by</TableHead>
-              <TableHead />
+              {before ? (
+                <>
+                  <TableHead className={TH}>Email</TableHead>
+                  <TableHead className={TH}>From</TableHead>
+                  <TableHead className={TH}>Subject</TableHead>
+                  <TableHead className={TH}>Attachments</TableHead>
+                  <TableHead className={TH}>Your call</TableHead>
+                  <TableHead />
+                </>
+              ) : (
+                <>
+                  <TableHead className={TH}>Email</TableHead>
+                  <TableHead className={TH}>Category</TableHead>
+                  <TableHead className={cn(TH, "text-right")}>Confidence</TableHead>
+                  <TableHead className={TH}>Status</TableHead>
+                  <TableHead className={TH}>Mismatched fields</TableHead>
+                  <TableHead className={TH}>Decided by</TableHead>
+                  <TableHead />
+                </>
+              )}
             </TableRow>
           </TableHeader>
-          <TableBody key={filterKey}>
+          <TableBody key={`${filterKey}|${mode}`}>
             <AnimatePresence mode="popLayout" initial={false}>
               {!casesLoaded ? (
                 // Distinct from the "no cases match this filter" row below:
@@ -531,14 +840,14 @@ export function RunPageView({ runId }: { runId: string }) {
                     </TableCell>
                   </TableRow>
                 ))
-              ) : visibleCases.length === 0 ? (
+              ) : (before ? allCases : visibleCases).length === 0 ? (
                 <motion.tr key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                     {run?.status === "running" ? "Processing…" : "No cases match this filter."}
                   </TableCell>
                 </motion.tr>
               ) : (
-                visibleCases.map((c) => (
+                (before ? allCases : visibleCases).map((c) => (
                   <motion.tr
                     key={c.email_id}
                     layout
@@ -548,11 +857,56 @@ export function RunPageView({ runId }: { runId: string }) {
                     transition={{ duration: 0.15 }}
                     className="border-b transition-colors last:border-0 hover:bg-muted/50"
                   >
+                    {before ? (
+                      <>
+                        <TableCell className="font-mono text-sm">{c.email_id}</TableCell>
+                        <TableCell className="max-w-[12rem] truncate text-sm text-muted-foreground" title={c.sender}>
+                          {c.sender || "—"}
+                        </TableCell>
+                        <TableCell className="max-w-[22rem] truncate text-sm" title={c.subject}>
+                          {c.subject || "(no subject)"}
+                        </TableCell>
+                        <TableCell
+                          className="max-w-[16rem] truncate font-mono text-xs text-muted-foreground"
+                          title={c.attachments.join(", ")}
+                        >
+                          {c.attachments.length > 0 ? c.attachments.join(", ") : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {firstFive.some((f) => f.email_id === c.email_id) ? (
+                            <YourCall value={guesses[c.email_id]} onChange={(cat, at) => guess(c.email_id, cat, at)} />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Link href={`/runs/${runId}/cases/${c.email_id}`}>
+                            <motion.span whileTap={TAP} transition={TAP_TRANSITION} className="inline-block">
+                              <Button size="sm" variant="outline">
+                                Open
+                              </Button>
+                            </motion.span>
+                          </Link>
+                        </TableCell>
+                      </>
+                    ) : (
+                    <>
                     <TableCell className="font-mono text-sm">{c.email_id}</TableCell>
                     <TableCell>
                       <CategoryBadge category={c.category} />
+                      {guesses[c.email_id] && (
+                        <span
+                          className={cn(
+                            "ml-2 whitespace-nowrap text-xs",
+                            guesses[c.email_id] === c.category ? "text-ok" : "text-danger",
+                          )}
+                          title="Your own call on this email, from Before Sentinel"
+                        >
+                          you said {CATEGORY_LABELS[guesses[c.email_id]]} {guesses[c.email_id] === c.category ? "✓" : "✗"}
+                        </span>
+                      )}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
                       {Math.round(c.category_confidence * 100)}%
                     </TableCell>
                     <TableCell>
@@ -563,7 +917,7 @@ export function RunPageView({ runId }: { runId: string }) {
                           next column; the count is what a scan of the list
                           picks up. */}
                       {c.status === "MISMATCH" && c.defect_fields.length > 0 && (
-                        <span className="ml-1.5 whitespace-nowrap text-[11px] text-muted-foreground">
+                        <span className="ml-1.5 whitespace-nowrap text-xs text-muted-foreground">
                           · {c.defect_fields.length} field{c.defect_fields.length === 1 ? "" : "s"}
                         </span>
                       )}
@@ -572,14 +926,14 @@ export function RunPageView({ runId }: { runId: string }) {
                           this shows who it came from, and what we had said. */}
                       {c.outcome_source === "review" && (
                         <span
-                          className="ml-2 whitespace-nowrap text-[11px] text-muted-foreground"
-                          title={`Sentinel said ${c.system_status}; corrected by a reviewer`}
+                          className="ml-2 whitespace-nowrap text-xs text-muted-foreground"
+                          title={`Sentinel said ${STATUS_LABELS[c.system_status]}; corrected by a reviewer`}
                         >
                           Corrected
                         </span>
                       )}
                       {c.outcome_source === "system" && c.reviewed && (
-                        <span className="ml-2 whitespace-nowrap text-[11px] text-muted-foreground">
+                        <span className="ml-2 whitespace-nowrap text-xs text-muted-foreground">
                           Confirmed
                         </span>
                       )}
@@ -589,7 +943,7 @@ export function RunPageView({ runId }: { runId: string }) {
                           that, not on what arrived in the inbox. */}
                       {c.recheck_count > 0 && (
                         <span
-                          className="ml-2 whitespace-nowrap text-[11px] text-muted-foreground"
+                          className="ml-2 whitespace-nowrap text-xs text-muted-foreground"
                           title="Re-checked on re-sent documents; the previous answer is kept on the case"
                         >
                           Re-checked
@@ -615,6 +969,8 @@ export function RunPageView({ runId }: { runId: string }) {
                         </motion.span>
                       </Link>
                     </TableCell>
+                    </>
+                    )}
                   </motion.tr>
                 ))
               )}
@@ -630,7 +986,7 @@ export function RunPageView({ runId }: { runId: string }) {
           That second part is not decoration: it is the evidence-gated
           verdict that is Sentinel's actual claim, put where a thumb
           scrolling past 500 rows will still see it without a tap. */}
-      <motion.div key={filterKey} className="flex flex-col rounded-md border bg-card md:hidden" variants={fadeUp}>
+      <motion.div key={`${filterKey}|${mode}`} className="flex flex-col rounded-md border bg-card md:hidden" variants={fadeUp}>
         <AnimatePresence mode="popLayout" initial={false}>
           {!casesLoaded ? (
             <div className="flex flex-col gap-3 p-3">
@@ -638,12 +994,23 @@ export function RunPageView({ runId }: { runId: string }) {
                 <Skeleton key={`skeleton-${i}`} className="h-16 w-full" />
               ))}
             </div>
-          ) : visibleCases.length === 0 ? (
+          ) : (before ? allCases : visibleCases).length === 0 ? (
             <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-8 text-center text-sm text-muted-foreground">
               {run?.status === "running" ? "Processing…" : "No cases match this filter."}
             </motion.div>
+          ) : before ? (
+            allCases.map((c) => (
+              <BeforeRowCard
+                key={c.email_id}
+                runId={runId}
+                c={c}
+                guessable={firstFive.some((f) => f.email_id === c.email_id)}
+                guess={guesses[c.email_id]}
+                onGuess={(cat, at) => guess(c.email_id, cat, at)}
+              />
+            ))
           ) : (
-            visibleCases.map((c) => <CaseRowCard key={c.email_id} runId={runId} c={c} />)
+            visibleCases.map((c) => <CaseRowCard key={c.email_id} runId={runId} c={c} guess={guesses[c.email_id]} />)
           )}
         </AnimatePresence>
       </motion.div>
@@ -656,7 +1023,93 @@ export function RunPageView({ runId }: { runId: string }) {
 // exiting card out of the flow while it fades -- Framer's own documented
 // requirement for custom components in that position. Without it the exit
 // still runs, but in place, shoving the rows below it around as it goes.
-function CaseRowCard({ runId, c, ref }: { runId: string; c: CaseSummary; ref?: Ref<HTMLDivElement> }) {
+/** Before Sentinel: one email as it sits in the inbox -- who, what subject,
+ *  which files -- and, on the first five, the visitor's own call. The
+ *  select sits outside the link so picking a category does not open the
+ *  case. */
+function BeforeRowCard({
+  runId,
+  c,
+  guessable,
+  guess,
+  onGuess,
+  ref,
+}: {
+  runId: string;
+  c: CaseSummary;
+  guessable: boolean;
+  guess?: Category;
+  onGuess: (cat: Category, at: number) => void;
+  ref?: Ref<HTMLDivElement>;
+}) {
+  return (
+    <motion.div
+      ref={ref}
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      className="border-b last:border-0"
+    >
+      <Link href={`/runs/${runId}/cases/${c.email_id}`}>
+        <motion.div whileTap={TAP} transition={TAP_TRANSITION} className="flex flex-col gap-1 p-3 active:bg-muted/50">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-mono text-sm">{c.email_id}</span>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </div>
+          <div className="truncate text-sm">{c.subject || "(no subject)"}</div>
+          <div className="truncate text-xs text-muted-foreground">{c.sender || "—"}</div>
+          {c.attachments.length > 0 && (
+            <div className="truncate font-mono text-xs text-muted-foreground">{c.attachments.join(", ")}</div>
+          )}
+        </motion.div>
+      </Link>
+      {guessable && (
+        <div className="flex items-center gap-2 px-3 pb-3 text-xs text-muted-foreground">
+          Your call:
+          <YourCall value={guess} onChange={onGuess} />
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+/** The "Your call" control for the classify-five exercise: a plain select,
+ *  the same five categories Sentinel picks from. */
+function YourCall({ value, onChange }: { value?: Category; onChange: (cat: Category, at: number) => void }) {
+  return (
+    <select
+      value={value ?? ""}
+      onChange={(e) => {
+        // The event's timestamp doubles as the click of the stopwatch.
+        if (e.target.value) onChange(e.target.value as Category, e.timeStamp);
+      }}
+      aria-label="Your category for this email"
+      className="rounded-md border bg-background px-2 py-1 text-xs text-foreground"
+    >
+      <option value="">Pick one…</option>
+      {CATEGORIES.map((k) => (
+        <option key={k} value={k}>
+          {CATEGORY_LABELS[k]}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function CaseRowCard({
+  runId,
+  c,
+  guess,
+  ref,
+}: {
+  runId: string;
+  c: CaseSummary;
+  /** The visitor's own call from Before Sentinel, if they made one. */
+  guess?: Category;
+  ref?: Ref<HTMLDivElement>;
+}) {
   return (
     <motion.div
       ref={ref}
@@ -674,7 +1127,7 @@ function CaseRowCard({ runId, c, ref }: { runId: string; c: CaseSummary; ref?: R
             <div className="flex items-center gap-1.5">
               <StatusBadge status={c.status} />
               {c.status === "MISMATCH" && c.defect_fields.length > 0 && (
-                <span className="whitespace-nowrap text-[11px] text-muted-foreground">
+                <span className="whitespace-nowrap text-xs text-muted-foreground">
                   · {c.defect_fields.length} field{c.defect_fields.length === 1 ? "" : "s"}
                 </span>
               )}
@@ -683,10 +1136,15 @@ function CaseRowCard({ runId, c, ref }: { runId: string; c: CaseSummary; ref?: R
           </div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             <CategoryBadge category={c.category} />
+            {guess && (
+              <span className={cn("text-xs", guess === c.category ? "text-ok" : "text-danger")}>
+                you said {CATEGORY_LABELS[guess]} {guess === c.category ? "✓" : "✗"}
+              </span>
+            )}
             <span>{Math.round(c.category_confidence * 100)}%</span>
             <DecidedByBadge decidedBy={c.decided_by} />
             {c.outcome_source === "review" && (
-              <span title={`Sentinel said ${c.system_status}; corrected by a reviewer`}>Corrected</span>
+              <span title={`Sentinel said ${STATUS_LABELS[c.system_status]}; corrected by a reviewer`}>Corrected</span>
             )}
             {c.outcome_source === "system" && c.reviewed && <span>Confirmed</span>}
             {c.recheck_count > 0 && (
@@ -704,39 +1162,96 @@ function CaseRowCard({ runId, c, ref }: { runId: string; c: CaseSummary; ref?: R
   );
 }
 
+/**
+ * Three or four cases worth opening first, picked from this run by what
+ * they are (lib/showcases.ts -- the same picks the home page's tiles use),
+ * each landing on the panel that shows the thing. The mentor's point, one
+ * screen earlier than the home page makes it: a judge who arrives straight
+ * at a run should not have to open twenty rows to find the scanned pair or
+ * the BL that never came.
+ */
+function WorthOpening({ runId, cases }: { runId: string; cases: CaseSummary[] }) {
+  const picks = useMemo(() => pickShowcases(cases), [cases]);
+  const mismatchFields = cases.find((c) => c.email_id === picks.mismatch)?.defect_fields.length ?? 0;
+  const items = [
+    {
+      key: "mismatch",
+      label: `a mismatch on ${mismatchFields} field${mismatchFields === 1 ? "" : "s"}`,
+      emailId: picks.mismatch,
+      spotlight: "fields",
+    },
+    { key: "recheck", label: "a BL that never arrived — re-upload it", emailId: picks.recheck, spotlight: "recheck" },
+    // "read out" only when the model read it: a run made without the model
+    // has scans on it and no transcript on any of them.
+    {
+      key: "scan",
+      label: picks.scanReadOut ? "a scanned pair, read out" : "a scanned pair",
+      emailId: picks.scan,
+      spotlight: "documents",
+    },
+    { key: "history", label: "same shipper, same field, again", emailId: picks.history, spotlight: "history" },
+  ].filter((i): i is typeof i & { emailId: string } => Boolean(i.emailId));
+  if (items.length === 0) return null;
+
+  return (
+    <motion.div className="flex flex-wrap items-center gap-2 text-xs" variants={fadeUp}>
+      <span className="text-muted-foreground">Worth opening:</span>
+      {items.map((i) => (
+        <Link
+          key={i.key}
+          href={showcaseHref(runId, i.emailId, i.spotlight)}
+          className="rounded-full border bg-card px-2.5 py-1 transition-colors hover:border-primary/40 hover:bg-muted/40"
+        >
+          {i.label} <span className="font-mono text-muted-foreground">{i.emailId}</span>
+        </Link>
+      ))}
+    </motion.div>
+  );
+}
+
+/** One row of chips: "All" and the options, each with its count when the
+ *  caller has one -- so the row is the run's own tally as much as a filter,
+ *  and a first-time visitor sees what is there before clicking anything. */
 function FilterGroup<T extends string>({
   label,
   options,
   value,
   onChange,
   renderLabel = (opt: T) => opt,
+  counts,
+  total,
+  dot,
 }: {
   label: string;
   options: T[];
   value: T | null;
   onChange: (v: T | null) => void;
-  // Category options already display as their raw code everywhere else
-  // (CategoryBadge shows "BL_COMPARISON" verbatim too), so only the Status
-  // filter passes this — its pills would otherwise be the one place still
-  // saying "OK" once StatusBadge said "Matched" everywhere else.
+  /** The words a person reads for each option (lib/labels.ts), never the
+   *  backend code. */
   renderLabel?: (opt: T) => string;
+  /** Whole-run count per option, and the run's total for the "All" chip. */
+  counts?: Record<T, number>;
+  total?: number;
+  /** A colour class for a small dot before the label (the outcome row). */
+  dot?: (opt: T) => string;
 }) {
+  const chip = (active: boolean) =>
+    cn(
+      "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors",
+      active ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground hover:border-primary/40 hover:text-foreground",
+    );
+  const count = (n: number, active: boolean) => (
+    <span className={cn("tabular-nums", active ? "text-primary-foreground/80" : "text-muted-foreground/80")}>{n.toLocaleString()}</span>
+  );
   return (
     <div className="flex w-full min-w-0 items-center gap-1.5 text-sm sm:w-auto">
-      <span className="shrink-0 text-muted-foreground">{label}:</span>
+      {/* A fixed label column, so the chips of every row in the card start
+          on the same line (the mentor's "everything must line up"). */}
+      <span className="w-24 shrink-0 text-muted-foreground">{label}</span>
       <ScrollFade>
-        <motion.button
-          whileTap={TAP}
-          transition={TAP_TRANSITION}
-          onClick={() => onChange(null)}
-          className={cn(
-            "shrink-0 rounded-full border px-2 py-0.5 text-xs transition-colors",
-            value === null
-              ? "border-primary bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:border-primary/40 hover:text-foreground",
-          )}
-        >
+        <motion.button whileTap={TAP} transition={TAP_TRANSITION} onClick={() => onChange(null)} aria-pressed={value === null} className={chip(value === null)}>
           All
+          {total !== undefined && count(total, value === null)}
         </motion.button>
         {options.map((opt) => (
           <motion.button
@@ -744,14 +1259,12 @@ function FilterGroup<T extends string>({
             whileTap={TAP}
             transition={TAP_TRANSITION}
             onClick={() => onChange(opt)}
-            className={cn(
-              "shrink-0 rounded-full border px-2 py-0.5 text-xs transition-colors",
-              value === opt
-                ? "border-primary bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:border-primary/40 hover:text-foreground",
-            )}
+            aria-pressed={value === opt}
+            className={chip(value === opt)}
           >
+            {dot && <span aria-hidden className={cn("size-1.5 rounded-full", dot(opt))} />}
             {renderLabel(opt)}
+            {counts && count(counts[opt], value === opt)}
           </motion.button>
         ))}
       </ScrollFade>

@@ -32,6 +32,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from sdoc.pipeline import build_client  # noqa: E402
+from sdoc.readers import scan  # noqa: E402
 
 from .direct_compare import MAX_BYTES, compare_uploads  # noqa: E402
 from .patterns import summarise as summarise_patterns  # noqa: E402
@@ -43,6 +44,7 @@ from .models import (  # noqa: E402
     RunStatusResponse,
 )
 from .pipeline_runner import retry_case, start_run  # noqa: E402
+from .review_outcome import FIELD_DECISIONS, SIDES, derive as derive_review  # noqa: E402
 from .store import store  # noqa: E402
 
 DEFAULT_DATA_ROOT = Path(os.environ.get("SENTINEL_DATA_ROOT", str(BACKEND.parent / "data" / "bundle")))
@@ -219,6 +221,20 @@ def _shipper_name(c) -> Optional[str]:
     return None
 
 
+def _scan_state(c) -> tuple[bool, bool]:
+    """(any document is an image-only scan, a vision model read one out).
+
+    Read-only, like `_shipper_name`. `review_reason == "unreadable"` cannot
+    tell a scan from a corrupt file, and the home page's "Scans read out"
+    tile (web/lib/showcases.ts) opened a corrupt BL because of it -- there is
+    nothing to read out of one. A scan is not always read out either: the
+    startup warm run makes no model call by design, so its scans escalate
+    with no transcript, and the tile has to know that too.
+    """
+    scans = [d for d in (c.si_doc, c.bl_doc) if d is not None and d.unreadable_reason == "no_text_layer"]
+    return bool(scans), any(scan.transcript_of(d) is not None for d in scans)
+
+
 @app.get("/runs/{run_id}/cases")
 def list_cases(
     run_id: str,
@@ -240,10 +256,16 @@ def list_cases(
             continue
         if decided_by and c.decided_by != decided_by:
             continue
+        inbox = store.inbox_of(run_id, c.email_id)
+        scanned, scan_transcribed = _scan_state(c)
         out.append({
             "case_id": f"{run_id}:{c.email_id}",
             "email_id": c.email_id,
             "sender": c.sender,
+            # The email as it arrived, for the dashboard's "Before Sentinel"
+            # view -- the desk's own inbox, no classification on it yet.
+            "subject": inbox["subject"],
+            "attachments": inbox["attachments"],
             "category": c.category,
             "category_confidence": round(c.category_confidence, 3),
             "status": eff["status"],
@@ -263,6 +285,11 @@ def list_cases(
             # re-sent documents (0 for almost every row). The list is the
             # place a reviewer notices "this one has moved on since the run".
             "recheck_count": store.recheck_count(run_id, c.email_id),
+            # Which unreadable pairs are image-only scans, and whether one was
+            # read out by the model (_scan_state) -- so the home page's scan
+            # tile opens a scan that shows its transcript, not a corrupt file.
+            "scanned": scanned,
+            "scan_transcribed": scan_transcribed,
         })
     return {"run_id": run_id, "count": len(out), "cases": out}
 
@@ -282,6 +309,7 @@ def _case_report(run_id: str, email_id: str, result) -> dict:
     report["effective"] = store.effective_outcome(run_id, result)
     report["recheck"] = store.recheck_info(run_id, email_id, result)
     report["history"] = store.get_history(run_id, email_id)
+    report["inbox"] = store.inbox_of(run_id, email_id)
     return report
 
 
@@ -414,20 +442,85 @@ def review_case(case_id: str, body: ReviewRequest) -> dict:
         raise HTTPException(status_code=404, detail=f"no case '{case_id}'")
     if body.decision not in ("confirm", "correct"):
         raise HTTPException(status_code=422, detail="decision must be 'confirm' or 'correct'")
-    if body.decision == "correct" and not body.status:
-        raise HTTPException(status_code=422, detail="status is required when decision is 'correct'")
+    # The per-field choices and corrections, when sent, must be about this
+    # case's own fields, name a real side and a real choice -- anything else
+    # is a client bug, and a review that silently kept it would show a case
+    # page that could never be reproduced.
+    known = {c.field for c in result.comparisons}
+    for name, mapping in (("decisions", body.decisions), ("corrections", body.corrections)):
+        unknown = sorted(f for f in (mapping or {}) if f not in known)
+        if unknown:
+            raise HTTPException(
+                status_code=422, detail=f"{name} names fields this case does not compare: {', '.join(unknown)}"
+            )
+    bad = sorted({v for v in (body.decisions or {}).values() if v not in FIELD_DECISIONS})
+    if bad:
+        raise HTTPException(
+            status_code=422, detail=f"decisions must be one of {', '.join(FIELD_DECISIONS)}; got {', '.join(bad)}"
+        )
+    # A blank correction is no correction: the reviewer cleared the box.
+    corrections: dict[str, dict[str, str]] = {}
+    for field_name, sides in (body.corrections or {}).items():
+        bad_sides = sorted(s for s in sides if s not in SIDES)
+        if bad_sides:
+            raise HTTPException(
+                status_code=422, detail=f"corrections must name a side ({' or '.join(SIDES)}); got {', '.join(bad_sides)}"
+            )
+        kept = {s: v.strip() for s, v in sides.items() if isinstance(v, str) and v.strip()}
+        if kept:
+            corrections[field_name] = kept
+
+    # In place, the outcome is derived here from what the reviewer did --
+    # the corrected pairs compared again by the pipeline's own comparison
+    # (review_outcome.py) -- never taken from the client. The whole-case
+    # form (a case with nothing comparable) still sends the outcome itself.
+    decisions = body.decisions or {}
+    in_place = body.decisions is not None or body.corrections is not None
+    if in_place and (decisions or corrections or body.cant_tell):
+        derived = derive_review(result, decisions=decisions, corrections=corrections, cant_tell=body.cant_tell)
+        status, defect_fields, field_verdicts = derived.status, derived.defect_fields, derived.field_verdicts
+    else:
+        if body.decision == "correct" and not body.status and not in_place:
+            raise HTTPException(status_code=422, detail="status is required when decision is 'correct'")
+        status = body.status or result.status
+        defect_fields = body.defect_fields if body.defect_fields is not None else list(result.defect_fields)
+        field_verdicts = {}
 
     return store.set_review(
         run_id,
         email_id,
         decision=body.decision,
-        status=body.status or result.status,
-        defect_fields=(
-            body.defect_fields if body.defect_fields is not None else list(result.defect_fields)
-        ),
+        status=status,
+        defect_fields=defect_fields,
         note=body.note,
         reviewer=body.reviewer,
+        decisions=decisions,
+        cant_tell=body.cant_tell,
+        corrections=corrections,
+        field_verdicts=field_verdicts,
     )
+
+
+@app.delete("/cases/{case_id}/review")
+def withdraw_review(case_id: str) -> dict:
+    """Withdraw the review on a case: Sentinel's own answer stands again, and
+    the case is back in the "nobody has looked" queue.
+
+    Exists for the case page's in-place review, where each choice on a field
+    card is saved as it is made: a reviewer who takes back their last choice
+    has no review left to save, and what they mean is "nothing from me" --
+    not a review record whose content happens to equal Sentinel's answer,
+    which the list would go on tagging as reviewed. Nothing else is touched:
+    the system's answer was never overwritten (store.py's effective_outcome),
+    so there is nothing to restore.
+    """
+    run_id, email_id = _split_case_id(case_id)
+    result = store.get_case(run_id, email_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"no case '{case_id}'")
+    if not store.clear_review(run_id, email_id):
+        raise HTTPException(status_code=404, detail=f"no review on '{case_id}' to withdraw")
+    return _case_report(run_id, email_id, result)
 
 
 @app.post("/cases/{case_id}/retry")

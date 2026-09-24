@@ -24,7 +24,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import { DURATION, EASE_OUT } from "@/lib/motion";
-import { STATUS_LABELS } from "@/lib/labels";
+import { CATEGORY_BADGE_LABELS, CATEGORY_LABELS, STATUS_LABELS } from "@/lib/labels";
 import type { CaseSummary, Category, CaseStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -178,8 +178,8 @@ export function RunProgress({
             </h2>
             <p className="text-sm text-muted-foreground">
               {llmEnabled
-                ? "Every email classified, every document pair compared by rules first, with the model tier available for what they cannot read."
-                : "Every email classified, every document pair compared, on rules alone — no model call, no network."}
+                ? "Rules first; the model tier for what they cannot read."
+                : "Rules only — no model, no network."}
             </p>
           </div>
 
@@ -216,7 +216,7 @@ export function RunProgress({
 
       {!filtered && stream.length > 0 && (
         <div className="flex flex-col gap-1">
-          <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Just finished
           </div>
           {/*
@@ -259,9 +259,7 @@ export function RunProgress({
                   className={cn("size-1.5 shrink-0 rounded-full", OUTCOME_STYLE[c.status].dot)}
                 />
                 <span className="font-mono text-xs">{c.email_id}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {c.category.replace(/_/g, " ").toLowerCase()}
-                </span>
+                <span className="truncate text-xs text-muted-foreground">{CATEGORY_BADGE_LABELS[c.category]}</span>
                 <span className={cn("ml-auto shrink-0 text-xs", OUTCOME_STYLE[c.status].text)}>
                   {STATUS_LABELS[c.status]}
                 </span>
@@ -335,7 +333,7 @@ function CategoryBar({
         {CATEGORY_ORDER.map((c) => (
           <span key={c} className="flex items-center gap-1">
             <span aria-hidden className={cn("size-1.5 rounded-full", CATEGORY_COLOURS[c])} />
-            {c.replace(/_/g, " ").toLowerCase()}
+            {CATEGORY_LABELS[c]}
             <span className="font-mono tabular-nums">{byCategory[c] ?? 0}</span>
           </span>
         ))}
@@ -349,7 +347,7 @@ function OutcomeTile({ status, value }: { status: CaseStatus; value: number }) {
   const style = OUTCOME_STYLE[status];
   return (
     <div className="flex flex-col gap-0.5 rounded-lg border bg-background/60 px-3 py-2">
-      <span className="flex items-center gap-1.5 text-[11px] tracking-wide text-muted-foreground uppercase">
+      <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         <span aria-hidden className={cn("size-1.5 rounded-full", style.dot)} />
         {STATUS_LABELS[status]}
       </span>

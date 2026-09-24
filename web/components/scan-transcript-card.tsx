@@ -34,9 +34,9 @@ export function ScanTranscriptCard({ role, transcript }: { role: "SI" | "BL"; tr
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-ai/40 bg-ai-bg/40 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <div className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-ai uppercase">
+        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ai">
           <Sparkles className="size-3.5" strokeWidth={2} />
-          {role} scan read by {transcript.model} — reviewer evidence only
+          {role} scan, read by {transcript.model}
         </div>
         <div className="text-xs text-muted-foreground tabular-nums">
           {transcript.legible_count}/{transcript.fields.length} fields legible · confidence{" "}
@@ -60,8 +60,7 @@ export function ScanTranscriptCard({ role, transcript }: { role: "SI" | "BL"; tr
           has no text layer, so nothing here was compared to anything and the
           case stays in review until a person confirms it against the image. */}
       <p className="border-t border-ai/30 pt-2 text-xs text-muted-foreground">
-        This document has no text layer, so none of these values entered the comparison and the
-        case stays in review. Confirm each one against the image before acting on it.
+        Read from the image, not compared — check each value against the scan.
       </p>
     </div>
   );

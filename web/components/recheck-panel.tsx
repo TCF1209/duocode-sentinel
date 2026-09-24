@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { FileCheck2, History, RotateCw, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronRight, FileCheck2, History, Play, RotateCw, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badges";
 import { AttachmentAction } from "@/components/attachment-action";
@@ -33,6 +33,18 @@ function sidesPhrase(sides: DocSide[]): string {
 
 function basename(path: string): string {
   return path.split("/").pop() || path;
+}
+
+/** Offered where a case has nothing on file to re-check: the Compare page's
+ *  ordinary SI, and a BL that agrees with it on all seven fields
+ *  (public/samples/ordinary-corrected_BL.txt) -- so a visitor with no files
+ *  of their own watches the case come back OK, the old answer kept. */
+const SAMPLE_PAIR = { si: "ordinary_SI.txt", bl: "ordinary-corrected_BL.txt" } as const;
+
+async function fetchSample(name: string): Promise<File> {
+  const res = await fetch(`/samples/${name}`);
+  if (!res.ok) throw new Error(`could not load sample ${name}`);
+  return new File([await res.blob()], name);
 }
 
 /** What the case is read from on this side right now, for the picker's
@@ -112,15 +124,40 @@ export function RecheckPanel({
   onRecheck,
   rechecking,
   className,
+  defaultOpen = false,
 }: {
   report: CaseReport;
   onRecheck: (files: RecheckFiles) => Promise<void>;
   rechecking?: boolean;
   className?: string;
+  /** Start unfolded -- when the page was opened at this panel (the home
+   *  page's "Correct by re-upload" tile). Folded otherwise: one line until
+   *  a re-sent document is actually in hand, decided directly ("some
+   *  things can start collapsed"). */
+  defaultOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [files, setFiles] = useState<RecheckFiles>({});
   const [error, setError] = useState<string | null>(null);
+  const [loadingSample, setLoadingSample] = useState(false);
   const chosen = SIDES.filter((s) => files[s]);
+  // A sample only where it replaces nothing: an email that came with no SI
+  // and no BL. On a case with real documents it would swap a real answer
+  // for one about unrelated paperwork, on a server every visitor shares.
+  const offerSample = !report.documents.si && !report.documents.bl && chosen.length === 0;
+
+  async function loadSample() {
+    setError(null);
+    setLoadingSample(true);
+    try {
+      const [si, bl] = await Promise.all([fetchSample(SAMPLE_PAIR.si), fetchSample(SAMPLE_PAIR.bl)]);
+      setFiles({ si, bl });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingSample(false);
+    }
+  }
 
   async function submit() {
     setError(null);
@@ -135,13 +172,44 @@ export function RecheckPanel({
     }
   }
 
+  if (!open) {
+    return (
+      <div className={cn("rounded-md border bg-background", className)}>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-expanded={false}
+          className="flex w-full items-center gap-3 p-3 text-left"
+        >
+          <Upload className="size-4 shrink-0 text-muted-foreground" />
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Re-sent documents</span>
+          <span className="text-sm text-muted-foreground">Got a corrected SI or BL back? Attach it here.</span>
+          <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+            Open
+            <ChevronRight className="size-4" />
+          </span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("rounded-md border bg-background p-3", className)}>
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Re-sent documents</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Re-sent documents</div>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          aria-expanded={true}
+          disabled={rechecking}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          Hide
+          <ChevronDown className="size-4" />
+        </button>
+      </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Got a corrected SI or BL back from the sender? Attach it and Sentinel runs the same check again on it. A
-        side you don&apos;t attach keeps the file it has now; the answer this replaces stays on the case, review
-        and all.
+        Attach the re-sent SI or BL; the same check runs again. The previous answer stays on the case.
       </p>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         {SIDES.map((side) => (
@@ -165,6 +233,18 @@ export function RecheckPanel({
           <RotateCw className={rechecking ? "animate-spin" : undefined} />
           {rechecking ? "Re-checking…" : chosen.length > 0 ? `Re-check with the re-sent ${sidesPhrase(chosen)}` : "Re-check"}
         </Button>
+        {offerSample && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={loadSample}
+            disabled={loadingSample || rechecking}
+            title="Sample paperwork, not this shipment's -- it shows the re-check working"
+          >
+            <Play />
+            {loadingSample ? "Loading…" : "No files? Load a sample pair"}
+          </Button>
+        )}
         {error && <span className="text-xs text-danger">{error}</span>}
       </div>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useId, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Check, FileCheck2, Loader2, Play, ScanLine, Sparkles, Upload, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ const SAMPLES = [
     title: "Ordinary wording",
     tagline: "the rules alone answer it",
     blurb:
-      "The same shipment, labelled the way our table expects. The rules answer it in milliseconds for nothing. This is the 100% of the graded inbox, and the reason the model is a fallback rather than the engine.",
+      "Labelled the way our table expects — the rules answer it; the whole graded inbox is like this.",
     si: "ordinary_SI.txt",
     bl: "ordinary_BL.txt",
     needsModel: false,
@@ -51,7 +52,7 @@ const SAMPLES = [
     title: "Labels we have never seen",
     tagline: "rules escalate; the model reads it",
     blurb:
-      "A human reads it at a glance — Sender of Goods, Deliver To, Loading Terminal. Our synonym table has none of them. Rules alone find nothing and escalate; the model reads it and the real defect surfaces.",
+      "Labels our table has never seen — rules escalate, the model reads them, the real defect surfaces.",
     si: "unfamiliar-labels_SI.txt",
     bl: "unfamiliar-labels_BL.txt",
     needsModel: true,
@@ -61,7 +62,7 @@ const SAMPLES = [
     title: "A scan with no text layer",
     tagline: "the vision path reads it out",
     blurb:
-      "Image-only PDFs. No parser can read them. With the model on, the vision path transcribes both for the reviewer — and the case still escalates, because a transcript is evidence for a person, not grounds for a verdict.",
+      "Image-only PDFs — the model transcribes both for the reviewer; the case still goes to a person.",
     si: "scanned_SI.pdf",
     bl: "scanned_BL.pdf",
     needsModel: true,
@@ -76,26 +77,24 @@ async function fetchSample(name: string): Promise<File> {
   return new File([await res.blob()], name);
 }
 
-// One soft pulse on the first sample button, the first time this browser
-// session sees the page, so a visitor's eye lands where the page starts.
-// Read through useSyncExternalStore so server and client agree on the first
-// paint (sessionStorage does not exist on the server; reading it in a
-// useState initializer is the hydration mismatch pitch-view.tsx documents).
-const PULSE_KEY = "sentinel:compare-pulsed";
-const subscribeNever = () => () => {};
-function readPulseWanted(): boolean {
-  try {
-    return !window.sessionStorage.getItem(PULSE_KEY);
-  } catch {
-    return false;
-  }
-}
-function markPulsed() {
-  try {
-    window.sessionStorage.setItem(PULSE_KEY, "1");
-  } catch {
-    // Private mode or blocked storage: the pulse simply plays again next time.
-  }
+/**
+ * `?sample=<id>` arrives with that pair already loaded: the home page's
+ * "Scans read out" tile sends a visitor here when no scan in the latest run
+ * was read out. A pair that needs the model switches it on as well; pressing
+ * Compare stays the visitor's move, as it is for every sample. Its own
+ * component inside <Suspense> so the rest of the page still prerenders
+ * (next/dist/docs/01-app/03-api-reference/04-functions/use-search-params.md).
+ */
+function SampleFromUrl({ onSample }: { onSample: (s: Sample) => void }) {
+  const id = useSearchParams().get("sample");
+  const loaded = useRef<string | null>(null);
+  useEffect(() => {
+    const s = SAMPLES.find((x) => x.id === id);
+    if (!s || loaded.current === s.id) return;
+    loaded.current = s.id;
+    onSample(s);
+  }, [id, onSample]);
+  return null;
 }
 
 export default function ComparePage() {
@@ -116,7 +115,14 @@ export default function ComparePage() {
   const [ranWith, setRanWith] = useState<{ off: boolean; on: boolean }>({ off: false, on: false });
   const [error, setError] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
-  const pulseWanted = useSyncExternalStore(subscribeNever, readPulseWanted, () => false);
+  // The light round the sample buttons (globals.css .attention-beam) is a
+  // function of page state and nothing else -- no timer, no "first visit",
+  // no listening for the visitor's first move; all three of those were
+  // tried and each left a state with no cue in it (a second visit, a stray
+  // scroll). Nothing loaded: every sample beams. A sample loaded: that one
+  // beams, marking the pair the result came from. The visitor's own file
+  // on either side: none, so the cue never competes with their upload.
+  const nothingLoaded = !si && !bl;
 
   // The result is below the fold on every screen once the samples and the
   // upload card are above it; a visitor who pressed Compare should not have
@@ -132,6 +138,9 @@ export default function ComparePage() {
     setError(null);
   }
 
+  // Picking a sample loads the pair; pressing Compare compares it. Running
+  // on the click was tried and taken out on purpose: on stage, the press on
+  // Compare is the moment the audience knows what is being compared.
   async function loadSample(s: Sample) {
     setLoadingSample(s.id);
     resetForNewPair();
@@ -147,6 +156,11 @@ export default function ComparePage() {
     }
   }
 
+  function loadSampleFromUrl(s: Sample) {
+    if (s.needsModel) setUseLlm(true);
+    loadSample(s);
+  }
+
   function pickOwn(side: "si" | "bl", f: File | null) {
     (side === "si" ? setSi : setBl)(f);
     setLoadedSample(null);
@@ -154,14 +168,16 @@ export default function ComparePage() {
   }
 
   // `withLlm` is passed in rather than read from state so the post-result
-  // button can flip the switch and run in the same click.
-  async function run(withLlm: boolean) {
-    if (!si || !bl) return;
+  // button can flip the switch and run in the same click; `files` likewise,
+  // so a sample can run the moment it has loaded, before state has caught up.
+  async function run(withLlm: boolean, files?: { si: File; bl: File }) {
+    const pair = files ?? (si && bl ? { si, bl } : null);
+    if (!pair) return;
     setUseLlm(withLlm);
     setBusy(true);
     setError(null);
     try {
-      const next = await compareUploads(si, bl, withLlm);
+      const next = await compareUploads(pair.si, pair.bl, withLlm);
       setReport(next);
       setReportLlm(withLlm);
       setRanWith((prev) => ({ ...prev, [withLlm ? "on" : "off"]: true }));
@@ -181,12 +197,14 @@ export default function ComparePage() {
 
   return (
     <motion.div className="flex flex-col gap-6" initial="hidden" animate="show" variants={stagger()}>
+      <Suspense fallback={null}>
+        <SampleFromUrl onSample={loadSampleFromUrl} />
+      </Suspense>
       <motion.div variants={fadeUp} className="flex flex-col gap-3">
         <div>
           <h1 className="font-heading text-2xl font-semibold tracking-tight">Compare two documents</h1>
           <p className="text-sm text-muted-foreground">
-            The same reader, extraction, comparison and evidence gate as the graded inbox, on one pair —
-            nothing is stored.
+            One SI against one BL, the same check as the inbox. Nothing is stored.
           </p>
         </div>
         <Stepper steps={steps} />
@@ -199,7 +217,7 @@ export default function ComparePage() {
       <motion.section variants={fadeUp} className="flex flex-col gap-2">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Try a pair</h2>
-          <span className="text-xs text-muted-foreground">Ten seconds, nothing to prepare.</span>
+          <span className="text-xs text-muted-foreground">Pick one, then press Compare.</span>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           {SAMPLES.map((s, i) => {
@@ -207,16 +225,9 @@ export default function ComparePage() {
             const isLoading = loadingSample === s.id;
             return (
               <div key={s.id} className="relative">
-                {/* Three soft pulses on the first button, first visit only
-                    (animate-ping, capped at three iterations); the session
-                    remembers once the animation has played. */}
-                {i === 0 && pulseWanted && (
-                  <span
-                    aria-hidden
-                    onAnimationEnd={markPulsed}
-                    className="pointer-events-none absolute inset-0 rounded-lg border-2 border-primary animate-ping [animation-duration:1.1s] [animation-iteration-count:3]"
-                  />
-                )}
+                {/* The beam rule is `nothingLoaded` above. The three are
+                    offset by a third of a turn each so they don't move in
+                    lockstep. */}
                 <motion.button
                   type="button"
                   whileTap={TAP}
@@ -224,10 +235,12 @@ export default function ComparePage() {
                   onClick={() => loadSample(s)}
                   disabled={loadingSample !== null || busy}
                   aria-pressed={isLoaded}
+                  style={{ "--beam-delay": `${-i * 0.8}s` } as React.CSSProperties}
                   className={cn(
                     "relative flex w-full items-center gap-3 rounded-lg border bg-card p-3 text-left shadow-sm transition-all",
                     "hover:-translate-y-0.5 hover:border-primary hover:shadow-md disabled:cursor-default disabled:opacity-60",
                     isLoaded ? "border-primary bg-primary/5" : "border-primary/30",
+                    (nothingLoaded || isLoaded) && "attention-beam",
                   )}
                 >
                   <span
@@ -250,7 +263,7 @@ export default function ComparePage() {
                     <span className="block text-sm font-semibold">{s.title}</span>
                     <span className="block text-xs text-muted-foreground">{s.tagline}</span>
                   </span>
-                  {isLoaded && <span className="text-[11px] font-medium text-primary">Loaded</span>}
+                  {isLoaded && <span className="text-xs font-medium text-primary">Loaded</span>}
                 </motion.button>
               </div>
             );
@@ -298,9 +311,9 @@ export default function ComparePage() {
               <details className="mt-1.5 text-xs text-muted-foreground">
                 <summary className="cursor-pointer select-none">Why off by default?</summary>
                 <p className="mt-1">
-                  Off for all 520 emails of the graded inbox — the rules answer every one of them. Switched on,
-                  the model is asked only about fields no rule could resolve; every answer it gives is
-                  re-located in the document before it is accepted, and anything it cannot ground is dropped.
+                  Off, the rules answer all 520 graded emails on their own. On, the model is asked only about
+                  fields no rule could resolve, and every answer is re-located in the document before it is
+                  accepted.
                 </p>
               </details>
             </div>
@@ -367,16 +380,16 @@ function NextStep({
   if (bothDone) {
     headline = "You have now seen this pair both ways.";
   } else if (sample.needsModel && !reportLlm) {
-    headline = "Rules alone could not read this pair, so it went to a person. Now let the model try.";
+    headline = "Rules alone sent this pair to a person. Now let the model try.";
     action = { label: "Flip the switch and compare again", withLlm: true };
   } else if (sample.needsModel && reportLlm) {
     headline = "That was with the model. See what the rules alone make of it.";
     action = { label: "Compare with the model off", withLlm: false };
   } else if (!reportLlm) {
-    headline = "The rules answered this one; the model was never needed — that is the whole graded inbox.";
+    headline = "The rules answered it; no model needed — like the whole graded inbox.";
     action = { label: "Run it with the model on anyway", withLlm: true };
   } else {
-    headline = "Same answer with the model on: it was offered, and nothing needed it.";
+    headline = "Same answer with the model on: nothing needed it.";
     action = { label: "Compare with the model off", withLlm: false };
   }
   return (
@@ -413,7 +426,7 @@ function Stepper({ steps }: { steps: { label: string; done: boolean }[] }) {
           <li key={s.label} className="flex items-center gap-2">
             <span
               className={cn(
-                "flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold transition-colors",
+                "flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors",
                 state === "done" && "bg-primary text-primary-foreground",
                 state === "current" && "border-2 border-primary text-primary",
                 state === "upcoming" && "border text-muted-foreground",

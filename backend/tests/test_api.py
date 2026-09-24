@@ -21,6 +21,8 @@ if str(BACKEND) not in sys.path:
 from fastapi.testclient import TestClient  # noqa: E402
 
 from api import main as api_main  # noqa: E402
+from sdoc.readers import scan  # noqa: E402
+from sdoc.schema import COMPARE_FIELDS, CaseResult, ParsedDoc  # noqa: E402
 
 _SI_TEXT = (
     "Shipper: TEST EXPORT COMPANY LTD\n"
@@ -185,8 +187,26 @@ class TestRunLifecycle:
         assert by_sender["email_001"] == "ops@example.com"
         assert by_sender["email_002"] == "ops@example.com"
 
+        # The email as it arrived -- subject line and attachment *names* --
+        # for the dashboard's "Before Sentinel" view. Names, not the
+        # data-root paths the inbox JSON lists: a person reading their mail
+        # sees "test0001_BL.txt", not "attachments/test0001_BL.txt".
+        by_subject = {c["email_id"]: c["subject"] for c in cases["cases"]}
+        assert by_subject["email_001"] == "TO CONFIRM DOCS - TEST0001"
+        by_attachments = {c["email_id"]: c["attachments"] for c in cases["cases"]}
+        assert by_attachments["email_001"] == ["test0001_SI.txt", "test0001_BL.txt"]
+        assert by_attachments["email_003"] == ["test0003_SI.txt"]
+
+        # No document here is an image-only scan, so none was read out
+        # either -- TestScanState covers the cases where one is.
+        assert all(c["scanned"] is False and c["scan_transcribed"] is False for c in cases["cases"])
+
         case_detail = client.get(f"/cases/{run_id}:email_002").json()
         assert case_detail["sender"] == "ops@example.com"
+        assert case_detail["inbox"] == {
+            "subject": "TO CONFIRM DOCS - TEST0002",
+            "attachments": ["test0002_SI.txt", "test0002_BL.txt"],
+        }
         assert case_detail["defect_fields"] == ["consignee"]
         assert case_detail["review"] is None
 
@@ -268,6 +288,32 @@ class TestRunLifecycle:
         monkeypatch.setattr(api_main, "DEFAULT_DATA_ROOT", tmp_path / "nowhere")
         resp = client.post("/runs", json={})
         assert resp.status_code == 400
+
+
+class TestScanState:
+    """The case list's `scanned` / `scan_transcribed` (api/main.py _scan_state)."""
+
+    def test_a_scan_is_told_apart_from_a_corrupt_file_and_from_one_read_out(self) -> None:
+        # All three escalate as review_reason "unreadable"; only a scan has
+        # anything to read out, and only a run made with the model read it.
+        def doc(role: str, reason: str) -> ParsedDoc:
+            return ParsedDoc(path=f"attachments/x_{role}.pdf", ext=".pdf", role_hint=role,
+                             readable=False, unreadable_reason=reason)
+
+        def state(si: ParsedDoc, bl: ParsedDoc) -> tuple[bool, bool]:
+            case = CaseResult(email_id="email_x", category="BL_COMPARISON", status="NEEDS_REVIEW",
+                              review_reason="unreadable", si_doc=si, bl_doc=bl)
+            return api_main._scan_state(case)
+
+        read_out = doc("SI", "no_text_layer")
+        scan.attach(read_out, scan.ScanTranscript(
+            fields=[scan.ScanField(field=f, value="", legible=False) for f in COMPARE_FIELDS],
+            overall_legible=False, confidence=0.0, model="gpt-5-mini", pages_read=1, note="",
+        ))
+
+        assert state(read_out, doc("BL", "no_text_layer")) == (True, True)
+        assert state(doc("SI", "no_text_layer"), doc("BL", "no_text_layer")) == (True, False)
+        assert state(doc("SI", "corrupt"), doc("BL", "corrupt")) == (False, False)
 
 
 def _finished_run(client: TestClient, data_root: Path, monkeypatch: pytest.MonkeyPatch) -> str:
@@ -479,3 +525,178 @@ class TestRecheck:
         refused = client.post(f"/cases/{case}/retry")
         assert refused.status_code == 409, refused.text
         assert client.get(f"/cases/{case}").json()["status"] == "OK"        # untouched
+
+
+class TestReviewInPlace:
+    """The case page's in-place review: each choice on a field card is saved
+    as it is made (POST, with the per-field choices behind the outcome), and
+    taking the last one back withdraws the review (DELETE)."""
+
+    def test_per_field_choices_are_kept_and_returned(
+        self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run_id = _finished_run(client, synthetic_inbox, monkeypatch)
+        case = f"{run_id}:email_002"                      # MISMATCH on consignee
+        # No status sent: in place, the outcome is derived from the choices.
+        saved = client.post(
+            f"/cases/{case}/review",
+            json={
+                "decision": "correct",
+                "decisions": {"consignee": "cleared"},
+                "corrections": {"shipper": {"si": "   "}},          # blank: no correction
+                "note": "typo on the draft",
+            },
+        )
+        assert saved.status_code == 200, saved.text
+        review = saved.json()
+        assert review["decisions"] == {"consignee": "cleared"}
+        assert review["cant_tell"] is False
+        assert review["corrections"] == {}
+        assert review["status"] == "OK"
+        assert review["defect_fields"] == []
+        # Sentinel's verdict on the field is kept; what stands is the choice.
+        assert review["field_verdicts"]["consignee"]["verdict"] == "MISMATCH"
+        assert review["field_verdicts"]["consignee"]["stands"] == "MATCH"
+        assert review["field_verdicts"]["shipper"]["si"]["corrected"] is False
+
+        detail = client.get(f"/cases/{case}").json()
+        assert detail["review"]["decisions"] == {"consignee": "cleared"}
+        assert detail["effective"] == {
+            "status": "OK", "review_reason": None, "has_defect": False, "defect_fields": [],
+            "source": "review", "reviewed": True, "review_decision": "correct",
+        }
+        # The system's own answer is untouched underneath.
+        assert detail["status"] == "MISMATCH"
+        assert detail["defect_fields"] == ["consignee"]
+
+        # A review recorded the old way -- no per-field choices -- still reads
+        # back with empty ones, so a client never has to special-case it.
+        plain = client.post(f"/cases/{case}/review", json={"decision": "confirm"})
+        assert plain.status_code == 200, plain.text
+        assert plain.json()["decisions"] == {}
+        assert plain.json()["cant_tell"] is False
+        assert plain.json()["corrections"] == {}
+        assert plain.json()["field_verdicts"] == {}
+        # The whole-case form still has to say what it corrects to.
+        no_status = client.post(f"/cases/{case}/review", json={"decision": "correct"})
+        assert no_status.status_code == 422, no_status.text
+
+    def test_a_corrected_value_is_compared_by_the_pipeline_itself(
+        self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The reviewer types what a side should read; the pair is compared
+        again with the same canonicalisation the run used."""
+        run_id = _finished_run(client, synthetic_inbox, monkeypatch)
+        case = f"{run_id}:email_002"                      # BL consignee differs from the SI
+
+        # Written the way a person types it, not the way the document prints
+        # it -- case and spacing are the canonicaliser's job, as in the run.
+        agreed = client.post(
+            f"/cases/{case}/review",
+            json={"decision": "correct", "corrections": {"consignee": {"bl": "  test import company ltd "}}},
+        )
+        assert agreed.status_code == 200, agreed.text
+        review = agreed.json()
+        assert review["corrections"] == {"consignee": {"bl": "test import company ltd"}}
+        assert review["status"] == "OK"
+        assert review["defect_fields"] == []
+        consignee = review["field_verdicts"]["consignee"]
+        assert consignee["verdict"] == "MATCH"
+        assert consignee["bl"] == {"raw": "test import company ltd", "normalised": consignee["si"]["normalised"], "corrected": True}
+        assert consignee["si"]["corrected"] is False
+        rows = {c["email_id"]: c for c in client.get(f"/runs/{run_id}/cases").json()["cases"]}
+        assert rows["email_002"]["status"] == "OK"
+        assert rows["email_002"]["outcome_source"] == "review"
+        assert client.get("/submission", params={"run_id": run_id}).json()["email_002"]["status"] == "OK"
+
+        # A value that still differs keeps the field on the list.
+        still = client.post(
+            f"/cases/{case}/review",
+            json={"decision": "correct", "corrections": {"consignee": {"bl": "ANOTHER IMPORT COMPANY LTD"}}},
+        )
+        assert still.status_code == 200, still.text
+        assert still.json()["status"] == "MISMATCH"
+        assert still.json()["defect_fields"] == ["consignee"]
+        assert still.json()["field_verdicts"]["consignee"]["verdict"] == "MISMATCH"
+
+        # A placeholder is a blank, not a discrepancy (CLAUDE.md rule 4):
+        # the field becomes uncomparable and the case goes to a person.
+        blank = client.post(
+            f"/cases/{case}/review",
+            json={"decision": "correct", "corrections": {"consignee": {"bl": "???"}}},
+        )
+        assert blank.status_code == 200, blank.text
+        assert blank.json()["status"] == "NEEDS_REVIEW"
+        assert blank.json()["defect_fields"] == []
+        assert blank.json()["field_verdicts"]["consignee"]["verdict"] == "UNCOMPARABLE"
+        assert blank.json()["field_verdicts"]["consignee"]["reason"] == "bl_blank"
+
+        # Sentinel's own comparison never moved.
+        detail = client.get(f"/cases/{case}").json()
+        assert detail["status"] == "MISMATCH"
+        assert [f for f in detail["fields"] if f["field"] == "consignee"][0]["bl"]["raw"] == "DIFFERENT IMPORT COMPANY LTD"
+
+    def test_choices_must_name_real_fields_and_real_choices(
+        self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run_id = _finished_run(client, synthetic_inbox, monkeypatch)
+        case = f"{run_id}:email_002"
+        unknown_field = client.post(
+            f"/cases/{case}/review",
+            json={"decision": "correct", "status": "OK", "decisions": {"vessel": "cleared"}},
+        )
+        assert unknown_field.status_code == 422, unknown_field.text
+        assert "vessel" in unknown_field.json()["detail"]
+        unknown_choice = client.post(
+            f"/cases/{case}/review",
+            json={"decision": "correct", "status": "OK", "decisions": {"consignee": "maybe"}},
+        )
+        assert unknown_choice.status_code == 422, unknown_choice.text
+        assert "maybe" in unknown_choice.json()["detail"]
+        unknown_corrected_field = client.post(
+            f"/cases/{case}/review",
+            json={"decision": "correct", "corrections": {"vessel": {"bl": "X"}}},
+        )
+        assert unknown_corrected_field.status_code == 422, unknown_corrected_field.text
+        unknown_side = client.post(
+            f"/cases/{case}/review",
+            json={"decision": "correct", "corrections": {"consignee": {"invoice": "X"}}},
+        )
+        assert unknown_side.status_code == 422, unknown_side.text
+        assert "si or bl" in unknown_side.json()["detail"]
+        # Nothing was recorded by any of them.
+        assert client.get(f"/cases/{case}").json()["review"] is None
+
+    def test_withdrawing_a_review_puts_the_case_back_unreviewed(
+        self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run_id = _finished_run(client, synthetic_inbox, monkeypatch)
+        case = f"{run_id}:email_002"
+        assert client.post(
+            f"/cases/{case}/review",
+            json={"decision": "correct", "decisions": {"consignee": "cleared"}},
+        ).status_code == 200
+        rows = {c["email_id"]: c for c in client.get(f"/runs/{run_id}/cases").json()["cases"]}
+        assert rows["email_002"]["status"] == "OK"
+        assert rows["email_002"]["outcome_source"] == "review"
+
+        gone = client.delete(f"/cases/{case}/review")
+        assert gone.status_code == 200, gone.text
+        # The fresh case report comes back, review-less, Sentinel's answer standing.
+        assert gone.json()["review"] is None
+        assert gone.json()["effective"]["status"] == "MISMATCH"
+        assert gone.json()["effective"]["reviewed"] is False
+        assert gone.json()["effective"]["source"] == "system"
+        rows = {c["email_id"]: c for c in client.get(f"/runs/{run_id}/cases").json()["cases"]}
+        assert rows["email_002"]["status"] == "MISMATCH"
+        assert rows["email_002"]["reviewed"] is False
+        assert client.get("/metrics", params={"run_id": run_id}).json()["review"] == {
+            "reviewed": 0, "confirmed": 0, "corrected": 0,
+        }
+        submission = client.get("/submission", params={"run_id": run_id}).json()
+        assert submission["email_002"]["status"] == "MISMATCH"
+
+        # Nothing left to withdraw; and an unknown case is an unknown case.
+        assert client.delete(f"/cases/{case}/review").status_code == 404
+        assert client.delete(f"/cases/{run_id}:email_999/review").status_code == 404
+        assert client.delete("/cases/not-a-valid-id/review").status_code == 400

@@ -26,6 +26,18 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   SPAM: "Spam",
 };
 
+// The same five, singular, for the badge on one case ("Comparison") --
+// CATEGORY_LABELS counts many ("Comparisons 220" on the run page's chips).
+// Never the backend code: a badge that says BL_COMPARISON is the one thing
+// on a row a first-time visitor cannot read.
+export const CATEGORY_BADGE_LABELS: Record<Category, string> = {
+  BL_COMPARISON: "Comparison",
+  SI_REQUEST: "SI request",
+  INVOICE_QUERY: "Invoice query",
+  GENERAL: "General",
+  SPAM: "Spam",
+};
+
 // "OK" reads as a chat acknowledgement, not the outcome of a 7-field
 // verification — "Matched" says what actually happened, and pairs with
 // "Mismatch" the same way the two outcomes already pair everywhere else
@@ -46,10 +58,10 @@ export const STATUS_LABELS: Record<CaseStatus, string> = {
 // `reviewReasonClause` below) and the metrics chart's tooltip, instead of
 // each of those keeping its own independently-worded copy.
 export const REVIEW_REASON_TEXT: Record<ReviewReason, string> = {
-  wrong_doc_type: "An attachment doesn't look like the document type it claims to be.",
-  missing_attachment: "An expected document is missing from this email.",
+  wrong_doc_type: "An attachment is not the document it claims to be.",
+  missing_attachment: "A document is missing from this email.",
   unreadable: "A document couldn't be read.",
-  missing_value: "One or more required fields are blank, or printed under a label Sentinel could not recognise.",
+  missing_value: "Some fields are blank, or under a label Sentinel doesn't recognise.",
 };
 
 /** "An expected document is missing from this email." -> "an expected document is missing from this email" */

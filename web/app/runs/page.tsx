@@ -128,7 +128,7 @@ export default function RunsPage() {
         <div>
           <h1 className="font-heading text-2xl font-semibold tracking-tight">Runs</h1>
           <p className="text-sm text-muted-foreground">
-            One run processes the whole graded inbox end to end. Start one to see it work.
+            Start a run over the whole inbox.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -173,10 +173,10 @@ export default function RunsPage() {
           </span>
           <span className="mt-0.5 block text-xs text-muted-foreground">
             {health === null
-              ? "Checking whether this server permits model-enabled runs…"
+              ? "Checking whether this server allows model runs…"
               : modelAllowed
-                ? "Adds the model tier to this run. On this inbox that means the six image-only scans are read out for the reviewer and shown on their Needs Review cases, and the model is asked about any label the rules cannot resolve — nothing it returns is adopted until it is found again in the document. Every decision on the graded inbox is still made by rules; the cost is capped per run and a re-run answers from the cache."
-                : "This server keeps model-enabled inbox runs switched off (SENTINEL_ALLOW_LLM_RUNS), so every run here is rules only — which is also exactly how the graded inbox was scored. The model tier is still demonstrable on Compare, one document pair at a time."}
+                ? "Also reads the six scanned PDFs for the reviewer. Every decision still comes from rules; the cost is capped."
+                : "Off on this server — every run is rules only, as the graded inbox was scored. The model tier is on Compare."}
           </span>
         </span>
       </motion.label>
@@ -195,9 +195,7 @@ export default function RunsPage() {
             <Skeleton className="h-20 w-full" />
             {waking && (
               <p className="text-center text-xs text-muted-foreground">
-                Waking the API — it runs on a free tier that sleeps after 15
-                minutes idle, so the first request can take 30–60 seconds. This
-                page keeps retrying on its own.
+                Waking the API (free tier, 30–60 s) — retrying on its own.
               </p>
             )}
           </motion.div>
@@ -331,7 +329,9 @@ function RunCard({ run }: { run: RunStatus }) {
           )}
           <Link href={`/runs/${run.run_id}`} className="block h-full">
             <Card className="h-full transition-colors hover:bg-muted/40">
-              <CardHeader className={cn("flex-row items-center justify-between space-y-0 pb-2", !hasHover && "pr-9")}>
+              {/* `flex`, not the card header's default grid: the status pill
+                  belongs on the run id's line, right-aligned, not under it. */}
+              <CardHeader className={cn("flex flex-row items-center justify-between space-y-0 pb-2", !hasHover && "pr-9")}>
                 <CardTitle className="font-mono text-sm">{run.run_id}</CardTitle>
                 <RunStatusPill status={run.status} />
               </CardHeader>
@@ -346,7 +346,7 @@ function RunCard({ run }: { run: RunStatus }) {
 
         <div style={{ gridArea: "1 / 1", backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
           <Card className="h-full">
-            <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="font-mono text-sm">{run.run_id}</CardTitle>
               {!hasHover && (
                 <button
