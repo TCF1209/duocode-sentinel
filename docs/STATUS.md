@@ -4,6 +4,102 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-24 (night, continued a fifth time) — Claude session 8 · the case page now shows the reviewer's correction beside Sentinel's answer, not instead of it
+
+Raised with a screenshot after the previous entry's field-level
+correction shipped: having un-checked Port of Discharge as "not actually
+wrong" on `email_025`, the Port of Discharge card below still showed a
+red MISMATCH badge. The user asked whether the cards would follow a
+correction, proposed "keep the original, attach the corrected view
+beside it for comparison", and asked for a full discussion of
+consequences before any code changed. Discussed first, with the cause
+traced from the code, then two AskUserQuestion rounds: (A) the
+verdict-level overlay below -- approved; (B) letting a reviewer type the
+correct *value* for a field -- declined, on the reasoning that the
+review record holds no such thing, nothing consumes one, "the correct
+value" in an SI-vs-BL check is almost always the SI side anyway, and a
+human-typed value carries no Evidence. Nothing was built before the
+answers came back.
+
+**Done**
+- **Root cause, stated precisely**: the case detail page painted only
+  the system's keys (`report.status`, `report.review_reason`,
+  `report.fields[].verdict`) and never read `report.effective`. So one
+  screen contradicted itself -- `email_270`'s header said Mismatch, the
+  line under it said "corrected to Matched", every field card still said
+  MISMATCH -- while the run table, the reply draft, and the pattern
+  alerts already used the corrected view. The detail page was the one
+  surface in the app that hadn't caught up. The user's proposal is
+  literally the design `lib/api.ts` already describes for `effective`
+  ("the keys above stay the system's own answer, so a card can show
+  both"); it had only been half-applied.
+- **`field-comparison-row.tsx`** gained optional `reviewerView`
+  ("cleared" | "flagged") and `reviewerNote` props. Sentinel's verdict
+  badge is never removed: dimmed, still legible, titled "What Sentinel
+  itself said", with the reviewer's badge beside it; the card's tint
+  follows whichever judgement currently stands; the SI/BL values and
+  evidence are untouched. The reviewer's note is case-level, not
+  per-field, so it rides as a hover on every reviewer badge rather than
+  being pretended to belong to one -- "why was this cleared when the two
+  values visibly differ" is the question a reader has at that spot.
+- **`case-report-view.tsx`** computes the per-field view from
+  `effective` only for a "correct" decision (a "confirm" leaves
+  `effective` identical to system, source "system"; NEEDS_REVIEW as a
+  corrected status is "couldn't tell", not a per-field claim, so it
+  changes the header only). Header shows the standing status with
+  "Sentinel said X" in words only when the two differ; the review-reason
+  banner, once resolved, stays but muted -- "Sentinel had flagged: ...
+  Resolved by a reviewer — corrected to Matched." `/compare` has no
+  `effective` and renders exactly as before.
+- One nit caught in verification and fixed before committing: the muted
+  banner's "Sentinel had flagged:" had a CSS margin but no actual space
+  before the reason text (`innerText` ran them together). Replaced with
+  a real space.
+
+**Verification** -- every row of the design table, live, on the real
+`bundle_data/` run, read from the DOM rather than eyeballed:
+- MISMATCH kept: `email_025` Container Count -- red, single badge.
+- MISMATCH cleared: `email_025` POD (its note verbatim in the hover),
+  `email_270` POD -- neutral card, dimmed MISMATCH + "Cleared by
+  reviewer". Screenshot checked the two badges side by side: not
+  crowded, the one visual risk flagged in the discussion.
+- MATCH flagged: `email_001` Consignee, corrected OK→MISMATCH via the
+  API -- red card, dimmed MATCH + "Flagged by reviewer".
+- NEEDS_REVIEW→OK: `email_499` -- header "Matched / Sentinel said Needs
+  Review", banner muted with the resolved line, all seven UNCOMPARABLE
+  cards untouched (the system never claimed a defect on them; nothing
+  to clear, and saying so would be false).
+- OK→NEEDS_REVIEW with seven fields: `email_005` -- header only, zero
+  reviewer badges, all cards unchanged. (`email_002` and `email_003`
+  were tried first and turned out to have no field cards at all -- an
+  invoice query and a "please issue the draft BL" request -- so they
+  proved the header path but not the card path; `email_005` was found
+  by scanning for a 7-field OK comparison case.)
+- Confirm only: `email_013` unchanged. Never reviewed: `email_004`
+  unchanged. `/compare`: no reviewer badge, no "Sentinel said", cards
+  as before.
+- `npx tsc --noEmit`, `npm run lint`, `npm run build`: clean, re-run
+  after the spacing fix. One code commit (`6ba94fd`), two files, `git
+  status` checked before staging.
+
+**Next**
+- Same open items as the entries below: slide deck, branch push/merge
+  decision, Mentor Session reply.
+- Both local servers still running.
+
+**Careful**
+- **Option B (typing a correct value) was declined, not forgotten.** If
+  it comes back after the pitch, the sane shape is a three-way "SI is
+  right / BL is right / neither (enter it)" rather than a free text box,
+  and the value must be labelled as a reviewer's assertion, never mixed
+  into the system's evidence-bearing fields.
+- Test corrections made via the API to exercise the paths above
+  (`email_001` → MISMATCH/consignee, `email_499` → OK, `email_002`,
+  `email_003`, `email_005` → NEEDS_REVIEW) are in-memory only, gone on
+  the next backend restart, same as every prior entry's note on this.
+
+---
+
 ## 2026-09-24 (night, continued a fourth time) — Claude session 8 · the review panel explained, then fixed with the user's sign-off, not before
 
 User asked "why does the review panel work this way" in detail (what
