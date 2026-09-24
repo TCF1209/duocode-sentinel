@@ -468,11 +468,24 @@ export function formatReplyDraft(draft: ReplyDraft): string {
  *  anything itself. `undefined` when there is no known recipient (e.g. a
  *  /compare upload, which has no inbox record to read a sender from).
  *  `to` may already be a comma-joined list (RFC 6068 allows it) — the
- *  pattern-level draft below passes several addresses this way. */
+ *  pattern-level draft below passes several addresses this way.
+ *
+ *  Percent-encoded by hand, not with URLSearchParams: that writes a space as
+ *  "+", which is form encoding, and a mail client reads a mailto: URL by
+ *  RFC 6068, where "+" is a literal plus. Outlook put "Thank+you+for..." in
+ *  the body of every draft. RFC 6068 also wants line breaks as CRLF, and each
+ *  address encoded on its own so the commas between them stay separators. */
 export function mailtoHref(to: string | undefined | null, draft: ReplyDraft): string | undefined {
   if (!to) return undefined;
-  const params = new URLSearchParams({ subject: draft.subject, body: draft.body });
-  return `mailto:${encodeURIComponent(to)}?${params.toString()}`;
+  const recipients = to
+    .split(",")
+    .map((a) => a.trim())
+    .filter(Boolean)
+    .map(encodeURIComponent)
+    .join(",");
+  if (!recipients) return undefined;
+  const enc = (s: string) => encodeURIComponent(s.replace(/\r?\n/g, "\r\n"));
+  return `mailto:${recipients}?subject=${enc(draft.subject)}&body=${enc(draft.body)}`;
 }
 
 /**
