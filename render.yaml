@@ -101,6 +101,21 @@ services:
       - key: SENTINEL_LLM_CACHE
         value: "1"
 
+      # Model-enabled inbox runs from the dashboard. backend/api/main.py keeps
+      # this off by default because the URL is public and unauthenticated; it
+      # is on here because every guard that makes it safe is already in place
+      # -- the per-run budget below, the content-hash cache above (a re-run of
+      # the same inbox answers from disk and costs nothing), and
+      # SENTINEL_MAX_ACTIVE_RUNS -- and because on this inbox a model run is
+      # small and specific: the rules still decide all 520 emails, the
+      # classifier and the extractor are never asked (measured,
+      # docs/STATUS.md 2026-09-24), and the only live calls are the six
+      # image-only scans, transcribed for the reviewer and shown on their
+      # NEEDS_REVIEW cases. That is the model tier doing exactly its job,
+      # where a judge can watch it.
+      - key: SENTINEL_ALLOW_LLM_RUNS
+        value: "1"
+
       # A hard ceiling on model spend per run. The free plan has no billing
       # attached, but the OpenAI key does, and an unattended public URL is
       # exactly where a runaway loop would be noticed last.
