@@ -186,6 +186,10 @@ class CaseResult:
     # read by anything under backend/sdoc/ itself, and not part of
     # to_submission()'s shape, so it cannot touch what the scorer sees.
     sender: str = ""
+    # The inbox record's subject, for the same reason and under the same
+    # rule as `sender`: a reply draft threads under the customer's own subject
+    # instead of Sentinel's internal email_id. Report-only, never scored.
+    subject: str = ""
     category_confidence: float = 0.0
     decided_by: str = "rule"                 # rule | llm  (scorer reads this)
     category_rationale: list[str] = field(default_factory=list)
@@ -225,6 +229,7 @@ class CaseResult:
         return {
             "email_id": self.email_id,
             "sender": self.sender,
+            "subject": self.subject,
             "category": self.category,
             "category_confidence": round(self.category_confidence, 3),
             "decided_by": self.decided_by,

@@ -10,6 +10,9 @@ export interface ApiHealth {
   data_root: string;
   ready: boolean;
   llm_runs_allowed: boolean;
+  /** Whether a model key is configured at all, which is what the reply
+   *  draft's optional wording pass needs. Absent from an older API. */
+  model_available?: boolean;
 }
 
 export async function fetchHealth(): Promise<ApiHealth> {

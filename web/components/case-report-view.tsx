@@ -7,6 +7,7 @@ import { FieldComparisonRow, formatReason, type ReviewerView } from "@/component
 import { Button } from "@/components/ui/button";
 import { ReviewPanel } from "@/components/review-panel";
 import { ReplyDraftPanel } from "@/components/reply-draft-panel";
+import { replyDraftKey } from "@/lib/reply-draft";
 import { AttachmentAction } from "@/components/attachment-action";
 import { RecheckHistory, RecheckPanel, type RecheckFiles } from "@/components/recheck-panel";
 import { Separator } from "@/components/ui/separator";
@@ -206,7 +207,7 @@ function NeedsReviewWorkspace({
           <RecheckPanel report={report} onRecheck={onRecheck} rechecking={rechecking} className="mt-2" />
         )}
         <div className="mt-2">
-          <ReplyDraftPanel report={report} />
+          <ReplyDraftPanel key={replyDraftKey(report)} report={report} />
         </div>
       </div>
     </div>
@@ -464,7 +465,7 @@ export function CaseReportView({
           on its own here otherwise. Never both. */}
       {!showWorkspace && (
         <motion.div variants={fadeUp}>
-          <ReplyDraftPanel report={report} />
+          <ReplyDraftPanel key={replyDraftKey(report)} report={report} />
         </motion.div>
       )}
 

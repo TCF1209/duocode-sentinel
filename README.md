@@ -38,7 +38,7 @@ of being reported as a discrepancy.*
 | | |
 |---|---|
 | **Accuracy** | **1.0000** final score on the dev set **and** on three held-out draws, generated from the organisers' own generator with seeds we never developed against — 225 planted defects, every one caught with the **exact** field set, no false alarms, all 80 escalations correct. Not four *independent* tests, and `docs/SCORING.md` §4.1 says why. |
-| **Tests** | **596** — up from 574 at `4c852a7`: twenty-two new (twenty test functions, one of them parametrised three ways; the last six cover `POST /cases/{id}/recheck`), re-run 24 Sep as **454 passed, 142 skipped, 0 failed, 0 xfailed**. The one strict `xfail` that used to sit here is gone: it pinned a defect found by review, `docs/ADVERSARIAL.md` §5.4, fixed the same day it was found. The same command runs on every push in [CI](.github/workflows/ci.yml). |
+| **Tests** | **641** — forty-five added on 25 Sep for the reply drafts' wording pass (`backend/tests/test_reply_polish.py`), on top of the 596 of 24 Sep; re-run 25 Sep on a copy of the tree with no `data/` as **499 passed, 142 skipped, 0 failed, 0 xfailed**. The one strict `xfail` that used to sit here is gone: it pinned a defect found by review, `docs/ADVERSARIAL.md` §5.4, fixed the same day it was found. The same command runs on every push in [CI](.github/workflows/ci.yml). |
 | **Speed** | **~3 ms per email**, single-threaded on a laptop: 520 emails end to end in about 1.5 s. |
 | **Cost** | **100% of decisions are made by rules.** `decided_by` is `"rule"` for all 520 emails; no model call decides anything on the graded inbox. |
 
@@ -47,15 +47,23 @@ written — the commands are in [Verify it yourself](#verify-it-yourself).
 
 The accuracy row is the only one a reader cannot reproduce without the
 organisers' dataset, so here is its provenance instead of asking for trust. It
-was measured at `4c852a7`. Three commits since have touched `backend/sdoc/` —
-the pipeline the score is a function of — each one found by testing against a
-real document from *outside* the organisers' generator
-([`docs/EXTERNAL_VALIDATION.md`](docs/EXTERNAL_VALIDATION.md)), not by
-touching anything the scorer exercises:
+was measured at `4c852a7`. **Six** commits since have touched `backend/sdoc/`
+— the pipeline the score is a function of — and the run it produces today is
+**byte-identical** to the one measured then, `submission.json` at md5
+`1c08cd21`. Run the command, count the commits, re-run the pipeline and
+compare the hashes; the paragraph is checkable rather than asking for trust:
 
 ```bash
 git log --oneline 4c852a7..HEAD -- backend/sdoc/
 ```
+
+Three of the six change what is *reported* and cannot reach the scorer at all:
+the vision transcript is attached to `to_report()` only, the sender likewise,
+and the evidence gate's new sentence names which label was not recognised
+instead of saying the documents do not state it — a better message for the
+same escalation. The other three change reading or comparison, and each was
+found by testing against a real document from *outside* the organisers'
+generator ([`docs/EXTERNAL_VALIDATION.md`](docs/EXTERNAL_VALIDATION.md)):
 
 | Commit | What, and why it cannot have moved the score |
 |---|---|
@@ -184,13 +192,13 @@ are reproducible and not re-billed, per-purpose token metering and a run
 budget. Every path is optional: with no `OPENAI_API_KEY` the pipeline still
 runs end to end and escalates what it cannot read (`CLAUDE.md` rule 5).
 
-**The API — `backend/api/`, FastAPI, 13 routes.** Pydantic models at the
+**The API — `backend/api/`, FastAPI, 15 routes.** Pydantic models at the
 boundary only; `store.py` isolates state so the in-memory store is one file to
 replace, not a rewrite of the routes.
 
 | | |
 |---|---|
-| `GET /` | readiness, data root, whether model runs are permitted |
+| `GET /` | readiness, data root, whether model runs are permitted, whether a model is configured at all |
 | `POST /runs` · `GET /runs` · `GET /runs/{id}` | start a run over the bundled inbox; list; status and `metrics.json` |
 | `GET /runs/{id}/cases` | case list, filterable by category, status and `decided_by` |
 | `GET /cases/{id}` | one full report — seven fields, both sides, every piece of evidence |
@@ -199,6 +207,8 @@ replace, not a rewrite of the routes.
 | `POST /cases/{id}/retry` | re-process one email in place, re-reading it from disk |
 | `POST /cases/{id}/recheck` | **re-sent documents**: the same check run again on an uploaded SI and/or BL; the answer it replaces, and any review of it, stay readable in the case's history |
 | `POST /compare` | **upload two documents of your own** and get the same report |
+| `POST /reply-drafts/polish` | reword a reply draft's greeting and closing; the facts and the request never reach the model ([`reply_polish.py`](backend/api/reply_polish.py)) |
+| `GET /runs/{id}/patterns` | the inbox read sideways: which fields go wrong, and per-sender defect rates with 95% intervals |
 | `GET /metrics` · `GET /submission` | operational counters; the graded artefact |
 
 **The dashboard — `web/`, Next.js 16 App Router, 7 routes.** `/` · `/runs` ·
@@ -269,10 +279,12 @@ the 520-email one, below.
 ```
 
 On a fresh clone at `4c852a7`: **431 passed, 142 skipped, 1 xfailed, 0
-errors**. Re-run on 24 Sep on a checkout holding no `data/` — the same
-condition as a clone — the suite is **596 tests: 454 passed, 142 skipped, 0
-failed, 0 xfailed**, counted from `pytest --junitxml` rather than remembered:
-twenty-two tests added since `4c852a7`, and the former `xfail` now a plain pass.
+errors**. Re-run on 25 Sep on a copy of the tree holding no `data/` — the same
+condition as a clone — the suite is **641 tests: 499 passed, 142 skipped, 0
+failed, 0 xfailed**, read off pytest's own summary line rather than
+remembered: sixty-seven tests added since `4c852a7` (forty-five of them on
+25 Sep, for the reply drafts' wording pass), and the former `xfail` now a
+plain pass.
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs this same command
 on every push, on a machine nobody on the team configured — the fresh-clone
 check made permanent rather than repeated by hand.
@@ -284,7 +296,7 @@ full bundle to read. `backend/tests/conftest.py` guards exactly the tests that
 open it and skips them with the reason printed, rather than letting ~100 tests
 fail on an empty read and read as a broken project. With the participant bundle
 at `data/bundle/`, the same command gave **573 passed, 1 xfailed** at
-`4c852a7`; by the same arithmetic as above, **596 passed, 0 xfailed** since.
+`4c852a7`, and **641 passed, 0 xfailed** on 25 Sep.
 
 ### The full inbox
 
@@ -521,8 +533,8 @@ Beyond the hackathon, in the order we would actually build them:
 3. **Batch patterns — built.** The run page now groups `MISMATCH` cases by
    shipper and field, surfacing any group of two or more, largest first, each
    expandable to the affected emails. Real signal on the graded inbox, not a
-   demo fixture: 21 such patterns, the largest six cases from one shipper's
-   container count. No new extraction — the shipper name was already read by
+   demo fixture: 21 such patterns, the largest seven cases from one shipper's
+   gross weight. No new extraction — the shipper name was already read by
    the pipeline; the API just started including it in the case list.
 4. **Throughput and cost at real inbox volume — built.** The metrics page now
    projects both onto a desk's own volume: processing time scales the run's

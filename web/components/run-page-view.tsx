@@ -364,6 +364,7 @@ export function RunPageView({ runId }: { runId: string }) {
             cases={visibleCases}
             filtered={Boolean(categoryFilter || statusFilter)}
             done={run.status === "done"}
+            llmEnabled={run.llm_enabled}
           />
         )}
       </AnimatePresence>

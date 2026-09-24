@@ -65,26 +65,44 @@ function groupIntoPatterns(cases: CaseSummary[]): Pattern[] {
  *  fetched for the table below; no extra request. */
 export function PatternAlerts({ runId, cases }: { runId: string; cases: CaseSummary[] }) {
   const patterns = useMemo(() => groupIntoPatterns(cases), [cases]);
+  // Collapsed by default, so the case table below is what a reviewer lands
+  // on; the heading keeps the count, so a collapsed box still says there is
+  // something here, and one click opens it.
+  const [collapsed, setCollapsed] = useState(true);
   if (patterns.length === 0) return null;
 
   return (
     <motion.div variants={fadeUp}>
       <Card className="border-warn/30">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm font-medium">
-            <AlertTriangle className="size-4 text-warn" />
-            Patterns worth a second look
+          <CardTitle className="text-sm font-medium">
+            <button
+              type="button"
+              onClick={() => setCollapsed((v) => !v)}
+              aria-expanded={!collapsed}
+              className="flex w-full items-center gap-2 text-left"
+            >
+              <AlertTriangle className="size-4 text-warn" />
+              Patterns worth a second look
+              <span className="font-normal text-muted-foreground">({patterns.length})</span>
+              <span className="ml-auto flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                {collapsed ? "Show" : "Hide"}
+                {collapsed ? <ChevronRight className="size-4" /> : <ChevronDown className="size-4" />}
+              </span>
+            </button>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <motion.div className="flex flex-col gap-2" initial="hidden" animate="show" variants={stagger()}>
-            {patterns.map((p) => (
-              <motion.div key={`${p.shipper}\u0000${p.field}`} variants={fadeUp}>
-                <PatternRow runId={runId} pattern={p} />
-              </motion.div>
-            ))}
-          </motion.div>
-        </CardContent>
+        {!collapsed && (
+          <CardContent>
+            <motion.div className="flex flex-col gap-2" initial="hidden" animate="show" variants={stagger()}>
+              {patterns.map((p) => (
+                <motion.div key={`${p.shipper}\u0000${p.field}`} variants={fadeUp}>
+                  <PatternRow runId={runId} pattern={p} />
+                </motion.div>
+              ))}
+            </motion.div>
+          </CardContent>
+        )}
       </Card>
     </motion.div>
   );

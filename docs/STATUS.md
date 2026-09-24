@@ -4,6 +4,46 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-25 — Claude session · reply drafts that say the right thing, and AI wording that cannot touch a fact
+
+Designed with the user before any change (scans get a holding reply; a blank
+field is asked about, never confirmed), then reviewed by four independent
+lenses with every finding re-verified; the eleven that held are fixed here.
+Branch `feat/reply-drafts`. `submission.json` byte-identical
+(`1c08cd215b0ba4d3c607a7133212a6f9`).
+
+**Done**
+- **Per-reason reply drafts** (`web/lib/reply-draft.ts`). One generic "please
+  re-send the affected document(s)" was wrong for 8 of the 20 escalations. Now
+  a rule-chosen situation per case: attachments missing, one document missing
+  (named by content, not slot), file will not open, scans (no re-send, a person
+  reads them), wrong document, fields to confirm (blank *and* mismatched fields
+  both listed; an unrecognised label is never put to the customer). No draft is
+  offered where "we compared the SI and BL" would be false (every non-comparison
+  category, and draft-issue requests). Replies thread under the customer's own
+  subject (`CaseResult.subject`, report-only, never scored).
+- **AI wording, facts locked** (`backend/api/reply_polish.py`,
+  `POST /reply-drafts/polish`). Only the greeting and the closing reach the
+  model; what happened, the facts and the request stay locked and are shown so
+  in the panel. The rewrite is refused if it adds a number, a name, a claim, a
+  request or a second salutation. Measured on gpt-5-mini: 54 of 54 rewrites
+  adopted across 9 situations × 3 tones × 2 presses, $0.03 in all.
+- `GET /` reports `model_available` and can no longer fail on a bad model
+  setting (it is Render's health check). 641 tests; 499 passed / 142 skipped
+  on a copy with no `data/`.
+
+**Next**
+- Merged into `main` straight after `feat/final-round-differentiators`
+  (`c3f562e`, then `e805f41`), which already uses the same status words.
+
+**Careful**
+- `reviewReasonClause` in `web/lib/labels.ts` is now unused; left in place
+  because the teammate branch edits the lines next to it.
+- The panel is keyed on `replyDraftKey(report)`, so a review or re-check closes
+  an open draft on purpose: it must not go on describing the old outcome.
+
+---
+
 ## 2026-09-24 (evening) — Claude session 8 · the reviewer's round: back to where you were, a Review filter, before-and-after on a correction, a needs-review workspace, and re-sent documents re-checked in place
 
 Six questions from the user after working the real 520-email inbox in the
@@ -898,7 +938,7 @@ higher here than earlier the same day, not lower.
   `pipeline.py` already computes — no new extraction, nothing in
   `backend/sdoc/` touched. Verified against the real 520-email
   `bundle_data/`, not a demo fixture: 21 real patterns exist, largest is
-  six cases on one shipper's container count, independently cross-checked
+  seven cases on one shipper's gross weight, independently cross-checked
   in a one-off script before trusting the UI, then confirmed the UI matches
   it exactly in a live browser, including the expand interaction and a
   followed link into the real case detail underneath it.

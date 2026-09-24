@@ -268,7 +268,7 @@ whole participant bundle. **(T) to decide.**
   read-only field (`shipper`, projected from a comparison already computed —
   no new extraction, no decision touched) so the frontend does not need an
   extra request per case. Verified against the real 520-email `bundle_data/`:
-  21 real patterns, largest is 6 cases on one shipper's container count.
+  21 real patterns, largest is 7 cases on one shipper's gross weight.
 - **Built** (24 Sep): throughput/cost projection at real inbox volume —
   `web/components/metrics-page-view.tsx`, the metrics page. Two figures, both
   grounded rather than guessed: processing time scales the run's own measured
