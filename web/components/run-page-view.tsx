@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { BarChart3, ChevronRight, Filter, ShipCargo } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CategoryBadge, DecidedByBadge, RunStatusPill, StatusBadge } from "@/components/status-badges";
 import { BackLink } from "@/components/back-link";
 import { RunProgress } from "@/components/run-progress";
@@ -51,6 +52,12 @@ export function RunPageView({ runId }: { runId: string }) {
   // Always the whole run, never filtered server-side any more -- see
   // visibleCases below for why, and refresh() for how it stays that way.
   const [allCases, setAllCases] = useState<CaseSummary[]>([]);
+  // Separate from `allCases.length > 0`: a run that genuinely has zero cases
+  // yet (just started) is a real, different state from "hasn't answered
+  // the first fetch yet", and the table/stat-strip below need to tell those
+  // two apart instead of both reading as "nothing here" -- raised directly
+  // as "clicking into a run looks empty for a few seconds".
+  const [casesLoaded, setCasesLoaded] = useState(false);
 
   // The one place a filter actually narrows what's shown. Everything that
   // used to read the old server-filtered `cases` for a *count of the whole
@@ -107,7 +114,10 @@ export function RunPageView({ runId }: { runId: string }) {
       .then((r) => setRun((prev) => (prev && JSON.stringify(prev) === JSON.stringify(r) ? prev : r)))
       .catch((e) => toast.error(e.message));
     listCases(runId, {})
-      .then((r) => setAllCases((prev) => (JSON.stringify(prev) === JSON.stringify(r.cases) ? prev : r.cases)))
+      .then((r) => {
+        setAllCases((prev) => (JSON.stringify(prev) === JSON.stringify(r.cases) ? prev : r.cases));
+        setCasesLoaded(true);
+      })
       .catch((e) => toast.error(e.message));
   }, [runId]);
 
@@ -295,7 +305,12 @@ export function RunPageView({ runId }: { runId: string }) {
           actually still true after a review. rule_share/llm_calls stay
           sourced from run.metrics on purpose -- which tier decided a case
           is a system fact a review never changes. */}
-      {allCases.length > 0 && run?.metrics && (
+      {!casesLoaded && (
+        <motion.div className="rounded-xl border bg-card px-4 py-3" variants={fadeUp}>
+          <Skeleton className="h-5 w-72" />
+        </motion.div>
+      )}
+      {casesLoaded && allCases.length > 0 && run?.metrics && (
         <motion.div
           className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border bg-card px-4 py-3 text-sm"
           variants={fadeUp}
@@ -380,7 +395,20 @@ export function RunPageView({ runId }: { runId: string }) {
           </TableHeader>
           <TableBody>
             <AnimatePresence mode="popLayout" initial={false}>
-              {visibleCases.length === 0 ? (
+              {!casesLoaded ? (
+                // Distinct from the "no cases match this filter" row below:
+                // that one is a real, finished answer, this one is standing
+                // in for rows that just haven't arrived yet. Showing the
+                // filter message here first, however briefly, was reading
+                // as "there's nothing in this run" during the initial fetch.
+                Array.from({ length: 8 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell colSpan={7} className="py-2.5">
+                      <Skeleton className="h-5 w-full" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : visibleCases.length === 0 ? (
                 <motion.tr key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                     {run?.status === "running" ? "Processing…" : "No cases match this filter."}
@@ -459,7 +487,13 @@ export function RunPageView({ runId }: { runId: string }) {
           scrolling past 500 rows will still see it without a tap. */}
       <motion.div className="flex flex-col rounded-md border bg-card md:hidden" variants={fadeUp}>
         <AnimatePresence mode="popLayout" initial={false}>
-          {visibleCases.length === 0 ? (
+          {!casesLoaded ? (
+            <div className="flex flex-col gap-3 p-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={`skeleton-${i}`} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : visibleCases.length === 0 ? (
             <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-8 text-center text-sm text-muted-foreground">
               {run?.status === "running" ? "Processing…" : "No cases match this filter."}
             </motion.div>
