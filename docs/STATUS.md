@@ -264,6 +264,32 @@ the deck built**
   (`61aa336`); every copy in the pitch and video documents updated
   (`a09edb6`).
 
+**Evening — the mentor session (20:30), and what it changed**
+- Thirty minutes with a mentor; notes in the user's
+  `mentor suggestion/1sts Meeting.pdf`, the table of points → changes in
+  `docs/PITCH_DAY.md`. The substance: reframe the AI ("reserved for what
+  rules can't handle, performs just as well" — never "we use less AI");
+  differentiate on the special features at the top-ten stage; put "why we
+  built it" and a manual-check benchmark in the intro; show how a person
+  uses it, not only the pipeline; design is better than most of the ten
+  but font sizes are uniform, capitalisation inconsistent, the Compare
+  samples don't look clickable, and mismatches should be visible from the
+  list; some judges dislike "Matched/Mismatched"; a judge asked another
+  team about KG vs MT.
+- Done tonight, mine: status words **No mismatch / Mismatch / Needs
+  review** (one map, `lib/labels.ts`); nav **Home · Compare · Runs · How it
+  works**; Compare page three-step strip and button-like sample cards;
+  deck slides 2/3/5/7 and their notes reworked (why + benchmark, the four
+  usage steps, the AI rule, "What makes it different" with the five
+  features at thirty seconds); `PITCH_DAY.md`'s mentor table and the unit
+  answer (re-checked: `20 MT` → 20,000 kg, `21 MT` → 21,000 kg). tsc, lint,
+  build clean; run page and Compare page re-captured.
+- Assigned to session 8 by file ownership: mismatch visibility on the run
+  table (count on the status cell, mismatches-first), chip capitalisation
+  (`all` → `All`), case-page type hierarchy.
+- The deck file was open in PowerPoint when the generator ran, so the
+  `.pptx`/`.pdf` rebuild is the commit after this one.
+
 **Next**
 - **The one path not yet exercised end to end: a model-enabled run.** Needs
   `OPENAI_API_KEY` in a local `.env` (the user places it) and

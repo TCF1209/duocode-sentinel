@@ -32,9 +32,13 @@ export const CATEGORY_LABELS: Record<Category, string> = {
 // (VerdictBadge already uses MATCH/MISMATCH per field). NEEDS_REVIEW gets a
 // space instead of shipping its underscore straight into a badge.
 export const STATUS_LABELS: Record<CaseStatus, string> = {
-  OK: "Matched",
+  // "No mismatch detected" is the problem statement's own phrase for a clean
+  // pair, and judges told the mentors they dislike "Matched/Mismatched" as a
+  // pair of labels -- "matched" reads as a claim about the tool rather than
+  // about the documents. Every status word in the app comes from this map.
+  OK: "No mismatch",
   MISMATCH: "Mismatch",
-  NEEDS_REVIEW: "Needs Review",
+  NEEDS_REVIEW: "Needs review",
 };
 
 // Full standalone sentences, for the case report's review banner. Also the
