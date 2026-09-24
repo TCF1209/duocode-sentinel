@@ -555,8 +555,8 @@ function TechStack() {
         <p className="text-base">
           <span className="font-medium">The evidence gate sits after the comparison and can
           overrule it.</span>{" "}
-          A value nobody can trace back to its source line is not reported as a discrepancy — the
-          case goes to a person with both readings attached.
+          A value we cannot find again in the document it was read from is not reported as a
+          discrepancy — the case goes to a person with both readings attached.
         </p>
       </motion.div>
 
