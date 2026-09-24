@@ -91,10 +91,16 @@ export function MetricsPageView({ runId }: { runId: string }) {
       {metrics.review && (
         <motion.div className="flex flex-col gap-2" variants={fadeUp}>
           <div className="text-xs font-medium text-muted-foreground">Human review of this run</div>
-          <motion.div className="grid grid-cols-3 gap-3" variants={stagger()}>
+          <motion.div
+            className={cn("grid gap-3", metrics.recheck ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}
+            variants={stagger()}
+          >
             <Stat label="Reviewed" value={metrics.review.reviewed} />
             <Stat label="Confirmed as-is" value={metrics.review.confirmed} accent="ok" />
             <Stat label="Corrected" value={metrics.review.corrected} />
+            {/* Cases re-run on documents the sender re-sent -- the other
+                thing a person does to a run after it finished. */}
+            {metrics.recheck && <Stat label="Re-checked" value={metrics.recheck.cases} />}
           </motion.div>
         </motion.div>
       )}

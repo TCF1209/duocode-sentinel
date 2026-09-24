@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { motion } from "motion/react";
-import { AlertTriangle, CheckCircle2, Download, Eye, RotateCw, XCircle } from "lucide-react";
-import { attachmentUrl, type CaseReport, type CaseStatus, type DocumentReport, type FieldComparisonReport } from "@/lib/api";
+import { AlertTriangle, CheckCircle2, RotateCw, XCircle } from "lucide-react";
+import type { CaseReport, CaseStatus, DocumentReport, FieldComparisonReport } from "@/lib/api";
 import { CategoryBadge, DecidedByBadge, StatusBadge } from "@/components/status-badges";
 import { FieldComparisonRow, formatReason, type ReviewerView } from "@/components/field-comparison-row";
 import { Button } from "@/components/ui/button";
 import { ReviewPanel } from "@/components/review-panel";
 import { ReplyDraftPanel } from "@/components/reply-draft-panel";
+import { AttachmentAction } from "@/components/attachment-action";
+import { RecheckHistory, RecheckPanel, type RecheckFiles } from "@/components/recheck-panel";
 import { Separator } from "@/components/ui/separator";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fadeUp, stagger } from "@/lib/motion";
 import { FIELD_LABELS, REVIEW_REASON_TEXT, STATUS_LABELS } from "@/lib/labels";
 import { ScanTranscriptCard, transcriptOf } from "@/components/scan-transcript-card";
@@ -44,120 +45,9 @@ function ModelTier({ offered, used }: { offered?: boolean; used?: boolean }) {
   );
 }
 
-/** The real file a run read off disk, not just its evidence snippet -- shown
- *  in a dialog right on this page rather than navigated to. That was the
- *  first design (a `target="_blank"` link): it did not reliably open a
- *  second tab in this app's own preview surface, so the click navigated
- *  this page away to a different origin, and the browser's back button
- *  returned to it scrolled to the top, not to where the reviewer had been
- *  -- confirmed live, reproducible, and (separately) true of any case
- *  clicked into from partway down the run table regardless of this
- *  feature, see lib/use-scroll-restoration.ts. Never leaving the page at
- *  all removes the whole class of problem rather than patching around it.
- *  A .txt/.pdf (220 of the dataset's 250 attachments, docs/DATA_NOTES.md)
- *  opens inline in the dialog; a .docx/.xlsx has no in-browser renderer
- *  either way, so those fall back to a plain download link instead of an
- *  empty preview. */
-function AttachmentAction({
-  caseId,
-  side,
-  ext,
-  path,
-}: {
-  caseId: string;
-  side: "si" | "bl";
-  ext: string;
-  path: string;
-}) {
-  const url = attachmentUrl(caseId, side);
-  const filename = path.split("/").pop() || path;
-
-  if (ext !== ".txt" && ext !== ".pdf") {
-    return (
-      <a href={url} download={filename} className="inline-flex items-center gap-1 text-primary hover:underline">
-        <Download className="size-3" />
-        Download original
-      </a>
-    );
-  }
-  return <AttachmentDialog url={url} filename={filename} kind={ext === ".pdf" ? "pdf" : "text"} />;
-}
-
-/** Retries before surfacing an error. Empirically, not defensively: live
- *  testing against the real dev backend repeatedly showed a fetch to this
- *  route, specifically when triggered from this button's click handler,
- *  fail with a CORS-shaped `net::ERR_FAILED` -- while curl against the
- *  identical URL with the same Origin header never once failed, and a
- *  `fetch()` to the identical URL typed directly into the console
- *  (bypassing the click handler) never once failed either. That rules out
- *  the route and its CORS setup, which is why the fix here is a retry
- *  rather than a change to backend/api/main.py: something specific to this
- *  dev environment (React Strict Mode's deliberate double-invocation is
- *  the leading suspect -- this Next.js app has it on by default and a
- *  second, unrelated fetch on this same page was independently observed
- *  firing twice per mount) makes the first attempt occasionally lose a
- *  race, and a short-backoff retry is the correct mitigation regardless of
- *  which exact mechanism turns out to be responsible. */
-async function fetchTextWithRetry(url: string, attempts = 3): Promise<string> {
-  let lastError: unknown;
-  for (let i = 0; i < attempts; i++) {
-    if (i > 0) await new Promise((resolve) => setTimeout(resolve, 200));
-    try {
-      const r = await fetch(url);
-      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-      return await r.text();
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  throw lastError instanceof Error ? lastError : new Error(String(lastError));
-}
-
-function AttachmentDialog({ url, filename, kind }: { url: string; filename: string; kind: "text" | "pdf" }) {
-  const [open, setOpen] = useState(false);
-  const [text, setText] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  function onOpenChange(next: boolean) {
-    setOpen(next);
-    // Fetched once per mount, on first open, not on every re-open of the
-    // same dialog instance -- text/error already set is the guard.
-    if (next && kind === "text" && text === null && error === null) {
-      fetchTextWithRetry(url)
-        .then(setText)
-        .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-    }
-  }
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => onOpenChange(true)}
-        className="inline-flex items-center gap-1 text-primary hover:underline"
-      >
-        <Eye className="size-3" />
-        View original
-      </button>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="font-mono text-sm font-normal">{filename}</DialogTitle>
-          </DialogHeader>
-          {kind === "pdf" ? (
-            <iframe src={url} title={filename} className="h-[70vh] w-full rounded-md border bg-white" />
-          ) : (
-            <div className="max-h-[70vh] overflow-y-auto rounded-md border bg-muted/30 p-3">
-              {error && <p className="text-sm text-danger">Could not load the file: {error}</p>}
-              {text === null && !error && <p className="text-sm text-muted-foreground">Loading…</p>}
-              {text !== null && <pre className="whitespace-pre-wrap font-mono text-xs">{text}</pre>}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
+// AttachmentAction (the "View original" dialog / download link) lives in
+// attachment-action.tsx: the re-check panel needs it for a case's superseded
+// versions too, and that panel is rendered from here.
 
 // The reader codes a document can fail with (readers/*, direct_compare.py's
 // read_upload), in words a person can act on. Anything not listed falls
@@ -245,12 +135,16 @@ function NeedsReviewWorkspace({
   suggestedAction,
   onRetry,
   retrying,
+  onRecheck,
+  rechecking,
 }: {
   report: CaseReport;
   caseId?: string;
   suggestedAction: string | null;
   onRetry?: () => Promise<void>;
   retrying?: boolean;
+  onRecheck?: (files: RecheckFiles) => Promise<void>;
+  rechecking?: boolean;
 }) {
   // Only meaningful when both documents were actually read: a blank field
   // on a document that could not be read at all is the unreadability, not
@@ -305,6 +199,12 @@ function NeedsReviewWorkspace({
             </Button>
           </div>
         )}
+        {/* The action that actually resolves most of these: the sender
+            re-sends the document and the same check runs on it. Sits with
+            the other actions, not in a section of its own. */}
+        {onRecheck && (
+          <RecheckPanel report={report} onRecheck={onRecheck} rechecking={rechecking} className="mt-2" />
+        )}
         <div className="mt-2">
           <ReplyDraftPanel report={report} />
         </div>
@@ -325,6 +225,8 @@ export function CaseReportView({
   priorDefectCounts,
   onRetry,
   retrying,
+  onRecheck,
+  rechecking,
 }: {
   report: CaseReport;
   /** `<run_id>:<email_id>`, only when this report came from a run -- gates
@@ -340,6 +242,10 @@ export function CaseReportView({
    *  to do", not above the report. Absent on /compare (nothing to re-read). */
   onRetry?: () => Promise<void>;
   retrying?: boolean;
+  /** Re-check on re-sent documents (recheck-panel.tsx). Absent on /compare,
+   *  which has no case to store the result against. */
+  onRecheck?: (files: RecheckFiles) => Promise<void>;
+  rechecking?: boolean;
 }) {
   // classify/intent.py's signal ids (e.g. "attach.attached-are") ride in the
   // same `notes` list as human-written sentences. Every human sentence in
@@ -386,6 +292,20 @@ export function CaseReportView({
   // stale advice. Under "Sentinel's original" `correction` is null, so the
   // workspace comes back with the rest of the original view -- consistent.
   const showWorkspace = report.status === "NEEDS_REVIEW" && (!correction || correction.status === "NEEDS_REVIEW");
+
+  // Where re-sent documents can be dropped in: a comparison request whose
+  // standing outcome is still a problem -- Sentinel's, or a reviewer's
+  // correction to one. Not on an OK case (nothing to resolve), and never on
+  // an email with no SI/BL pair to compare (the backend refuses those with
+  // the same reasoning). The view toggle above does not move this: it is
+  // about what the case *is*, so it follows the live correction, not the
+  // one being displayed.
+  const standingStatus = (liveCorrection ?? report).status;
+  const recheckable = Boolean(onRecheck) && report.category === "BL_COMPARISON";
+  const offerRecheck = recheckable && (standingStatus === "MISMATCH" || standingStatus === "NEEDS_REVIEW");
+  // A retry re-reads the run's inbox from disk -- once a re-sent file has
+  // replaced that, the backend refuses it (409), so it is not offered.
+  const retry = report.recheck ? undefined : onRetry;
 
   // The pipeline already writes one "Suggested action: ..." sentence per
   // escalation reason (pipeline.py's notes); the workspace promotes it to a
@@ -465,6 +385,15 @@ export function CaseReportView({
         )}
       </motion.div>
 
+      {/* Leads once the case has been re-checked: the answer below was
+          reached on re-sent documents, and what it replaced is one
+          disclosure away. */}
+      {report.recheck && (
+        <motion.div variants={fadeUp}>
+          <RecheckHistory report={report} caseId={caseId} />
+        </motion.div>
+      )}
+
       {!showWorkspace && report.review_reason && (
         <motion.div
           className={cn(
@@ -499,8 +428,10 @@ export function CaseReportView({
             report={report}
             caseId={caseId}
             suggestedAction={suggestedAction}
-            onRetry={onRetry}
+            onRetry={retry}
             retrying={retrying}
+            onRecheck={offerRecheck ? onRecheck : undefined}
+            rechecking={rechecking}
           />
         </motion.div>
       )}
@@ -516,6 +447,16 @@ export function CaseReportView({
       {onReview && (
         <motion.div variants={fadeUp}>
           <ReviewPanel report={report} onSubmit={onReview} priorDefectCounts={priorDefectCounts} />
+        </motion.div>
+      )}
+
+      {/* On a mismatch the same panel sits under the review: "the shipper
+          sent a corrected BL" is the other way a mismatch gets resolved,
+          beside a reviewer deciding it. Inside the workspace's "what to do"
+          when the case is escalated instead -- never both. */}
+      {!showWorkspace && offerRecheck && onRecheck && (
+        <motion.div variants={fadeUp}>
+          <RecheckPanel report={report} onRecheck={onRecheck} rechecking={rechecking} />
         </motion.div>
       )}
 

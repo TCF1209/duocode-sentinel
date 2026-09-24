@@ -513,6 +513,18 @@ export function RunPageView({ runId }: { runId: string }) {
                           confirmed
                         </span>
                       )}
+                      {/* The other way a case moves on after the run: the
+                          sender re-sent a document and the check ran
+                          again. The answer this row shows was reached on
+                          that, not on what arrived in the inbox. */}
+                      {c.recheck_count > 0 && (
+                        <span
+                          className="ml-2 whitespace-nowrap text-[11px] text-muted-foreground"
+                          title="Re-checked on re-sent documents; the previous answer is kept on the case"
+                        >
+                          re-checked
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {c.defect_fields.length > 0 ? (
@@ -602,6 +614,9 @@ function CaseRowCard({ runId, c, ref }: { runId: string; c: CaseSummary; ref?: R
               <span title={`Sentinel said ${c.system_status}; corrected by a reviewer`}>corrected</span>
             )}
             {c.outcome_source === "system" && c.reviewed && <span>confirmed</span>}
+            {c.recheck_count > 0 && (
+              <span title="Re-checked on re-sent documents; the previous answer is kept on the case">re-checked</span>
+            )}
           </div>
           {c.defect_fields.length > 0 && (
             <div className="text-sm text-danger">

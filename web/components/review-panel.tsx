@@ -16,8 +16,9 @@ const STATUS_OPTIONS: CaseStatus[] = ["OK", "MISMATCH", "NEEDS_REVIEW"];
 const ALL_FIELDS = Object.keys(FIELD_LABELS);
 
 /** "Mismatch on Container Count, Port of Discharge" / "Matched" -- one
- *  outcome as a phrase, for the before/after lines in the reviewed state. */
-function describeOutcome(status: CaseStatus, defectFields: string[]): string {
+ *  outcome as a phrase, for the before/after lines in the reviewed state
+ *  (and the same lines in recheck-panel.tsx, which reuses it). */
+export function describeOutcome(status: CaseStatus, defectFields: string[]): string {
   const label = STATUS_LABELS[status];
   if (status !== "MISMATCH" || defectFields.length === 0) return label;
   return `${label} on ${defectFields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}`;

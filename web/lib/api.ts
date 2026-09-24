@@ -87,6 +87,11 @@ export interface CaseReport {
   /** What the case is NOW, after any human correction. The keys above stay
    *  the system's own answer, so a card can show both. */
   effective?: EffectiveOutcome | null;
+  /** Re-checks on re-sent documents (POST /cases/{id}/recheck). `recheck` is
+   *  null and `history` empty for a case whose documents were never re-sent
+   *  -- the overwhelming majority -- and both are absent on /compare. */
+  recheck?: RecheckInfo | null;
+  history?: CaseVersion[];
 }
 
 export interface EffectiveOutcome {
@@ -98,6 +103,36 @@ export interface EffectiveOutcome {
   source: "system" | "review";
   reviewed: boolean;
   review_decision: "confirm" | "correct" | null;
+}
+
+export type DocSide = "si" | "bl";
+
+/** Where each side of the case is currently read from: the run's own file on
+ *  disk ("original"), a re-sent copy held by the API ("resent"), or nothing
+ *  at all (the email never carried that document and none was re-sent). */
+export interface RecheckInfo {
+  count: number;
+  /** Epoch seconds, as the backend's time.time() writes it. */
+  last_at: number;
+  last_resubmitted: DocSide[];
+  sources: Record<DocSide, "original" | "resent" | null>;
+}
+
+/** One superseded answer, kept when a re-check replaced it. `version` 1 is
+ *  what the run itself decided; the review is whatever stood against that
+ *  version at the time (it is reset by the re-check), and `effective` is what
+ *  the case was then, review included -- reported the same way the live
+ *  case is, so "was X, now Y" compares like with like. */
+export interface CaseVersion {
+  version: number;
+  /** Epoch seconds. */
+  replaced_at: number;
+  /** Which sides the re-check that replaced this version re-sent. */
+  resubmitted: DocSide[];
+  uploaded: Partial<Record<DocSide, string>>;
+  report: CaseReport;
+  review: ReviewRecord | null;
+  effective: EffectiveOutcome;
 }
 
 export interface CaseSummary {
@@ -122,6 +157,9 @@ export interface CaseSummary {
   /** What Sentinel itself said, kept beside the effective status so a row a
    *  person overrode does not look like a row we got right. */
   system_status: CaseStatus;
+  /** How many times this case was re-checked on re-sent documents; 0 for
+   *  almost every row. See CaseReport.recheck. */
+  recheck_count: number;
 }
 
 export interface RunStatus {
@@ -154,6 +192,9 @@ export interface PipelineMetrics {
    *  numbers. Present on GET /metrics for a run; absent in the bare pipeline
    *  metrics shape. */
   review?: { reviewed: number; confirmed: number; corrected: number };
+  /** Cases re-checked on re-sent documents, and how many re-checks in all --
+   *  the other thing a person can do to a run after it finished. */
+  recheck?: { cases: number; rechecks: number };
 }
 
 class ApiError extends Error {
@@ -224,8 +265,12 @@ export function getCase(runId: string, emailId: string) {
  *  /compare holds its upload in memory and writes nothing, so there is
  *  nothing this could point at there (backend/api/main.py's own docstring
  *  on this route says the same). */
-export function attachmentUrl(caseId: string, side: "si" | "bl"): string {
-  return `${API_BASE}/cases/${encodeURIComponent(caseId)}/attachments/${side}`;
+export function attachmentUrl(caseId: string, side: DocSide, version?: number): string {
+  const base = `${API_BASE}/cases/${encodeURIComponent(caseId)}/attachments/${side}`;
+  // `version` names a superseded answer (CaseVersion.version): the file that
+  // side was read from back then, which after a re-check is not the file the
+  // case is read from now. Omitted, the current one.
+  return version === undefined ? base : `${base}?version=${version}`;
 }
 
 export function reviewCase(
@@ -247,6 +292,35 @@ export function retryCase(runId: string, emailId: string) {
     `/cases/${encodeURIComponent(runId)}:${encodeURIComponent(emailId)}/retry`,
     { method: "POST" },
   );
+}
+
+/** Run the same check again on documents the sender re-sent -- one side or
+ *  both; a side not attached keeps the file the case has now. The answer this
+ *  replaces goes into the case's `history`, review and all, and the review is
+ *  reset (it was about the old documents). Multipart, so not `request()`,
+ *  which would stamp a JSON content-type on the body; the error detail is
+ *  still unwrapped the same way, because the backend's refusals here are
+ *  written for the person reading them ("attach the re-sent SI, the re-sent
+ *  BL, or both"). */
+export async function recheckCase(runId: string, emailId: string, files: { si?: File; bl?: File }): Promise<CaseReport> {
+  const form = new FormData();
+  if (files.si) form.set("si", files.si);
+  if (files.bl) form.set("bl", files.bl);
+  const res = await fetch(
+    `${API_BASE}/cases/${encodeURIComponent(runId)}:${encodeURIComponent(emailId)}/recheck`,
+    { method: "POST", body: form },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    let detail = body;
+    try {
+      detail = JSON.parse(body).detail ?? body;
+    } catch {
+      // body was not JSON; use it verbatim
+    }
+    throw new ApiError(res.status, detail || res.statusText);
+  }
+  return res.json();
 }
 
 export function getMetrics(runId?: string) {
