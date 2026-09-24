@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { RotateCw } from "lucide-react";
 import { CaseReportView } from "@/components/case-report-view";
 import { BackLink } from "@/components/back-link";
@@ -8,7 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCase, listCases, retryCase, reviewCase, type CaseReport, type CaseSummary } from "@/lib/api";
+import { listUrlFor, markReturningToRun } from "@/lib/list-memory";
 import { toast } from "sonner";
+
+// The list URL never changes while this page is open, so there is nothing
+// to subscribe to -- useSyncExternalStore is used here only for its
+// hydration-safe read of sessionStorage (see backHref below).
+const subscribeNever = () => () => {};
 
 /** See run-page-view.tsx's file comment: kept out of app/runs/[runId]/... on purpose. */
 export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId: string }) {
@@ -36,6 +42,23 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Tells the run's list that its next mount is a return from one of its
+  // cases (lib/list-memory.ts): the list restores the reviewer's place only
+  // then, never on a fresh visit from Runs.
+  useEffect(() => {
+    markReturningToRun(runId);
+  }, [runId]);
+
+  // The run's list URL, filters included, for "Back to run". Read via
+  // useSyncExternalStore rather than in render or in an effect: the value
+  // lives in sessionStorage, which the server cannot see, so rendering it
+  // straight into the href would make server and client disagree on the
+  // first pass, and setting state from an effect body is what this
+  // project's lint (react-hooks/set-state-in-effect) rejects. The server
+  // snapshot is the bare run URL; the client swaps in the remembered one
+  // after hydration, which is exactly what this hook exists to do.
+  const backHref = useSyncExternalStore(subscribeNever, () => listUrlFor(runId), () => `/runs/${runId}`);
 
   const priorDefectCounts = useMemo(() => {
     const self = allCases.find((c) => c.email_id === emailId);
@@ -102,7 +125,7 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <BackLink href={`/runs/${runId}`} label={`Back to ${runId}`} />
+        <BackLink href={backHref} label={`Back to ${runId}`} />
         {couldChange && (
           <Button
             variant="outline"

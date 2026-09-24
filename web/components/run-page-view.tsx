@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { fadeUp, stagger, TAP, TAP_TRANSITION } from "@/lib/motion";
 import { FIELD_LABELS, STATUS_LABELS } from "@/lib/labels";
 import { getRun, listCases, type CaseSummary, type CaseStatus, type Category, type RunStatus } from "@/lib/api";
-import { useScrollRestoration } from "@/lib/use-scroll-restoration";
+import { useListMemory } from "@/lib/list-memory";
 import { toast } from "sonner";
 
 /**
@@ -204,11 +204,10 @@ export function RunPageView({ runId }: { runId: string }) {
   // run's, regardless of what visibleCases is currently narrowed to.
   const lastCompleted = allCases.length > 0 ? allCases[allCases.length - 1].email_id : null;
 
-  // Gated on allCases having landed at least once: restoring before then
-  // would scroll a page that is still its pre-fetch height, which does
-  // nothing (see the hook's own comment for why that is the bug in the
-  // first place).
-  useScrollRestoration(allCases.length > 0);
+  // `ready` once the list has its real height -- restoring before then would
+  // scroll a page that is still its skeleton height, which does nothing.
+  // See lib/list-memory.ts for what this remembers and when it restores.
+  useListMemory({ runId, ready: casesLoaded });
 
   return (
     <motion.div className="flex flex-col gap-4" initial="hidden" animate="show" variants={stagger()}>
