@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ChevronDown, ChevronRight, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { motion } from "motion/react";
 import { FIELD_LABELS } from "@/lib/labels";
 import type { CaseSummary } from "@/lib/api";
 import { buildPatternDraft, formatReplyDraft, mailtoHref, type ReplyDraft } from "@/lib/reply-draft";
+import { getPatternContactedAt, markPatternContacted } from "@/lib/pattern-contact";
+import { timeAgo } from "@/lib/format-time";
 import { cn } from "@/lib/utils";
 
 /** Below this, one or two stray cases sharing a shipper and a field is not
@@ -90,6 +92,10 @@ export function PatternAlerts({ runId, cases }: { runId: string; cases: CaseSumm
 
 function PatternRow({ runId, pattern }: { runId: string; pattern: Pattern }) {
   const [open, setOpen] = useState(false);
+  // Read once per mount rather than on every render: nothing outside this
+  // component's own "Email this" click (which updates it directly, see
+  // onEmailed below) can change it, so there is nothing to re-read for.
+  const [contactedAt, setContactedAt] = useState(() => getPatternContactedAt(pattern.shipper, pattern.field));
   const fieldLabel = FIELD_LABELS[pattern.field] ?? pattern.field;
 
   return (
@@ -105,11 +111,18 @@ function PatternRow({ runId, pattern }: { runId: string; pattern: Pattern }) {
           <span className="font-medium">{pattern.shipper}</span> mismatch on{" "}
           <span className="font-medium text-warn">{fieldLabel}</span>
         </span>
-        {open ? (
-          <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-        )}
+        <span className="flex shrink-0 items-center gap-2">
+          {/* Visible on the collapsed row, not just inside the drafting
+              panel -- the point is an operator scanning this list at a
+              glance can tell "I already followed up here" without opening
+              each pattern back up to check. */}
+          {contactedAt && <ContactedBadge at={contactedAt} />}
+          {open ? (
+            <ChevronDown className="size-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="size-4 text-muted-foreground" />
+          )}
+        </span>
       </button>
       {open && (
         <div className="flex flex-col gap-3 border-t p-3">
@@ -127,10 +140,34 @@ function PatternRow({ runId, pattern }: { runId: string; pattern: Pattern }) {
               </Link>
             ))}
           </div>
-          <PatternDraft pattern={pattern} fieldLabel={fieldLabel} />
+          <PatternDraft pattern={pattern} fieldLabel={fieldLabel} onEmailed={() => setContactedAt(Date.now())} />
         </div>
       )}
     </div>
+  );
+}
+
+/** "Already followed up," deliberately distinct from the pattern
+ *  disappearing: this marks that a message was sent about it, not that the
+ *  underlying cases were corrected -- those are different facts (see
+ *  lib/pattern-contact.ts), and only a real correction should make a
+ *  pattern stop showing here. Ticks its own label every 30s while mounted
+ *  so "2 minutes ago" does not go stale sitting on screen; cheap, since at
+ *  most MAX_PATTERNS_SHOWN of these exist at once. */
+function ContactedBadge({ at }: { at: number }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <span
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[11px] text-primary"
+      title="Recorded when a summary email was opened for this pattern in your mail client -- Sentinel hands off to it and has no way to confirm the message was actually sent."
+    >
+      <Mail className="size-3" />
+      Emailed {timeAgo(at)}
+    </span>
   );
 }
 
@@ -140,7 +177,15 @@ function PatternRow({ runId, pattern }: { runId: string; pattern: Pattern }) {
  *  are not a CaseReport, and that panel was already verified end to end
  *  earlier tonight -- duplicating the handful of form lines was worth not
  *  reopening it under the same time pressure. */
-function PatternDraft({ pattern, fieldLabel }: { pattern: Pattern; fieldLabel: string }) {
+function PatternDraft({
+  pattern,
+  fieldLabel,
+  onEmailed,
+}: {
+  pattern: Pattern;
+  fieldLabel: string;
+  onEmailed: () => void;
+}) {
   const [draft, setDraft] = useState<ReplyDraft | null>(null);
   const [to, setTo] = useState("");
   const [copied, setCopied] = useState(false);
@@ -192,7 +237,13 @@ function PatternDraft({ pattern, fieldLabel }: { pattern: Pattern; fieldLabel: s
       />
       <div className="flex flex-wrap gap-2">
         {href && (
-          <a href={href}>
+          <a
+            href={href}
+            onClick={() => {
+              markPatternContacted(pattern.shipper, pattern.field);
+              onEmailed();
+            }}
+          >
             <Button size="sm">
               <Mail className="size-4" />
               Email this
