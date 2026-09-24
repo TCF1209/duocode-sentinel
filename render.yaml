@@ -50,9 +50,10 @@ services:
 
     # `GET /` is the only endpoint backend/api/main.py serves that does not
     # touch the pipeline; there is no /health route, so do not "correct" this
-    # path to one. Note what that means: `/` returns a static dict, so a green
-    # health check proves the container is listening and proves nothing at all
-    # about whether the demo data is present. See docs/DEPLOY.md step 6, which
+    # path to one. Note what that means: `/` returns a small dict that cannot
+    # fail (a bad model setting reads as model_available: false, never as a
+    # 500), so a green health check proves the container is listening and
+    # proves nothing at all about whether the demo data is present. See docs/DEPLOY.md step 6, which
     # checks the two separately for exactly this reason.
     healthCheckPath: /
 
