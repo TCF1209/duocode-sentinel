@@ -332,7 +332,7 @@ export function CaseReportView({
       variants={stagger()}
     >
       <motion.div className="flex flex-wrap items-center gap-2" variants={fadeUp}>
-        <h2 className="font-heading text-lg font-semibold">{report.email_id}</h2>
+        <h2 className="font-heading text-xl font-semibold">{report.email_id}</h2>
         <CategoryBadge category={report.category} />
         {/* The outcome that currently stands leads; Sentinel's own is kept
             beside it in words when the two differ. Same status corrected
@@ -497,6 +497,16 @@ export function CaseReportView({
       {report.errors.length > 0 && (
         <motion.div className="rounded-md border border-danger/30 bg-danger-bg p-3 text-sm text-danger" variants={fadeUp}>
           {report.errors.join(" · ")}
+        </motion.div>
+      )}
+
+      {/* A section label over the field cards, in the same small-caps style
+          as the other section labels on this page, so the list of cards
+          reads as one section with a boundary rather than more of the
+          same-sized text (the collapsed variant below has its own line). */}
+      {report.fields.length > 0 && !collapseFields && (
+        <motion.div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" variants={fadeUp}>
+          {report.fields.length} fields compared
         </motion.div>
       )}
 

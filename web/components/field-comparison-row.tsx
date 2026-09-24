@@ -24,7 +24,12 @@ function Side({ value, side }: { value: FieldValueReport; side: "SI" | "BL" }) {
           untouched either way — only the typeface changes, never the
           case, since the case is part of what "exact evidence" means
           here. */}
-      <div className="mt-1 text-sm font-medium">{value.raw}</div>
+      {/* The value is the thing a reviewer came to read, so it is the one
+          element on the card set larger and heavier than everything around
+          it -- the field name above is a label, the evidence below is a
+          citation. Raised after the mentor session: "everything looks the
+          same font size; the key information should stand out". */}
+      <div className="mt-1 text-base font-semibold leading-snug">{value.raw}</div>
       {value.evidence && (
         <div className="mt-2 border-t pt-2 text-xs text-muted-foreground">
           <div>
@@ -140,7 +145,12 @@ export function FieldComparisonRow({
   return (
     <div className={cn("rounded-lg border p-3 transition-colors", cardStyle)}>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="font-medium">{FIELD_LABELS[comparison.field] ?? comparison.field}</div>
+        {/* A label, styled like the other section labels on this page
+            ("What to do", "Re-sent documents"), so the values under it are
+            what the eye lands on. */}
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {FIELD_LABELS[comparison.field] ?? comparison.field}
+        </div>
         {reviewerView ? (
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             <span className="opacity-40" title="What Sentinel itself said">

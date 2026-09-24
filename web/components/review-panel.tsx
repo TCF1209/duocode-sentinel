@@ -40,7 +40,9 @@ const URGENCY: Record<CaseStatus, { container: string; icon: string; heading: st
     container: "",
     icon: "",
     heading: "Confirm this outcome",
-    description: "All 7 fields matched. Confirming just records who signed off — there's nothing here to fix.",
+    // "No mismatch", not "matched": the same wording rule as STATUS_LABELS
+    // (lib/labels.ts) -- judges read "matched" as a claim about the tool.
+    description: "No mismatch on any of the 7 fields. Confirming just records who signed off — there's nothing here to fix.",
   },
   MISMATCH: {
     container: "border-danger/40 bg-danger-bg/40",

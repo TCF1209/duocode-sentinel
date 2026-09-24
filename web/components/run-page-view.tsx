@@ -43,6 +43,13 @@ const REVIEW_FILTER_LABELS: Record<ReviewFilter, string> = {
   confirmed: "Confirmed",
   corrected: "Corrected",
 };
+type ListOrder = "attention" | "inbox";
+const LIST_ORDERS: ListOrder[] = ["attention", "inbox"];
+const ORDER_LABELS: Record<ListOrder, string> = {
+  attention: "Needs attention first",
+  inbox: "Inbox order",
+};
+const ATTENTION_RANK: Record<CaseStatus, number> = { MISMATCH: 0, NEEDS_REVIEW: 1, OK: 2 };
 function reviewStateOf(c: CaseSummary): ReviewFilter {
   if (c.outcome_source === "review") return "corrected";
   return c.reviewed ? "confirmed" : "pending";
@@ -69,6 +76,12 @@ export function RunPageView({ runId }: { runId: string }) {
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter | null>(
     REVIEW_FILTERS.includes(reviewParam as ReviewFilter) ? (reviewParam as ReviewFilter) : null,
   );
+  // Row order, in the URL like the filters so "Back to run" (lib/list-memory)
+  // brings it back too. "Needs attention first" is the default: the mentor
+  // session's ask was that a mismatch be visible from the list without
+  // opening anything, and the surest way is for it to be at the top.
+  const orderParam = searchParams.get("order");
+  const [order, setOrder] = useState<ListOrder>(orderParam === "inbox" ? "inbox" : "attention");
   const [run, setRun] = useState<RunStatus | null>(null);
   // Always the whole run, never filtered server-side any more -- see
   // visibleCases below for why, and refresh() for how it stays that way.
@@ -86,16 +99,21 @@ export function RunPageView({ runId }: { runId: string }) {
   // allCases instead now: computing those from a filtered fetch meant they
   // silently meant "of the filtered subset" the moment a filter was active,
   // which nothing on screen said out loud.
-  const visibleCases = useMemo(
-    () =>
-      allCases.filter(
-        (c) =>
-          (!categoryFilter || c.category === categoryFilter) &&
-          (!statusFilter || c.status === statusFilter) &&
-          (!reviewFilter || reviewStateOf(c) === reviewFilter),
-      ),
-    [allCases, categoryFilter, statusFilter, reviewFilter],
-  );
+  const visibleCases = useMemo(() => {
+    const filtered = allCases.filter(
+      (c) =>
+        (!categoryFilter || c.category === categoryFilter) &&
+        (!statusFilter || c.status === statusFilter) &&
+        (!reviewFilter || reviewStateOf(c) === reviewFilter),
+    );
+    if (order === "inbox") return filtered;
+    // Mismatches first, the ones with more fields wrong ahead of the rest,
+    // then the cases a person has to decide, then the clean ones. Sort is
+    // stable, so within a rank the inbox order still holds.
+    return [...filtered].sort(
+      (a, b) => ATTENTION_RANK[a.status] - ATTENTION_RANK[b.status] || b.defect_fields.length - a.defect_fields.length,
+    );
+  }, [allCases, categoryFilter, statusFilter, reviewFilter, order]);
 
   // Keys the two row lists below, so a filter change swaps the whole list at
   // once instead of exit-animating every row that just left it. Measured
@@ -104,7 +122,7 @@ export function RunPageView({ runId }: { runId: string }) {
   // after 5s, each exiting row forcing a reflow of the whole table. Within
   // one filter the key is stable, so rows appended by a live run still
   // animate in one by one exactly as before.
-  const filterKey = `${categoryFilter ?? ""}|${statusFilter ?? ""}|${reviewFilter ?? ""}`;
+  const filterKey = `${categoryFilter ?? ""}|${statusFilter ?? ""}|${reviewFilter ?? ""}|${order}`;
 
   // Feeds the stat strip below. Counted from allCases (effective status,
   // always the whole run) rather than trusted from run.metrics.by_status --
@@ -128,18 +146,28 @@ export function RunPageView({ runId }: { runId: string }) {
   // fought its inference (it saw only the setState calls, not the reads of
   // categoryFilter/statusFilter in the ternaries) — "Compilation Skipped"
   // rather than a working memoization.
-  function setFilters(next: { category?: Category | null; status?: CaseStatus | null; review?: ReviewFilter | null }) {
+  function setFilters(next: {
+    category?: Category | null;
+    status?: CaseStatus | null;
+    review?: ReviewFilter | null;
+    order?: ListOrder;
+  }) {
     const category = next.category !== undefined ? next.category : categoryFilter;
     const status = next.status !== undefined ? next.status : statusFilter;
     const review = next.review !== undefined ? next.review : reviewFilter;
+    const nextOrder = next.order !== undefined ? next.order : order;
     if (next.category !== undefined) setCategoryFilter(next.category);
     if (next.status !== undefined) setStatusFilter(next.status);
     if (next.review !== undefined) setReviewFilter(next.review);
+    if (next.order !== undefined) setOrder(next.order);
 
     const params = new URLSearchParams();
     if (category) params.set("category", category);
     if (status) params.set("status", status);
     if (review) params.set("review", review);
+    // The default order is left out of the URL, so a plain /runs/{id} link
+    // and the default view stay the same address.
+    if (nextOrder !== "attention") params.set("order", nextOrder);
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
@@ -431,6 +459,26 @@ export function RunPageView({ runId }: { runId: string }) {
           onChange={(review) => setFilters({ review })}
           renderLabel={(r) => REVIEW_FILTER_LABELS[r]}
         />
+        <div className="flex items-center gap-1.5 text-sm" role="group" aria-label="Row order">
+          <span className="shrink-0 text-muted-foreground">Order:</span>
+          {LIST_ORDERS.map((o) => (
+            <motion.button
+              key={o}
+              whileTap={TAP}
+              transition={TAP_TRANSITION}
+              onClick={() => setFilters({ order: o })}
+              aria-pressed={order === o}
+              className={cn(
+                "shrink-0 rounded-full border px-2 py-0.5 text-xs transition-colors",
+                order === o
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:border-primary/40 hover:text-foreground",
+              )}
+            >
+              {ORDER_LABELS[o]}
+            </motion.button>
+          ))}
+        </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground sm:ml-auto">
           <span>
             {visibleCases.length} case{visibleCases.length === 1 ? "" : "s"}
@@ -462,7 +510,7 @@ export function RunPageView({ runId }: { runId: string }) {
               <TableHead>Category</TableHead>
               <TableHead>Confidence</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Defects</TableHead>
+              <TableHead>Mismatched fields</TableHead>
               <TableHead>Decided by</TableHead>
               <TableHead />
             </TableRow>
@@ -508,6 +556,16 @@ export function RunPageView({ runId }: { runId: string }) {
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={c.status} />
+                      {/* How many fields, right on the badge -- the mentor's
+                          words: "without clicking inside you can already
+                          know there are two mismatches". The names are in the
+                          next column; the count is what a scan of the list
+                          picks up. */}
+                      {c.status === "MISMATCH" && c.defect_fields.length > 0 && (
+                        <span className="ml-1.5 whitespace-nowrap text-[11px] text-muted-foreground">
+                          · {c.defect_fields.length} field{c.defect_fields.length === 1 ? "" : "s"}
+                        </span>
+                      )}
                       {/* A row a person overrode must not read like a row we
                           got right. The badge shows the outcome that stands;
                           this shows who it came from, and what we had said. */}
@@ -516,12 +574,12 @@ export function RunPageView({ runId }: { runId: string }) {
                           className="ml-2 whitespace-nowrap text-[11px] text-muted-foreground"
                           title={`Sentinel said ${c.system_status}; corrected by a reviewer`}
                         >
-                          corrected
+                          Corrected
                         </span>
                       )}
                       {c.outcome_source === "system" && c.reviewed && (
                         <span className="ml-2 whitespace-nowrap text-[11px] text-muted-foreground">
-                          confirmed
+                          Confirmed
                         </span>
                       )}
                       {/* The other way a case moves on after the run: the
@@ -533,7 +591,7 @@ export function RunPageView({ runId }: { runId: string }) {
                           className="ml-2 whitespace-nowrap text-[11px] text-muted-foreground"
                           title="Re-checked on re-sent documents; the previous answer is kept on the case"
                         >
-                          re-checked
+                          Re-checked
                         </span>
                       )}
                     </TableCell>
@@ -614,6 +672,11 @@ function CaseRowCard({ runId, c, ref }: { runId: string; c: CaseSummary; ref?: R
             <span className="font-mono text-sm">{c.email_id}</span>
             <div className="flex items-center gap-1.5">
               <StatusBadge status={c.status} />
+              {c.status === "MISMATCH" && c.defect_fields.length > 0 && (
+                <span className="whitespace-nowrap text-[11px] text-muted-foreground">
+                  · {c.defect_fields.length} field{c.defect_fields.length === 1 ? "" : "s"}
+                </span>
+              )}
               <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
             </div>
           </div>
@@ -622,11 +685,11 @@ function CaseRowCard({ runId, c, ref }: { runId: string; c: CaseSummary; ref?: R
             <span>{Math.round(c.category_confidence * 100)}%</span>
             <DecidedByBadge decidedBy={c.decided_by} />
             {c.outcome_source === "review" && (
-              <span title={`Sentinel said ${c.system_status}; corrected by a reviewer`}>corrected</span>
+              <span title={`Sentinel said ${c.system_status}; corrected by a reviewer`}>Corrected</span>
             )}
-            {c.outcome_source === "system" && c.reviewed && <span>confirmed</span>}
+            {c.outcome_source === "system" && c.reviewed && <span>Confirmed</span>}
             {c.recheck_count > 0 && (
-              <span title="Re-checked on re-sent documents; the previous answer is kept on the case">re-checked</span>
+              <span title="Re-checked on re-sent documents; the previous answer is kept on the case">Re-checked</span>
             )}
           </div>
           {c.defect_fields.length > 0 && (
@@ -672,7 +735,7 @@ function FilterGroup<T extends string>({
               : "text-muted-foreground hover:border-primary/40 hover:text-foreground",
           )}
         >
-          all
+          All
         </motion.button>
         {options.map((opt) => (
           <motion.button
