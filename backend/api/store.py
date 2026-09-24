@@ -52,6 +52,15 @@ class Store:
         # one never touches disk (the data root is the organisers' bundle,
         # not ours to write into), so the attachment route reads it from here.
         self._files: dict[str, dict[str, dict[str, tuple[str, bytes]]]] = {}
+        # Who sent each email, kept beside the case rather than on it.
+        # `CaseResult` is a `backend/sdoc/` type and the official scorer reads
+        # what it serialises, so the sender -- which no pipeline stage needs and
+        # the submission format has no field for -- lives here in the API layer
+        # instead. `/runs/{id}/patterns` is the only consumer.
+        # (Merged from main: this branch also carries `CaseResult.sender`,
+        # set by the pipeline for the case list and re-checks -- two homes
+        # for one value; reconciling them is noted in docs/STATUS.md.)
+        self._senders: dict[str, dict[str, str]] = {}
         self._counter = itertools.count(1)
 
     def new_run_id(self) -> str:
@@ -73,11 +82,20 @@ class Store:
         with self._lock:
             return sorted(self._runs.values(), key=lambda r: r.created_at, reverse=True)
 
-    def add_case(self, run_id: str, result: CaseResult) -> None:
+    def add_case(self, run_id: str, result: CaseResult, *, sender: str = "") -> None:
         with self._lock:
             self._cases[run_id][result.email_id] = result
             self._order[run_id].append(result.email_id)
             self._runs[run_id].processed += 1
+            if sender:
+                self._senders.setdefault(run_id, {})[result.email_id] = sender
+
+    def sender_of(self, run_id: str, email_id: str) -> str:
+        """Empty string when unknown -- a run started before this existed, or
+        an inbox record with no `from`. Patterns groups those under one bucket
+        rather than dropping the case."""
+        with self._lock:
+            return self._senders.get(run_id, {}).get(email_id, "")
 
     def get_case(self, run_id: str, email_id: str) -> Optional[CaseResult]:
         with self._lock:

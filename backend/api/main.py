@@ -34,6 +34,7 @@ if str(BACKEND) not in sys.path:
 from sdoc.pipeline import build_client  # noqa: E402
 
 from .direct_compare import MAX_BYTES, compare_uploads  # noqa: E402
+from .patterns import summarise as summarise_patterns  # noqa: E402
 from .models import (  # noqa: E402
     ReviewRequest,
     RunCreateRequest,
@@ -577,6 +578,27 @@ def metrics(run_id: Optional[str] = None) -> dict:
     return {"run_id": rec.run_id, **rec.metrics,
             "review": store.review_summary(rec.run_id),
             "recheck": store.recheck_summary(rec.run_id)}
+
+
+@app.get("/runs/{run_id}/patterns")
+def patterns(run_id: str) -> dict:
+    """What is wrong across the whole inbox, rather than in one case.
+
+    Answers while a run is still going, on whatever has finished — unlike
+    `/metrics` and `/submission`, which refuse a partial run because a partial
+    *submission* is a wrong answer to the scorer. A partial aggregation is not
+    wrong, it is early, and the page says how many cases it is drawn from.
+    """
+    rec = _run_or_404(run_id)
+    cases = store.list_cases(run_id)
+    senders = {c.email_id: store.sender_of(run_id, c.email_id) for c in cases}
+    return {
+        "run_id": rec.run_id,
+        "run_status": rec.status,
+        "cases_counted": len(cases),
+        "total_emails": rec.total_emails,
+        **summarise_patterns(cases, senders),
+    }
 
 
 @app.get("/submission")

@@ -328,6 +328,39 @@ export function getMetrics(runId?: string) {
   return request<PipelineMetrics & { run_id: string }>(`/metrics${qs}`);
 }
 
+/** One run read sideways — see `backend/api/patterns.py`. */
+export interface RunPatterns {
+  run_id: string;
+  run_status: string;
+  cases_counted: number;
+  total_emails: number;
+  totals: { emails: number; comparisons: number; with_defect: number; escalated: number };
+  baseline_defect_rate: number;
+  defect_fields_total: number;
+  fields: { field: string; count: number; share: number }[];
+  senders: {
+    sender: string;
+    emails: number;
+    comparisons: number;
+    defects: number;
+    escalated: number;
+    rate: number | null;
+    /** 95% Wilson interval. Null when the sender sent no comparison requests. */
+    ci_low: number | null;
+    ci_high: number | null;
+    /** True only when the interval's lower bound clears the run's baseline. */
+    above_baseline: boolean;
+    /** False when the interval straddles the baseline — i.e. too few to tell. */
+    conclusive: boolean;
+    top_fields: { field: string; count: number }[];
+  }[];
+  escalation_reasons: { reason: string; count: number }[];
+}
+
+export function getPatterns(runId: string) {
+  return request<RunPatterns>(`/runs/${encodeURIComponent(runId)}/patterns`);
+}
+
 export function getSubmission(runId?: string) {
   const qs = runId ? `?run_id=${encodeURIComponent(runId)}` : "";
   return request<Record<string, { category: string; status: string; review_reason: string | null; defect_fields: string[]; has_defect: boolean; decided_by: string }>>(
