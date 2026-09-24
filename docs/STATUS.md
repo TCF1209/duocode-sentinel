@@ -4,6 +4,128 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-24 (evening) — Claude session 8 · the reviewer's round: back to where you were, a Review filter, before-and-after on a correction, a needs-review workspace, and re-sent documents re-checked in place
+
+Six questions from the user after working the real 520-email inbox in the
+dashboard, each discussed and designed before anything was changed (the
+standing rule: explain → discuss → confirm → then modify), then executed in
+the agreed order Q1 → Q2 → Q3 → Q5 → Q4 and verified live in the browser on
+`bundle_data` after every step. Session 9 was committing to this same
+checkout throughout; file ownership was agreed by message and every `git
+add` here names its paths. Follows this file's previous session-8 entry
+(the reviewer overlay, `7f0a068`).
+
+**Done**
+- **Q1 — Back returns to where the reviewer was, filters included**
+  (`ec895bf`, `web/lib/list-memory.ts`, replacing `use-scroll-restoration.ts`).
+  The first fix was under-verified and wrong twice over: the router's own
+  scroll-to-top overwrote the saved position at leave time, and BackLink
+  dropped the query string. Now the list freezes its saved position the
+  moment a case link is clicked, remembers its own URL (path + filters),
+  and restores only when the case page has flagged a return
+  (`sentinel:return-to-run`), never on a fresh visit from Runs. Four paths
+  checked live: browser back, "Back to run", back after "View original",
+  back with a filter active.
+- **Q2 — "confirmed" and "corrected" told apart, and countable**
+  (`afd41b4`). A Review filter (pending / confirmed / corrected) on the run
+  page beside category and status, a "Reviewed n / N" stat with the
+  breakdown on hover, and a "Human review of this run" block on the
+  metrics page (the API had returned these counts since the review feature
+  shipped; nothing showed them). Filter transitions on 520 `motion.tr` rows
+  were 5–8 s with `layout` animation on exit; the table body and mobile
+  list now remount on a filter key — 520 → 3 rows in 586 ms desktop / 141
+  ms mobile.
+- **Q3 — the unchanged version stays visible next to the correction**
+  (`91b1afa`). The review panel's reviewed state shows "Sentinel said X /
+  Now Y" for a correction, and a "With correction / Sentinel's original"
+  toggle in the case header flips the header badge, the banner and every
+  field card together without refetching. Nothing is overwritten: the
+  system's answer is never replaced, only joined by the person's where they
+  differ.
+- **Q5 — the NEEDS_REVIEW page as a place to work** (`8f22eca`). It looked
+  like a mismatch page in a different colour. Now three sections in the
+  order the questions get asked: *why this needs a person* (the reason, and
+  each document's state — not attached / could not be read and why / read
+  as the wrong kind / fine — with View original), *what to do* (the
+  pipeline's own "Suggested action" promoted from a bullet, Retry, the
+  reply draft), and *decide it yourself* (the review panel, re-worded for
+  this status). Seven identical amber UNCOMPARABLE cards collapse to one
+  line with the cards a click away. Seven scenarios checked, including the
+  scanned sample on /compare; session 9's scan transcript card slots into
+  the per-document card here (`96cf84c`).
+- **Q4 — the latest SI/BL dropped back in and checked again, in place**
+  (`61aa336` API, `eecb657` dashboard). `POST /cases/{id}/recheck` takes
+  the re-sent SI and/or BL as multipart and runs the same comparison
+  `/compare` runs, stored against the case: a side not re-sent keeps the
+  file the case already has (disk original, or an earlier re-sent copy —
+  a second re-check that re-sends only the SI is compared against the BL
+  from the first, never the disk BL the desk has moved past); the answer
+  it replaces goes into the case's history *with the review that stood
+  against it*, and the review is reset (it was about the old documents);
+  the email's category, confidence and rationale are carried over — only
+  the comparison is new. Decided with the user, each against the
+  alternative: list / detail / `/submission` all follow the re-checked
+  answer (as `retry` already does); only `BL_COMPARISON` cases can be
+  re-checked (409 otherwise); the panel shows on NEEDS_REVIEW and MISMATCH;
+  Retry on a re-checked case is refused (409) rather than reinterpreted,
+  because it would silently read the disk file back over the re-sent one.
+  The attachment route serves the re-sent file from memory and takes
+  `?version=N` for the file a superseded version was read from. On the
+  page: a "Re-sent documents" panel inside the workspace's *what to do*
+  (and under the review panel on a mismatch), the backend's refusals shown
+  beside the button, and after a re-check the report leads with
+  "Re-checked just now with the re-sent BL — Was: Mismatch on Container
+  Count (confirmed by a reviewer) / Now: Matched" and each previous version
+  behind a disclosure with "SI at v1 / BL at v1" opening the file that
+  version was actually read from. Run rows carry a "re-checked" tag; the
+  metrics block gains "Re-checked". Six API tests (`TestRecheck`); suite
+  **596 tests, 454 passed, 142 skipped, 0 failed** from `--junitxml`;
+  README / `ADVERSARIAL.md` / `/pitch` bumped from 590, and the README's
+  route table from 11 to 13 (the attachment route was missing from it
+  too). Verified live: `email_043` MISMATCH → Matched on a corrected BL
+  with the v1 dialog showing the original `5 x 20'GP`; `email_507` (BL
+  never arrived) refused SI-only inline, then resolved on a re-sent BL with
+  Retry and the workspace gone; 375 px stacks the pickers with no overflow.
+- **Q6 answered, no code:** Sentinel is the documentation desk's automated
+  pre-issuance check gate plus the human-review workbench for what it
+  cannot decide — not an inbox organiser. Classification exists so the
+  comparison requests can be found; the product is the check and the
+  evidence.
+
+**Next**
+- The final-round deck (session 9's `docs/PITCH_DECK.md` / `/pitch`) and the
+  branch push / merge decision for `feat/final-round-differentiators` —
+  both the user's call, not started here.
+- The Mentor Session reply (25 Sep).
+- A light-mode look at the new panel: the pane's colour-scheme emulation did
+  not take (the app has its own theme switch), so only dark was seen; the
+  panel uses the same semantic tokens as its neighbours and nothing else.
+
+**Careful**
+- **Re-sent files live in the API's memory**, like every run: a restart
+  loses them and the histories with them. Fine for the demo, and the same
+  caveat `store.py` has always carried.
+- **`/submission` moves when a case is re-checked** — decided, and the same
+  thing `retry` has always done; a judge scoring the API's `/submission`
+  after someone re-checked a case with different documents is scoring
+  those documents.
+- **Retry ≠ re-check.** Retry re-reads the inbox on disk and keeps the
+  review; re-check takes uploaded files, keeps history, resets the review.
+  Retry is refused (409) on a re-checked case; the UI hides it there.
+- **The Browser pane, when hidden, pauses `requestAnimationFrame`**: count-ups
+  read 0, Framer transitions never finish, screenshots return stale frames.
+  Cost real time twice this session before it was pinned down. Read the
+  DOM (`document.visibilityState` first); trust a screenshot only with the
+  pane visible.
+- This checkout's earlier "45 / 21" was the Windows CRLF artefact session 9
+  found and fixed (`c97f192`); the inbox is **46 MISMATCH / 20 NEEDS_REVIEW**
+  before any re-check.
+- `describeOutcome` is now exported from `review-panel.tsx` and
+  `AttachmentAction` lives in `attachment-action.tsx` — both shared with
+  `recheck-panel.tsx`; nothing else imports them yet.
+
+---
+
 ## 2026-09-24 (afternoon) — Claude session 9 · the final-round rubric read against the repository; a Windows line-ending bug that hid a real defect; the model tier made visible; the pitch's numbers re-measured
 
 Asked to read the organisers' final-round judging rubric (the three PDFs
