@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
@@ -31,6 +31,23 @@ import { toast } from "sonner";
 const CATEGORIES: Category[] = ["BL_COMPARISON", "SI_REQUEST", "INVOICE_QUERY", "GENERAL", "SPAM"];
 const STATUSES: CaseStatus[] = ["OK", "MISMATCH", "NEEDS_REVIEW"];
 
+// The third filter axis, asked for directly: "confirmed together, corrected
+// together, and the ones nobody has looked at together". Not a backend
+// field -- derived from the two the case list already carries (reviewed,
+// outcome_source), exactly as the table's own "confirmed"/"corrected" tags
+// are, so the filter can never disagree with the tag on the row.
+type ReviewFilter = "pending" | "confirmed" | "corrected";
+const REVIEW_FILTERS: ReviewFilter[] = ["pending", "confirmed", "corrected"];
+const REVIEW_FILTER_LABELS: Record<ReviewFilter, string> = {
+  pending: "Not reviewed",
+  confirmed: "Confirmed",
+  corrected: "Corrected",
+};
+function reviewStateOf(c: CaseSummary): ReviewFilter {
+  if (c.outcome_source === "review") return "corrected";
+  return c.reviewed ? "confirmed" : "pending";
+}
+
 export function RunPageView({ runId }: { runId: string }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -47,6 +64,10 @@ export function RunPageView({ runId }: { runId: string }) {
   );
   const [statusFilter, setStatusFilter] = useState<CaseStatus | null>(
     STATUSES.includes(statusParam as CaseStatus) ? (statusParam as CaseStatus) : null,
+  );
+  const reviewParam = searchParams.get("review");
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilter | null>(
+    REVIEW_FILTERS.includes(reviewParam as ReviewFilter) ? (reviewParam as ReviewFilter) : null,
   );
   const [run, setRun] = useState<RunStatus | null>(null);
   // Always the whole run, never filtered server-side any more -- see
@@ -68,10 +89,22 @@ export function RunPageView({ runId }: { runId: string }) {
   const visibleCases = useMemo(
     () =>
       allCases.filter(
-        (c) => (!categoryFilter || c.category === categoryFilter) && (!statusFilter || c.status === statusFilter),
+        (c) =>
+          (!categoryFilter || c.category === categoryFilter) &&
+          (!statusFilter || c.status === statusFilter) &&
+          (!reviewFilter || reviewStateOf(c) === reviewFilter),
       ),
-    [allCases, categoryFilter, statusFilter],
+    [allCases, categoryFilter, statusFilter, reviewFilter],
   );
+
+  // Keys the two row lists below, so a filter change swaps the whole list at
+  // once instead of exit-animating every row that just left it. Measured
+  // before this existed: with `layout` on 520 motion.tr rows, dropping 10
+  // rows took ~8s and dropping 517 (the Confirmed filter) was still going
+  // after 5s, each exiting row forcing a reflow of the whole table. Within
+  // one filter the key is stable, so rows appended by a live run still
+  // animate in one by one exactly as before.
+  const filterKey = `${categoryFilter ?? ""}|${statusFilter ?? ""}|${reviewFilter ?? ""}`;
 
   // Feeds the stat strip below. Counted from allCases (effective status,
   // always the whole run) rather than trusted from run.metrics.by_status --
@@ -82,20 +115,31 @@ export function RunPageView({ runId }: { runId: string }) {
     return counts;
   }, [allCases]);
 
+  // How much of the run a person has actually looked at -- the review
+  // queue's own progress, which nothing on this page said before.
+  const reviewCounts = useMemo(() => {
+    const counts: Record<ReviewFilter, number> = { pending: 0, confirmed: 0, corrected: 0 };
+    for (const c of allCases) counts[reviewStateOf(c)]++;
+    return counts;
+  }, [allCases]);
+
   // Not wrapped in useCallback: the React Compiler in this project memoizes
   // call sites automatically, and a manual dependency array here previously
   // fought its inference (it saw only the setState calls, not the reads of
   // categoryFilter/statusFilter in the ternaries) — "Compilation Skipped"
   // rather than a working memoization.
-  function setFilters(next: { category?: Category | null; status?: CaseStatus | null }) {
+  function setFilters(next: { category?: Category | null; status?: CaseStatus | null; review?: ReviewFilter | null }) {
     const category = next.category !== undefined ? next.category : categoryFilter;
     const status = next.status !== undefined ? next.status : statusFilter;
+    const review = next.review !== undefined ? next.review : reviewFilter;
     if (next.category !== undefined) setCategoryFilter(next.category);
     if (next.status !== undefined) setStatusFilter(next.status);
+    if (next.review !== undefined) setReviewFilter(next.review);
 
     const params = new URLSearchParams();
     if (category) params.set("category", category);
     if (status) params.set("status", status);
+    if (review) params.set("review", review);
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
@@ -327,6 +371,19 @@ export function RunPageView({ runId }: { runId: string }) {
             {STATUS_LABELS.NEEDS_REVIEW}{" "}
             <span className="font-medium tabular-nums">{statusCounts.NEEDS_REVIEW}</span>
           </span>
+          {/* The review queue's progress, beside the outcome counts it
+              applies to. The hover breaks it down the same three ways the
+              Review filter below does, so the number and the filter can
+              never mean different things. */}
+          <span
+            className="flex items-center gap-1.5"
+            title={`${reviewCounts.confirmed} confirmed · ${reviewCounts.corrected} corrected · ${reviewCounts.pending} not reviewed yet`}
+          >
+            <span className="size-1.5 rounded-full bg-primary" />
+            Reviewed{" "}
+            <span className="font-medium tabular-nums">{reviewCounts.confirmed + reviewCounts.corrected}</span>
+            <span className="text-muted-foreground">/ {allCases.length}</span>
+          </span>
           <span className="text-muted-foreground sm:ml-auto">
             {Math.round(run.metrics.rule_share * 100)}% resolved by rules
             {run.metrics.llm_calls === 0
@@ -356,14 +413,21 @@ export function RunPageView({ runId }: { runId: string }) {
           onChange={(status) => setFilters({ status })}
           renderLabel={(s) => STATUS_LABELS[s]}
         />
+        <FilterGroup
+          label="Review"
+          options={REVIEW_FILTERS}
+          value={reviewFilter}
+          onChange={(review) => setFilters({ review })}
+          renderLabel={(r) => REVIEW_FILTER_LABELS[r]}
+        />
         <div className="flex items-center gap-3 text-xs text-muted-foreground sm:ml-auto">
           <span>
             {visibleCases.length} case{visibleCases.length === 1 ? "" : "s"}
           </span>
-          {(categoryFilter || statusFilter) && (
+          {(categoryFilter || statusFilter || reviewFilter) && (
             <button
               type="button"
-              onClick={() => setFilters({ category: null, status: null })}
+              onClick={() => setFilters({ category: null, status: null, review: null })}
               className="underline decoration-dotted underline-offset-2 hover:text-foreground"
             >
               Clear filters
@@ -392,7 +456,7 @@ export function RunPageView({ runId }: { runId: string }) {
               <TableHead />
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody key={filterKey}>
             <AnimatePresence mode="popLayout" initial={false}>
               {!casesLoaded ? (
                 // Distinct from the "no cases match this filter" row below:
@@ -484,7 +548,7 @@ export function RunPageView({ runId }: { runId: string }) {
           That second part is not decoration: it is the evidence-gated
           verdict that is Sentinel's actual claim, put where a thumb
           scrolling past 500 rows will still see it without a tap. */}
-      <motion.div className="flex flex-col rounded-md border bg-card md:hidden" variants={fadeUp}>
+      <motion.div key={filterKey} className="flex flex-col rounded-md border bg-card md:hidden" variants={fadeUp}>
         <AnimatePresence mode="popLayout" initial={false}>
           {!casesLoaded ? (
             <div className="flex flex-col gap-3 p-3">
@@ -505,9 +569,15 @@ export function RunPageView({ runId }: { runId: string }) {
   );
 }
 
-function CaseRowCard({ runId, c }: { runId: string; c: CaseSummary }) {
+// `ref` is forwarded to the motion.div because this is a direct child of an
+// AnimatePresence in popLayout mode, which needs the DOM node to pop an
+// exiting card out of the flow while it fades -- Framer's own documented
+// requirement for custom components in that position. Without it the exit
+// still runs, but in place, shoving the rows below it around as it goes.
+function CaseRowCard({ runId, c, ref }: { runId: string; c: CaseSummary; ref?: Ref<HTMLDivElement> }) {
   return (
     <motion.div
+      ref={ref}
       layout
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}

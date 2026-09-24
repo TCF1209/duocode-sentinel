@@ -148,6 +148,12 @@ export interface PipelineMetrics {
   total_ms: number;
   mean_ms_per_email: number;
   llm?: { available: boolean; [k: string]: unknown };
+  /** What humans did to this run, reported beside what Sentinel did rather
+   *  than folded into it (backend/api/main.py's /metrics): a person
+   *  confirming a case afterwards must not retro-improve the pipeline's own
+   *  numbers. Present on GET /metrics for a run; absent in the bare pipeline
+   *  metrics shape. */
+  review?: { reviewed: number; confirmed: number; corrected: number };
 }
 
 class ApiError extends Error {

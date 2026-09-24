@@ -82,6 +82,23 @@ export function MetricsPageView({ runId }: { runId: string }) {
         {metrics.llm?.available && <Stat label="Model cost" value={costUsd} format={(v) => `$${v.toFixed(4)}`} />}
       </motion.div>
 
+      {/* Its own row, under its own heading, not three more tiles in the
+          grid above: the grid is what Sentinel did, this is what people
+          did to it afterwards, and /metrics reports them beside each other
+          for exactly that reason (main.py's own comment on the route).
+          The backend has returned these counts since the review feature
+          shipped; nothing on this page showed them until now. */}
+      {metrics.review && (
+        <motion.div className="flex flex-col gap-2" variants={fadeUp}>
+          <div className="text-xs font-medium text-muted-foreground">Human review of this run</div>
+          <motion.div className="grid grid-cols-3 gap-3" variants={stagger()}>
+            <Stat label="Reviewed" value={metrics.review.reviewed} />
+            <Stat label="Confirmed as-is" value={metrics.review.confirmed} accent="ok" />
+            <Stat label="Corrected" value={metrics.review.corrected} />
+          </motion.div>
+        </motion.div>
+      )}
+
       <motion.div variants={fadeUp}>
         <ThroughputProjection metrics={metrics} costUsd={costUsd} />
       </motion.div>
