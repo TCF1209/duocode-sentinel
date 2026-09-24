@@ -33,8 +33,8 @@ Branch `feat/reply-drafts`. `submission.json` byte-identical
   on a copy with no `data/`.
 
 **Next**
-- Merge after `feat/final-round-differentiators`; both add to the top of this
-  file, so keep both entries.
+- Merged into `main` straight after `feat/final-round-differentiators`
+  (`c3f562e`, then `e805f41`), which already uses the same status words.
 
 **Careful**
 - `reviewReasonClause` in `web/lib/labels.ts` is now unused; left in place
