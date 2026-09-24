@@ -65,6 +65,9 @@ export interface CaseReport {
    *  there — a direct upload). Never sent anywhere by Sentinel itself; a
    *  mailto: link is as far as this goes. */
   sender: string;
+  /** The inbox record's subject, so a reply draft threads under it. Empty
+   *  on /compare; absent from an API older than the field. */
+  subject?: string;
   category: Category;
   category_confidence: number;
   decided_by: DecidedBy;
@@ -366,6 +369,33 @@ export function getSubmission(runId?: string) {
   return request<Record<string, { category: string; status: string; review_reason: string | null; defect_fields: string[]; has_defect: boolean; decided_by: string }>>(
     `/submission${qs}`,
   );
+}
+
+export type ReplyTone = "formal" | "warm" | "brief";
+
+/** POST /reply-drafts/polish. `adopted` is false when the backend refused the
+ *  model's wording (it read as a value or a claim) and sent the template's
+ *  own wording back with the reason. */
+export interface ReplyPolishResult {
+  greeting: string;
+  closing: string;
+  adopted: boolean;
+  rejected_reason: string | null;
+  model: string | null;
+}
+
+/** Only the two courtesy lines are sent. The draft's context, facts and
+ *  request never leave the page, so the model is not shown a case value or a
+ *  claim. `attempt` counts presses, so each one is a fresh prompt rather than
+ *  a cached copy of the last answer. */
+export function polishReplyWording(input: {
+  situation: string;
+  tone: ReplyTone;
+  greeting: string;
+  closing: string;
+  attempt: number;
+}) {
+  return request<ReplyPolishResult>("/reply-drafts/polish", { method: "POST", body: JSON.stringify(input) });
 }
 
 export async function compareUploads(si: File, bl: File, useLlm = false): Promise<CaseReport> {

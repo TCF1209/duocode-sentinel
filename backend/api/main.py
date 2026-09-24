@@ -35,6 +35,7 @@ from sdoc.pipeline import build_client  # noqa: E402
 
 from .direct_compare import MAX_BYTES, compare_uploads  # noqa: E402
 from .patterns import summarise as summarise_patterns  # noqa: E402
+from .reply_polish import LLMUnavailable, PolishRequest, polish as polish_reply  # noqa: E402
 from .models import (  # noqa: E402
     ReviewRequest,
     RunCreateRequest,
@@ -141,6 +142,12 @@ def root() -> dict:
     It deliberately touches nothing: a green health check says the container
     is listening, and says nothing about whether the demo data is readable.
     `ready` is the field that answers the second question.
+
+    `model_available` says whether a key is configured at all, which is what
+    the reply draft's optional wording pass needs before it offers itself.
+    It makes no network call, and it cannot fail this route: this is Render's
+    health check, so a bad model setting must switch the model features off,
+    never take the container down (`_model_available`).
     """
     return {
         "service": "sentinel-api",
@@ -148,6 +155,7 @@ def root() -> dict:
         "data_root": str(DEFAULT_DATA_ROOT),
         "ready": store.latest_done_run() is not None,
         "llm_runs_allowed": ALLOW_LLM_RUNS,
+        "model_available": _model_available(),
     }
 
 
@@ -568,6 +576,7 @@ async def recheck_one_case(
     # comparison set it -- which tier answered this time is its own fact.
     fresh.email_id = result.email_id
     fresh.sender = result.sender
+    fresh.subject = result.subject
     fresh.category = result.category
     fresh.category_confidence = result.category_confidence
     fresh.category_rationale = list(result.category_rationale)
@@ -669,6 +678,48 @@ def _shared_compare_client():
         _compare_client = build_client(enabled=True)
         _compare_client_built = True
     return _compare_client
+
+
+def _model_available() -> bool:
+    """Whether the shared client exists, without ever raising.
+
+    `build_client` reads the model settings, and `load_settings` raises on a
+    model with no pinned price or a malformed budget. That is right for the
+    routes that would spend money, and wrong for `GET /`, which Render polls
+    as its health check: a typo in one environment variable would otherwise
+    fail every health check and restart the whole service.
+    """
+    try:
+        client = _shared_compare_client()
+    except Exception:
+        return False
+    return client is not None and client.available
+
+
+@app.post("/reply-drafts/polish")
+def polish_reply_draft(body: PolishRequest) -> dict:
+    """Reword a reply draft's greeting and closing, and nothing else.
+
+    The request has no field for the draft's context, facts or action: those
+    never leave the browser, so the model is not shown a single case value
+    (backend/api/reply_polish.py). Not gated behind SENTINEL_ALLOW_LLM_RUNS
+    for the same reason `/compare` is not: it is one small call, it draws on
+    the same shared, budgeted client, and an identical request is answered
+    from the response cache for nothing.
+
+    503 when no model is configured or it cannot be reached; the page keeps
+    the template's own wording either way.
+    """
+    try:
+        client = _shared_compare_client()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"the model settings are invalid ({exc}); the template wording stands")
+    if client is None or not client.available:
+        raise HTTPException(status_code=503, detail="no model is available on this server; the template wording stands")
+    try:
+        return polish_reply(body, client).model_dump()
+    except LLMUnavailable as exc:
+        raise HTTPException(status_code=503, detail=f"the model could not be reached ({exc}); the template wording stands")
 
 
 @app.post("/compare")
