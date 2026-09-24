@@ -70,7 +70,7 @@ const REASON_TEXT: Record<string, string> = {
 // "bl_missing" -> "BL missing", not "Bl missing" -- si/bl are the document
 // acronyms this whole app is built around, so a generic capitalize-first-
 // letter reads like a typo of them.
-function formatReason(reason: string) {
+export function formatReason(reason: string) {
   const override = REASON_TEXT[reason];
   if (override) return override;
   const words = reason.split("_").map((w) => (w === "si" || w === "bl" ? w.toUpperCase() : w));

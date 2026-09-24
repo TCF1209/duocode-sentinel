@@ -102,8 +102,13 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
   // do nothing but spend a second and invite the reviewer to doubt a clean
   // result; re-reading one that arrived corrupt is exactly what they want
   // after the sender re-sends it, because the file is read from disk again.
+  //
+  // For a NEEDS_REVIEW case the button now lives inside the report's own
+  // workspace, next to "what to do" (case-report-view.tsx), so the header
+  // only keeps it for the other case where re-reading can change the
+  // answer: a run-level error on a case that was not escalated.
   const couldChange =
-    report.status === "NEEDS_REVIEW" || report.errors.length > 0;
+    report.status !== "NEEDS_REVIEW" && report.errors.length > 0;
 
   async function onRetry() {
     setRetrying(true);
@@ -145,6 +150,8 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
             report={report}
             caseId={`${runId}:${emailId}`}
             priorDefectCounts={priorDefectCounts}
+            onRetry={onRetry}
+            retrying={retrying}
             onReview={async (body) => {
               await reviewCase(runId, emailId, body);
               toast.success("Review saved");

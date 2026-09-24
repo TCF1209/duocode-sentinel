@@ -56,10 +56,13 @@ const URGENCY: Record<CaseStatus, { container: string; icon: string; heading: st
   NEEDS_REVIEW: {
     container: "border-warn/40 bg-warn-bg/40",
     icon: "text-warn",
-    heading: "Human review needed",
+    // Third section of the needs-review workspace (case-report-view.tsx),
+    // after "why this needs a person" and "what to do": the fallback for
+    // a reviewer who has looked at the documents themselves.
+    heading: "Decide it yourself",
     description:
-      "Confirming means you agree this genuinely couldn't be checked automatically. " +
-      "If you can tell what it should say, use Correct it instead.",
+      "Looked at the documents and can tell what they say? Correct it to what you found. " +
+      "Confirming means you agree it genuinely couldn't be checked automatically.",
   },
 };
 

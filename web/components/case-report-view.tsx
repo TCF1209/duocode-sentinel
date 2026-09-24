@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { motion } from "motion/react";
-import { AlertTriangle, Download, Eye } from "lucide-react";
-import { attachmentUrl, type CaseReport, type CaseStatus, type FieldComparisonReport } from "@/lib/api";
+import { AlertTriangle, CheckCircle2, Download, Eye, RotateCw, XCircle } from "lucide-react";
+import { attachmentUrl, type CaseReport, type CaseStatus, type DocumentReport, type FieldComparisonReport } from "@/lib/api";
 import { CategoryBadge, DecidedByBadge, StatusBadge } from "@/components/status-badges";
-import { FieldComparisonRow, type ReviewerView } from "@/components/field-comparison-row";
+import { FieldComparisonRow, formatReason, type ReviewerView } from "@/components/field-comparison-row";
+import { Button } from "@/components/ui/button";
 import { ReviewPanel } from "@/components/review-panel";
 import { ReplyDraftPanel } from "@/components/reply-draft-panel";
 import { Separator } from "@/components/ui/separator";
@@ -157,6 +158,149 @@ function AttachmentDialog({ url, filename, kind }: { url: string; filename: stri
   );
 }
 
+// The reader codes a document can fail with (readers/*, direct_compare.py's
+// read_upload), in words a person can act on. Anything not listed falls
+// back to the code with its underscores removed rather than to nothing.
+const UNREADABLE_TEXT: Record<string, string> = {
+  corrupt: "the file is corrupt and will not open",
+  no_text_layer: "a scanned image with no text layer to read",
+  empty_file: "the file is empty",
+  unsupported: "an unsupported file type",
+};
+
+const EXPECTED_DOC_TYPE = { si: "SHIPPING_INSTRUCTION", bl: "BILL_OF_LADING" } as const;
+const SIDE_NAME = { si: "shipping instruction", bl: "draft bill of lading" } as const;
+const SIDE_LABEL = { si: "Shipping Instruction (SI)", bl: "Draft Bill of Lading (BL)" } as const;
+const TONE_TEXT = { ok: "text-ok", warn: "text-warn", danger: "text-danger" } as const;
+
+/** One document's state, as the thing a reviewer needs to know first:
+ *  not attached / could not be read (and why) / read as the wrong kind of
+ *  document / fine. Everything here is already in `report.documents`; it was
+ *  only ever shown as a one-line "SI: path (TYPE, 621b)" at the bottom. */
+function DocumentStatus({ side, doc, caseId }: { side: "si" | "bl"; doc: DocumentReport | null; caseId?: string }) {
+  let tone: keyof typeof TONE_TEXT;
+  let text: string;
+  if (!doc) {
+    tone = "danger";
+    text = "Not attached to this email";
+  } else if (!doc.readable) {
+    tone = "danger";
+    text = `Could not be read — ${UNREADABLE_TEXT[doc.unreadable_reason ?? ""] ?? (doc.unreadable_reason ?? "unknown reason").replace(/_/g, " ")}`;
+  } else if (doc.doc_type !== EXPECTED_DOC_TYPE[side]) {
+    tone = "warn";
+    text = `Read as a ${doc.doc_type.replace(/_/g, " ").toLowerCase()} — not a ${SIDE_NAME[side]}`;
+  } else {
+    tone = "ok";
+    text = `Read as a ${SIDE_NAME[side]}`;
+  }
+  const Icon = tone === "ok" ? CheckCircle2 : tone === "warn" ? AlertTriangle : XCircle;
+  return (
+    <div className="flex flex-wrap items-start gap-x-2 gap-y-1 rounded-md border bg-background p-2.5 text-sm">
+      <Icon className={cn("mt-0.5 size-4 shrink-0", TONE_TEXT[tone])} strokeWidth={2} />
+      <div className="min-w-0 flex-1">
+        <div className="font-medium">{SIDE_LABEL[side]}</div>
+        <div className={cn("text-xs", TONE_TEXT[tone])}>{text}</div>
+        {doc && (
+          <div className="text-xs text-muted-foreground">
+            {doc.path} · {doc.n_bytes}b
+          </div>
+        )}
+      </div>
+      {doc && caseId && <AttachmentAction caseId={caseId} side={side} ext={doc.ext} path={doc.path} />}
+    </div>
+  );
+}
+
+/**
+ * The NEEDS_REVIEW case page as a place to work, not a mismatch page with a
+ * different colour. Raised directly: "human review isn't a simple thing,
+ * and this page looked bare and nearly identical to a mismatch" -- a
+ * mismatch is a few clicks, a needs-review case means Sentinel could not
+ * read or find what it needed, and the person picking it up has to find
+ * out what, and what to do about it. Three sections, in the order those
+ * questions get asked: why it is here (with the state of each document),
+ * what to do (the pipeline's own suggested action, and the actions that
+ * exist), and -- in ReviewPanel right after -- deciding it yourself.
+ *
+ * Nothing here is new data: review_reason, documents.*.readable /
+ * unreadable_reason / doc_type, the "Suggested action:" note, and the
+ * per-field present/blank flags were all already on the page, as one
+ * banner, a bullet among bullets, and a footer line.
+ */
+function NeedsReviewWorkspace({
+  report,
+  caseId,
+  suggestedAction,
+  onRetry,
+  retrying,
+}: {
+  report: CaseReport;
+  caseId?: string;
+  suggestedAction: string | null;
+  onRetry?: () => Promise<void>;
+  retrying?: boolean;
+}) {
+  // Only meaningful when both documents were actually read: a blank field
+  // on a document that could not be read at all is the unreadability, not
+  // a separate finding.
+  const bothReadable = Boolean(report.documents.si?.readable && report.documents.bl?.readable);
+  const blankFields = bothReadable
+    ? report.fields
+        .filter((f) => !f.si.present || !f.bl.present)
+        .map((f) => {
+          const sides = [!f.si.present && "SI", !f.bl.present && "BL"].filter(Boolean).join(" & ");
+          return `${FIELD_LABELS[f.field] ?? f.field} (${sides})`;
+        })
+    : [];
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-warn/40 bg-warn-bg/40 p-4">
+      <div>
+        <div className="flex items-center gap-2 text-sm font-semibold text-warn">
+          <AlertTriangle className="size-4" strokeWidth={2} />
+          Why this needs a person
+        </div>
+        <p className="mt-1 text-sm">
+          {report.review_reason ? REVIEW_REASON_TEXT[report.review_reason] : "Sentinel could not decide this one automatically."}
+        </p>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        <DocumentStatus side="si" doc={report.documents.si} caseId={caseId} />
+        <DocumentStatus side="bl" doc={report.documents.bl} caseId={caseId} />
+      </div>
+
+      {blankFields.length > 0 && (
+        <p className="text-sm">
+          Blank where a value was expected: <span className="font-medium">{blankFields.join(", ")}</span>
+        </p>
+      )}
+
+      <div className="rounded-md border bg-background p-3">
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">What to do</div>
+        <p className="mt-1 text-sm">{suggestedAction ?? "Ask the sender for what is missing, or decide it yourself below."}</p>
+        {onRetry && (
+          <div className="mt-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onRetry}
+              disabled={retrying}
+              title="Read the attachments again and re-decide this one case -- the thing to press once the sender has re-sent them"
+            >
+              <RotateCw className={retrying ? "animate-spin" : undefined} />
+              {retrying ? "Re-processing…" : "Retry this case"}
+            </Button>
+          </div>
+        )}
+        <div className="mt-2">
+          <ReplyDraftPanel report={report} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * The discrepancy report — "the screen the whole project exists to produce"
  * (docs/ROADMAP.md 3b). Shared by the run case-detail page and the judge
@@ -167,6 +311,8 @@ export function CaseReportView({
   caseId,
   onReview,
   priorDefectCounts,
+  onRetry,
+  retrying,
 }: {
   report: CaseReport;
   /** `<run_id>:<email_id>`, only when this report came from a run -- gates
@@ -177,6 +323,11 @@ export function CaseReportView({
   onReview?: (body: { decision: "confirm" | "correct"; status?: CaseStatus; defect_fields?: string[]; note?: string }) => Promise<void>;
   /** Passed straight through to ReviewPanel -- see its own prop comment. */
   priorDefectCounts?: Record<string, number>;
+  /** "Retry this case", rendered inside the NEEDS_REVIEW workspace as one of
+   *  its actions rather than in the page header -- it belongs next to "what
+   *  to do", not above the report. Absent on /compare (nothing to re-read). */
+  onRetry?: () => Promise<void>;
+  retrying?: boolean;
 }) {
   // classify/intent.py's signal ids (e.g. "attach.attached-are") ride in the
   // same `notes` list as human-written sentences. Every human sentence in
@@ -215,6 +366,30 @@ export function CaseReportView({
   // Sentinel's review-reason banner, once a reviewer has moved the case off
   // NEEDS_REVIEW (effective_outcome nulls the reason for any other status).
   const reasonResolved = Boolean(report.review_reason && correction && correction.review_reason === null);
+
+  // The workspace replaces the banner while the case still genuinely needs a
+  // person: Sentinel escalated it and no reviewer has moved it anywhere
+  // else (a correction *to* NEEDS_REVIEW keeps it). Once corrected to
+  // OK/MISMATCH the muted banner above says so and the workspace would be
+  // stale advice. Under "Sentinel's original" `correction` is null, so the
+  // workspace comes back with the rest of the original view -- consistent.
+  const showWorkspace = report.status === "NEEDS_REVIEW" && (!correction || correction.status === "NEEDS_REVIEW");
+
+  // The pipeline already writes one "Suggested action: ..." sentence per
+  // escalation reason (pipeline.py's notes); the workspace promotes it to a
+  // heading and drops it from the bullet list so it isn't said twice.
+  const suggestedNote = readableNotes.find((n) => n.startsWith("Suggested action:"));
+  const suggestedAction = suggestedNote ? suggestedNote.replace(/^Suggested action:\s*/, "") : null;
+  const notesToShow = showWorkspace && suggestedNote ? readableNotes.filter((n) => n !== suggestedNote) : readableNotes;
+
+  // Seven near-identical amber "UNCOMPARABLE" cards say one thing seven
+  // times when a document could not be read at all; one line says it once,
+  // and the cards stay a click away for anyone who wants them.
+  const collapseFields =
+    showWorkspace && report.fields.length > 0 && report.fields.every((f) => f.verdict === "UNCOMPARABLE");
+  const uncomparableReasons = Array.from(new Set(report.fields.map((f) => f.reason ?? "")));
+  const uncomparableReason =
+    uncomparableReasons.length === 1 && uncomparableReasons[0] ? formatReason(uncomparableReasons[0]) : "see each field";
 
   return (
     <motion.div
@@ -278,7 +453,7 @@ export function CaseReportView({
         )}
       </motion.div>
 
-      {report.review_reason && (
+      {!showWorkspace && report.review_reason && (
         <motion.div
           className={cn(
             "flex items-start gap-2.5 rounded-md border p-3 text-sm",
@@ -306,6 +481,18 @@ export function CaseReportView({
         </motion.div>
       )}
 
+      {showWorkspace && (
+        <motion.div variants={fadeUp}>
+          <NeedsReviewWorkspace
+            report={report}
+            caseId={caseId}
+            suggestedAction={suggestedAction}
+            onRetry={onRetry}
+            retrying={retrying}
+          />
+        </motion.div>
+      )}
+
       {/* Right under the "why", not after every field — a reviewer landing
           here should see what to do before they see the evidence, not after
           scrolling past all of it. The reply draft is the same kind of
@@ -320,18 +507,22 @@ export function CaseReportView({
         </motion.div>
       )}
 
-      <motion.div variants={fadeUp}>
-        <ReplyDraftPanel report={report} />
-      </motion.div>
+      {/* Inside the workspace's "what to do" when the case is escalated;
+          on its own here otherwise. Never both. */}
+      {!showWorkspace && (
+        <motion.div variants={fadeUp}>
+          <ReplyDraftPanel report={report} />
+        </motion.div>
+      )}
 
       {(readableNotes.length > 0 ||
         signalNotes.length > 0 ||
         report.errors.length > 0 ||
         report.fields.length > 0) && <Separator />}
 
-      {readableNotes.length > 0 && (
+      {notesToShow.length > 0 && (
         <motion.ul className="list-inside list-disc text-sm text-muted-foreground" variants={fadeUp}>
-          {readableNotes.map((n, i) => (
+          {notesToShow.map((n, i) => (
             <li key={i}>{n}</li>
           ))}
         </motion.ul>
@@ -356,16 +547,31 @@ export function CaseReportView({
         </motion.div>
       )}
 
-      {report.fields.length > 0 && (
-        <motion.div className="flex flex-col gap-2" variants={stagger(0, 0.05)}>
-          {report.fields.map((f) => (
-            <motion.div key={f.field} variants={fadeUp}>
-              <FieldComparisonRow comparison={f} reviewerView={reviewerViewFor(f)} reviewerNote={report.review?.note} />
-            </motion.div>
-          ))}
-        </motion.div>
-      )}
+      {report.fields.length > 0 &&
+        (collapseFields ? (
+          <motion.details className="rounded-lg border bg-card text-sm" variants={fadeUp}>
+            <summary className="cursor-pointer select-none p-3 text-muted-foreground">
+              All {report.fields.length} fields uncomparable — {uncomparableReason}. Show the fields anyway
+            </summary>
+            <div className="flex flex-col gap-2 border-t p-3">
+              {report.fields.map((f) => (
+                <FieldComparisonRow key={f.field} comparison={f} reviewerView={reviewerViewFor(f)} reviewerNote={report.review?.note} />
+              ))}
+            </div>
+          </motion.details>
+        ) : (
+          <motion.div className="flex flex-col gap-2" variants={stagger(0, 0.05)}>
+            {report.fields.map((f) => (
+              <motion.div key={f.field} variants={fadeUp}>
+                <FieldComparisonRow comparison={f} reviewerView={reviewerViewFor(f)} reviewerNote={report.review?.note} />
+              </motion.div>
+            ))}
+          </motion.div>
+        ))}
 
+      {/* The workspace's document cards above carry path, size and "View
+          original" already; showing this line as well said it all twice. */}
+      {!showWorkspace && (
       <motion.div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2" variants={fadeUp}>
         {report.documents.si && (
           <div className="flex flex-wrap items-center gap-x-2">
@@ -388,6 +594,7 @@ export function CaseReportView({
           </div>
         )}
       </motion.div>
+      )}
     </motion.div>
   );
 }
