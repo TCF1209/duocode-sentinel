@@ -62,20 +62,24 @@ for that sentence."
 ## Slide 2 · The problem, and the fourth case *(0:15–0:40)* → criterion 5
 
 **On the slide:** the organisers' own four capabilities — Classify ·
-Extract · Compare · Ask for help — as four boxes; under them, one line:
-*"The SI is the reference. Catch incorrect details before the draft is
-finalised."* And the desk's three pains from the problem statement:
-finding the right emails takes time; manual comparison is repetitive and
-easy to get wrong; the same field is printed differently on the two
-documents.
+Extract · Compare · Ask for help — as four boxes; under them, the line the
+mentor asked for: *why we built it* — a documentation clerk does this by
+hand, about 4 minutes per SI/BL pair and 20 seconds to triage each email
+(a conservative estimate, labelled as one), and a missed field becomes a
+correction, a delay, rework. Then the desk's three pains from the problem
+statement: finding the right emails takes time; manual comparison is
+repetitive and easy to get wrong; the same field is printed differently on
+the two documents.
 
-**Say:** "A shipping desk gets five kinds of mail in one inbox. For a
-document check someone compares the Shipping Instruction against the draft
-Bill of Lading — seven fields, by hand. Miss one and it's a correction, a
-delay, rework. And there's a fourth case the statement names: sometimes the
-check *can't* be done — an unreadable scan, a blank field, the wrong
-document. That has to reach a person with the reason, not be guessed at.
-Sentinel does all four."
+**Say:** "Why we built it: a shipping desk gets five kinds of mail in one
+inbox, and for every document check a person compares the Shipping
+Instruction against the draft Bill of Lading — seven fields, by hand. At a
+conservative estimate that's about four minutes a pair and twenty seconds
+to triage each email; this inbox alone is a day and a half of desk work.
+Miss one field and it's a correction, a delay, rework. And there's a fourth
+case the statement names: sometimes the check *can't* be done — an
+unreadable scan, a blank field, the wrong document. That has to reach a
+person with the reason, not be guessed at. Sentinel does all four."
 
 **Scores:** Solution Effectiveness & User Value — problem-solution fit,
 in the organisers' own words.
@@ -84,19 +88,27 @@ in the organisers' own words.
 
 **On the slide:** one screenshot of the run page over the real inbox, and
 four numbers beside it — **520 emails · 46 mismatches · 20 sent to a person,
-with the reason · 12.7 s on a free container.** Below: the two public URLs,
-the words *live, deployed, the organisers' full bundle*.
+with the reason · 12.7 s on a free container.** Below, the four steps a
+desk actually takes (the mentor: "the pitch shows the pipeline, not how a
+person uses it"): *run the inbox · open a flagged case · confirm it, correct
+a single field, or re-upload the corrected document · send the drafted
+reply.*
 
 **Say:** "This is the whole inbox, live on Render and Vercel — not a
 sample, the organisers' 520 emails. Every email classified, every document
 pair compared, every case Sentinel can't decide sent to a person with the
-reason attached. Thirteen seconds. You'll press the button yourself in a
-minute."
+reason attached. Thirteen seconds. And this is how a desk uses it, four
+steps: run the inbox, open a flagged case, confirm it or correct one field
+or re-upload the corrected document, send the drafted reply."
 
 **Scores:** End-to-End Functionality. Do not say the accuracy here — that
 is slide 6's evidence.
 
-## Slide 4 · How it decides *(1:05–1:40)* → criterion 2
+## Slide 4 · How it decides *(1:05–1:30)* → criterion 2
+
+*Trimmed after the mentor session to buy slide 7 its extra fifteen seconds:
+keep the diagram on screen and say only the two choices and the gate
+sentence; the rest of the "Say" below is the eight-minute version.*
 
 **On the slide:** the six-stage diagram from `ARCHITECTURE.md` — Classify →
 Intake → Extract → Compare → **Gate** → Decide — with the gate drawn as the
@@ -121,7 +133,11 @@ behind one class in one file."
 **Scores:** Architecture & Scalability — trade-offs stated with their
 reasons, and a realistic scaling approach the code supports.
 
-## Slide 5 · Where the AI is, and why it is aimed *(1:40–2:20)* → criterion 3
+## Slide 5 · Where the AI is, and why it is aimed *(1:30–2:10)* → criterion 3
+
+*The mentor's rule for this slide: never say "we use less AI". Say the AI
+is reserved for the cases the rules can't handle — and the system performs
+just as well.*
 
 **On the slide:** three rows — **classify** *(an email the rules can't
 separate)* · **read** *(a label the table has never seen)* · **see** *(a
@@ -148,7 +164,7 @@ unknown labels read on request."
 rather than claimed. This slide is the answer to the judges' feedback;
 land it and move on.
 
-## Slide 6 · How we know it holds *(2:20–2:55)* → criterion 4
+## Slide 6 · How we know it holds *(2:10–2:45)* → criterion 4
 
 **On the slide:** four short blocks. *Not memorised:* 1.0000 on four
 datasets, three from seeds we never developed against — 225 defects, exact
@@ -174,7 +190,7 @@ than one we miss."
 **Scores:** Engineering Quality & Robustness. The 1.0000 lives here and
 only here.
 
-## Demo *(2:55–4:25)* → criteria 1, 3, 6
+## Demo *(2:45–4:10)* → criteria 1, 3, 6
 
 Not a slide. The running order is in `PITCH_DAY.md`: the run with the model
 tier on → the pattern group → a mismatch case with the source line under
@@ -194,21 +210,34 @@ Integration (the model doing its two jobs); User Experience &
 Differentiation (the evidence line, the per-field review, the pattern
 groups — the things a reviewer actually uses).
 
-## Slide 7 · What a reviewer gets, and what nobody else shows them *(4:25–4:40)* → criterion 6
+## Slide 7 · What makes it different *(4:10–4:40)* → criterion 6
 
-**On the slide:** four small captures — the evidence line under a value ·
-Correct it with a checkbox per field and the same-shipper count beside it ·
-*Patterns worth a second look* · the reply draft that changes when a
-reviewer corrects the case. One line: *Every flag carries the line it came
-from; every escalation carries the reason and what to do about it.*
+*Rebuilt after the mentor session: "at the top-ten stage everyone meets
+the brief — emphasise the special things."*
 
-**Say:** "Every other checker shows you a verdict. This one shows you the
-line, lets you correct a single field, groups the same shipper's repeated
-mistakes, and drafts the reply from the corrected outcome — not the stale
-one."
+**On the slide:** five numbered features, left; the scan read-out capture,
+right. **1 Correct by re-upload** — the sender re-sends a fixed SI or BL,
+you attach it on the case, the same check runs again, the old answer stays
+on record. **2 Scans read out for the reviewer** — an image-only PDF still
+goes to a person, but with the seven fields already read by the model,
+marked as evidence, not a verdict. **3 Shipper history on the field** —
+correcting a field shows how often this shipper was wrong on that same
+field before. **4 The original, one click away** — every value carries its
+line and the source document opens beside it. **5 A reply drafted from the
+corrected outcome** — not the stale one; a person still presses send. One
+line under them: *Every flag carries the line it came from; every
+escalation carries the reason and what to do about it.*
 
-**Scores:** User Experience & Differentiation. Keep it to fifteen seconds;
-the demo already did the work.
+**Say:** "At this stage everyone meets the brief, so here is what the
+others mostly don't have. The sender re-sends a fixed document — you
+re-upload it on the case, the check runs again, and the old answer stays on
+record. A scan still goes to a person, but already read out by the model.
+Correcting a field shows this shipper's history on that field. The original
+document is one click from every value. And the reply is drafted from what
+the reviewer decided, not the stale answer."
+
+**Scores:** User Experience & Differentiation. Thirty seconds now, not
+fifteen — the demo showed two of the five; this names all of them.
 
 ## Slide 8 · Impact, and what comes next *(4:40–4:58)* → criterion 7
 
@@ -238,6 +267,17 @@ The "eleven hours" carries *at a conservative estimate* aloud, always.
 you."
 
 ---
+
+## What the mentor changed (24 Sep)
+
+The full table is in `PITCH_DAY.md`. In this document it landed as: the
+"why we built it" line and the manual-check estimate on slide 2; the four
+usage steps on slide 3; the "never say 'we use less AI'" rule on slide 5;
+slide 4 trimmed to twenty seconds; slide 7 rebuilt around the five
+differentiating features and given thirty; and, in the product, the status
+words "No mismatch / Mismatch / Needs review", the Compare page's
+three-step strip and clickable sample cards, and the nav order Home ·
+Compare · Runs · How it works.
 
 ## Cuts and extensions
 

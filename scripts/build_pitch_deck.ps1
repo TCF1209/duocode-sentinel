@@ -133,7 +133,7 @@ for ($i = 0; $i -lt 4; $i++) {
   Add-Body $s $caps[$i][1] ($x + 14) ($y + 54) ($bw - 28) 90 12 $C.ink | Out-Null
   $x += $bw + $gapx
 }
-Add-Text $s "The organisers' own four capabilities. The SI is the reference; the goal is to catch incorrect details before the draft is finalised." $M 268 ($W - 2 * $M) 20 12 $C.muted 0 $BODY 1 1 | Out-Null
+Add-Text $s "Why we built it: today a documentation clerk does this by hand - about 4 minutes per SI/BL pair and 20 seconds to triage each email (a conservative estimate, not a measurement) - and a missed field becomes a correction, a delay, rework." $M 266 ($W - 2 * $M) 34 11.5 $C.ink 0 $BODY 1 1 | Out-Null
 $pains = @(
   @("Finding the right emails takes time", "A document request that is overlooked never reaches the checking step."),
   @("Manual comparison is easy to get wrong", "Names, ports, quantities and weight across two documents; a missed discrepancy is a correction, a delay, rework."),
@@ -148,7 +148,7 @@ for ($i = 0; $i -lt 3; $i++) {
 Add-Rect $s $M 436 ($W - 2 * $M) 44 $C.warn 0.15 $null | Out-Null
 Add-Text $s "The fourth case: sometimes the check cannot be done at all - an unreadable scan, a blank field, the wrong document. That has to reach a person with the reason attached, not be guessed at. Sentinel does all four." ($M + 16) 443 ($W - 2 * $M - 32) 32 12 $C.ink 0 $BODY 1 3 | Out-Null
 Add-Tag $s "Criterion 5 · Solution effectiveness & user value" $false | Out-Null
-Set-Notes $s "A shipping desk gets five kinds of mail in one inbox. For a document check someone compares the Shipping Instruction against the draft Bill of Lading - seven fields, by hand. Miss one and it's a correction, a delay, rework. And there's a fourth case the statement names: sometimes the check can't be done - an unreadable scan, a blank field, the wrong document. That has to reach a person with the reason, not be guessed at. Sentinel does all four. (0:15-0:40)"
+Set-Notes $s "Why we built it: a shipping desk gets five kinds of mail in one inbox, and for every document check a person compares the Shipping Instruction against the draft Bill of Lading - seven fields, by hand. At a conservative estimate that is about four minutes a pair and twenty seconds to triage each email; this inbox alone is a day and a half of desk work. Miss one field and it's a correction, a delay, rework. And there's a fourth case the statement names: sometimes the check can't be done - an unreadable scan, a blank field, the wrong document. That has to reach a person with the reason, not be guessed at. Sentinel does all four. (0:15-0:40)"
 
 # ------------------------------------------------------ 3 · what it does
 $s = New-Slide $pres $C.white
@@ -161,9 +161,9 @@ foreach ($st in $stats) {
   Add-Body $s $st[1] $x ($y + 46) 292 30 12 $C.ink | Out-Null
   $y += 92
 }
-Add-Text $s "duocode-sentinel.vercel.app · sdoc-sentinel-api.onrender.com - deployed from the repository by the committed render.yaml and vercel.json." $M 452 ($W - 2 * $M) 30 11 $C.muted 0 $BODY 1 1 | Out-Null
+Add-Text $s "How a desk uses it:   1  Run the inbox   ·   2  Open a flagged case   ·   3  Confirm it, correct a single field, or re-upload the corrected document   ·   4  Send the drafted reply" $M 450 ($W - 2 * $M) 30 11.5 $C.ink 0 $BODY 1 1 | Out-Null
 Add-Tag $s "Criterion 1 · End-to-end functionality" $false | Out-Null
-Set-Notes $s "This is the whole inbox, live on Render and Vercel - not a sample, the organisers' 520 emails. Every email classified, every document pair compared, every case Sentinel can't decide sent to a person with the reason attached. Thirteen seconds. You'll press the button yourself in a minute. Do not say the accuracy here - that is slide 6. (0:40-1:05)"
+Set-Notes $s "This is the whole inbox, live on Render and Vercel - not a sample, the organisers' 520 emails. Every email classified, every document pair compared, every case Sentinel can't decide sent to a person with the reason attached. Thirteen seconds. And this is how a desk uses it, four steps: run the inbox, open a flagged case, confirm it or correct one field or re-upload the corrected document, send the drafted reply. Do not say the accuracy here - that is slide 6. (0:40-1:05)"
 
 # ------------------------------------------------------ 4 · how it decides
 $s = New-Slide $pres $C.white
@@ -225,7 +225,7 @@ Add-Bold $s "False discrepancies: 0 both ways. Recall bought by guessing would h
 Add-Rect $s $M 404 ($W - 2 * $M) 54 $C.warn 0.15 $null | Out-Null
 Add-Text $s "`$0.0013 per document at the published rates · cached · `$2 ceiling per run.   On this inbox: 0 classifier calls, 0 extractor calls, 6 scans read out for the reviewer - every decision is a rule's, and that is measured, not assumed." ($M + 16) 410 ($W - 2 * $M - 32) 42 11.5 $C.ink 0 $BODY 1 3 | Out-Null
 Add-Tag $s "Criterion 3 · Technology integration" $false | Out-Null
-Set-Notes $s "A judge in the first round said we use AI less than most teams. True, and measured. On this inbox the rules answer all 520 and the scoring is all-or-nothing per email, so a model that is almost always right costs places. The model goes only where the rules admit they can't read: an ambiguous email, a label we've never seen, a scanned page. On documents with wording we invented, rules alone send 168 of 188 cases to a human; with the model, two - and false discrepancies stay at zero, because nothing the model says is adopted until we find it again in the source. You'll see both in the demo: a scan read out for the reviewer, and four unknown labels read on request. (1:40-2:20)"
+Set-Notes $s "Never say 'we use less AI'. Say: the AI is reserved for the cases the rules cannot handle - and the system performs just as well. A judge in the first round said we use AI less than most teams. True, and measured. On this inbox the rules answer all 520 and the scoring is all-or-nothing per email, so a model that is almost always right costs places. The model goes only where the rules admit they can't read: an ambiguous email, a label we've never seen, a scanned page. On documents with wording we invented, rules alone send 168 of 188 cases to a human; with the model, two - and false discrepancies stay at zero, because nothing the model says is adopted until we find it again in the source. You'll see both in the demo: a scan read out for the reviewer, and four unknown labels read on request. (1:40-2:20)"
 
 # ------------------------------------------------------ 6 · how we know
 $s = New-Slide $pres $C.white
@@ -275,15 +275,27 @@ Set-Notes $s "At the mismatch case: 'Under every value - the line it was read fr
 
 # ------------------------------------------------------ 8 · reviewer UX
 $s = New-Slide $pres $C.white
-Add-Title $s "What a reviewer gets" $false | Out-Null
-Add-Pic $s "$REPO\docs\img\report.png" $M 96 420 258 | Out-Null
-Add-Body $s "A mismatch: the two fields that differ, and under every value the document, the line and the label it was read from." $M 366 420 40 11 $C.muted | Out-Null
-Add-Pic $s "$SHOTS\scan_case_crop.png" 492 96 420 258 | Out-Null
-Add-Body $s "A scan: the model's reading as reviewer evidence, marked as such - nothing entered the comparison." 492 366 420 40 11 $C.muted | Out-Null
-$ux = @("Correct a single field, with how often this shipper was wrong on it beside the box", "Patterns worth a second look: the same shipper's repeated mistakes, grouped", "A reply draft built from the corrected outcome, not the stale one", "Every escalation carries the reason and what to do about it")
-Add-Bullets $s $ux $M 408 ($W - 2 * $M) 70 11.5 $C.ink 3 | Out-Null
+Add-Title $s "What makes it different" $false | Out-Null
+$feat = @(
+  @("Correct by re-upload", "The sender re-sends a fixed SI or BL? Attach it on the case and the same check runs again. The old answer stays on record."),
+  @("Scans read out for the reviewer", "An image-only PDF still goes to a person - but with the seven fields already read by the model, marked as evidence, not a verdict."),
+  @("Shipper history on the field", "Correcting a field shows how often this shipper was wrong on that same field before. A count, not a guess."),
+  @("The original, one click away", "Every value carries its line, and the source document opens beside it."),
+  @("A reply drafted from the corrected outcome", "Subject and body ready, built from what the reviewer decided - not the stale answer. A person still presses send.")
+)
+$y = 96
+for ($i = 0; $i -lt 5; $i++) {
+  Add-Circle $s $M $y 26 $C.amber ([string]($i + 1)) $C.ink | Out-Null
+  Add-Bold $s $feat[$i][0] ($M + 36) ($y - 2) 440 22 13.5 $C.ink | Out-Null
+  Add-Body $s $feat[$i][1] ($M + 36) ($y + 20) 440 44 11 $C.muted | Out-Null
+  $y += 68
+}
+Add-Pic $s "$SHOTS\scan_case_crop.png" 540 96 372 236 | Out-Null
+Add-Body $s "The scan read-out, as the reviewer sees it: seven fields, the model's confidence, and the sentence that none of it entered the comparison." 540 340 372 44 10.5 $C.muted | Out-Null
+Add-Rect $s $M 440 ($W - 2 * $M) 40 $C.warn 0.15 $null | Out-Null
+Add-Text $s "Every flag carries the line it came from. Every escalation carries the reason and what to do about it. Most teams at this stage meet the brief; these are the things a reviewer actually uses." ($M + 16) 446 ($W - 2 * $M - 32) 28 11.5 $C.ink 0 $BODY 1 3 | Out-Null
 Add-Tag $s "Criterion 6 · User experience & differentiation" $false | Out-Null
-Set-Notes $s "Every other checker shows you a verdict. This one shows you the line, lets you correct a single field, groups the same shipper's repeated mistakes, and drafts the reply from the corrected outcome - not the stale one. Fifteen seconds; the demo already did the work. (4:25-4:40)"
+Set-Notes $s "At the top-ten stage everyone meets the brief, so this is the slide to slow down on - thirty seconds. Five things the others mostly don't have: the sender re-sends a fixed document and you re-upload it on the case, the check runs again and the old answer stays on record; a scan still goes to a person but already read out by the model; correcting a field shows this shipper's history on that field; the original document is one click away from every value; and the reply is drafted from what the reviewer decided, not the stale answer. (4:10-4:40)"
 
 # ------------------------------------------------------ 9 · impact & next
 $s = New-Slide $pres $C.white

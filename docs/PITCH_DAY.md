@@ -93,20 +93,38 @@ If the venue network dies mid-demo: switch to the local tab (`localhost:3000`
 already open behind), say so in one sentence, and continue from the same
 step. The inbox run is identical; only the model beat changes.
 
+## Mentor feedback (24 Sep, 20:30) — and what changed because of it
+
+Thirty minutes with a mentor the evening before the final. Their points, in
+their order of emphasis, and what was done with each:
+
+| They said | What changed |
+|---|---|
+| Don't say "we use less AI". Say the AI is *reserved* for the cases rules can't handle — and the system performs just as well. | Slide 5's notes open with that sentence; the answer below is rewritten around it. |
+| At the top-ten stage everyone meets the brief; **differentiate on the special things** — correction by re-upload, the scan read-out, shipper history on a field, the original document beside the value, the drafted reply. | Slide 8 is now "What makes it different", five features, thirty seconds instead of fifteen. |
+| The intro should say **why the system was built** and how long a manual check takes. | Slide 2 carries both; the time is our estimate (≈4 min a pair, 20 s an email) and is labelled as one. |
+| The pitch shows the pipeline steps but not **how a person uses it**. | Slide 3's footer is the four steps: run, open a case, confirm / correct a field / re-upload, send the reply. |
+| Design is better and more distinctive than most of the ten. **But**: font sizes too uniform; capitalisation inconsistent (`all` vs `All`); the Compare page's samples don't look clickable; mismatches should be visible from the list without opening a row. | Status labels are now "No mismatch / Mismatch / Needs review" (judges dislike "Matched/Mismatched"; "no mismatch detected" is the problem statement's phrase). Compare samples are obvious buttons with a "Load this pair →" footer and a three-step strip above them. Run-table emphasis, chip capitalisation and the case page's type hierarchy: session 8's list. |
+| Nav: "Pitch" says nothing; Runs could come after Compare. | Home · Compare · Runs · How it works. |
+| A judge asked another team whether **20,000 KG against 20 MT** is caught as a unit mismatch. | It is handled, and re-checked on 24 Sep: `20 MT` → 20,000 kg, `21 MT` → 21,000 kg, so 20,000 KG vs 20 MT compares equal and 20,000 KG vs 21 MT is a mismatch. Answer below. |
+
 ## Questions to expect, and the short true answer
 
 **"You said almost every decision is made by rules, not AI — why use AI so
-little?"** *(the preliminary judge's own comment)*
-Because on this inbox the rules are right every time and the scoring is
-all-or-nothing per email: flag one of two fields and that email scores
-zero. The model is aimed at the three things the rules admit they cannot do
-— an ambiguous email, a label we have never seen, a scanned page — and we
-measured it there: on documents with wording we invented, rules alone send
-168 of 188 cases to a human; with the model, 2, and false discrepancies stay
-at zero because nothing the model returns is adopted until we find it again
-in the document. You just watched it read a scan and read four labels. On
-this data the rules need no help, and that is a measured result, not an
-absence.
+little?"** — *the mentor's rule: never say "we use less AI".*
+The AI is reserved for the cases the rules can't handle — an ambiguous
+email, a label we have never seen, a scanned page — and the system performs
+just as well, because we measured it there: on wording we invented, rules
+alone send 168 of 188 cases to a human; with the model, 2, with false
+discrepancies still at zero. Using AI on every email would cost money on
+every email for no gain; on this inbox the rules are right every time, and
+that is a measured result, not an absence.
+
+**"What about units — 20,000 KG on one document and 20 MT on the other?"**
+Both are normalised to kilograms before the comparison — 20 MT reads as
+20,000 kg, so that pair compares equal; 20,000 KG against 21 MT is reported
+as a mismatch. Same for thousands separators and bare numbers in a
+spreadsheet cell.
 
 **"A perfect score — is it overfitting?"**
 Four datasets, three from seeds we never developed against: 1.0000 on all
