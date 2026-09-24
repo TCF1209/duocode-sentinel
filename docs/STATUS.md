@@ -4,6 +4,103 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-24 (night, continued a fourth time) — Claude session 8 · the review panel explained, then fixed with the user's sign-off, not before
+
+User asked "why does the review panel work this way" in detail (what
+Confirm vs Correct actually do, why a MISMATCH can be confirmed, what the
+three status choices in Correct it mean, why a NEEDS_REVIEW case asks for
+a reason) and explicitly asked for an explanation and a discussion before
+any code changed -- "你不要擅自修改" (don't modify on your own). Answered
+first from the actual code (review-panel.tsx, store.py's
+effective_outcome), not from memory, surfacing two real gaps along the
+way rather than only answering what was asked: "Confirm outcome"'s
+wording is genuinely ambiguous on a MISMATCH, and "Correct it" had no way
+to say *which* field was wrong, which silently produced an empty
+defect_fields list server-side whenever a false negative got corrected up
+to MISMATCH. Also separately asked to check "run pages look empty for a
+few seconds", and floated an AI-driven "learns this shipper's habits"
+idea for the correction flow, which got a direct "this isn't buildable
+properly right now, here's why, here's a smaller thing that is" answer
+rather than a yes. Scope for all four (loading skeleton, copy fix,
+field-level correction, a same-run pattern hint instead of the AI
+version) was confirmed with the user via two AskUserQuestion rounds
+before any file was touched.
+
+**Done**
+- **Loading skeleton for the run table.** Root-caused: the stat strip,
+  patterns, and table were conditionally *absent* (not loading) while
+  data was in flight, and the table's own empty-state row read "No cases
+  match this filter" during that same window -- actively misleading, not
+  just quiet. New `casesLoaded` flag, kept separate from
+  `allCases.length > 0` so a genuinely empty run and a not-yet-loaded one
+  read differently. Also explained, not fixed: part of the reported delay
+  is Next.js dev-mode's on-demand compile on a route's first hit after a
+  server restart (719-843ms, measured from the dev server's own logs) --
+  a dev-only cost, gone in a production build.
+- **`review-panel.tsx`'s MISMATCH/NEEDS_REVIEW copy rewritten.** "Confirm
+  outcome" read as confirming the documents are fine; it confirms
+  Sentinel's *call* instead, which on MISMATCH means the opposite. The
+  description above the buttons now says so explicitly and points at
+  Correct it as the alternative, read in context rather than the button
+  label alone.
+- **Field-level correction, the actual fix for "I don't know what to
+  correct".** Correct it now shows a checkbox per field -- all 7, in
+  `FIELD_LABELS`' own order -- but only when the corrected status is
+  MISMATCH (the only status `defect_fields` means anything for;
+  `store.py`'s `effective_outcome` forces it to `[]` for the other two
+  regardless of what's sent). Pre-checked to whatever Sentinel itself
+  flagged, so a reviewer un-checks what wasn't actually wrong rather than
+  re-finding every defect from a blank slate. This also fixes the silent
+  bug the investigation surfaced: the frontend never sent `defect_fields`
+  before tonight, so a false-negative correction up to MISMATCH always
+  produced an empty list, invisible to "Patterns worth a second look".
+- **A same-run pattern hint, instead of the AI-habit-learning idea.**
+  Evaluated and turned down as asked, not built: no persistent review
+  history exists to learn from (the `Store` resets on every restart) and
+  an ungrounded LLM suggestion would cut against this project's own
+  evidence-gated thesis two days before the pitch. Shipped the smaller
+  thing instead -- a badge next to each field checkbox showing how many
+  *other* cases from this case's shipper, in the current run, already
+  carry a defect on that field. Reuses data the run already computed; no
+  AI, no new storage. `case-detail-page-view.tsx` now also fetches the
+  run's case list (best-effort, failure doesn't block the report itself)
+  to compute it.
+
+**Verification**
+- `npx tsc --noEmit`, `npm run lint`, `npm run build`: clean after both
+  commits.
+- Live, against a real MISMATCH case (`email_025`, APRIL FAR EAST (M) SDN
+  BHD, flagged `container_count` + `port_of_discharge`) in a fresh run
+  over the real `bundle_data/`: opened Correct it, confirmed both fields
+  pre-checked and every prior-count badge against a hand count of the
+  run's other same-shipper cases (Shipper 2, Consignee 2, Notify Party 2,
+  Port of Discharge 3, Container Count 4); un-checked Port of Discharge,
+  saved with a note, and confirmed via the API that the stored review,
+  the effective view, *and* the pattern groupings all updated exactly as
+  expected (`port_of_discharge` pattern dropped 4→3, `container_count`
+  stayed at 5, `email_025` present in one, not the other). Separately
+  corrected a different case fully to OK and confirmed `defect_fields`
+  came back empty and it left its pattern entirely.
+- Two commits on `feat/final-round-differentiators`, `git status` clean
+  before and after each stage.
+
+**Next**
+- Same open items as the entries below: slide deck, branch push/merge
+  decision, Mentor Session reply.
+- Both local servers still running.
+
+**Careful**
+- **Every one of the four changes above was confirmed with the user
+  first**, including the exact shape of the field-checkbox UI (asked
+  specifically, not assumed) -- explicit standing instruction this round
+  was "ask immediately on any uncertainty, don't decide alone."
+- The in-memory corrections made to verify this
+  (`run_000002_1790220546:email_025`, `email_270`) are local test state
+  only, gone on the next backend restart, same as every prior session's
+  note on this.
+
+---
+
 ## 2026-09-24 (night, continued a third time) — Claude session 8 · the attachment link became a dialog; two real bugs it took to get there; scroll restoration; a pattern-emailed badge
 
 Two things raised directly after the entry below shipped: (1) clicking
