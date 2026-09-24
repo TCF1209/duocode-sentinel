@@ -1,5 +1,7 @@
 # Sentinel — shipping document verification
 
+[![CI](https://github.com/TCF1209/duocode-sentinel/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/TCF1209/duocode-sentinel/actions/workflows/ci.yml)
+
 > **Every answer comes with its evidence.**
 
 *From email inbox to discrepancy report.*
@@ -36,7 +38,7 @@ of being reported as a discrepancy.*
 | | |
 |---|---|
 | **Accuracy** | **1.0000** final score on the dev set **and** on three held-out draws, generated from the organisers' own generator with seeds we never developed against — 225 planted defects, every one caught with the **exact** field set, no false alarms, all 80 escalations correct. Not four *independent* tests, and `docs/SCORING.md` §4.1 says why. |
-| **Tests** | **582** — up from 574, 8 new since `4c852a7` (`docs/STATUS.md` 2026-09-24). The one strict `xfail` that used to sit here is gone: it pinned a defect found by review, `docs/ADVERSARIAL.md` §5.4, fixed the same day it was found. |
+| **Tests** | **590** — up from 574 at `4c852a7`: sixteen new (fourteen test functions, one of them parametrised three ways), re-run 24 Sep as **448 passed, 142 skipped, 0 failed, 0 xfailed**. The one strict `xfail` that used to sit here is gone: it pinned a defect found by review, `docs/ADVERSARIAL.md` §5.4, fixed the same day it was found. The same command runs on every push in [CI](.github/workflows/ci.yml). |
 | **Speed** | **~3 ms per email**, single-threaded on a laptop: 520 emails end to end in about 1.5 s. |
 | **Cost** | **100% of decisions are made by rules.** `decided_by` is `"rule"` for all 520 emails; no model call decides anything on the graded inbox. |
 
@@ -213,8 +215,8 @@ claimed.*
 and `render.yaml` build the API, `web/vercel.json` the frontend. Runbook and
 the failures worth predicting: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
-**Tests — 582**, up from 574 at `4c852a7` (8 new, one former `xfail` now a
-plain pass — see the table two sections up). The skips are guarded in
+**Tests — 590**, up from 574 at `4c852a7` (sixteen new, one former `xfail` now
+a plain pass — see the table two sections up). The skips are guarded in
 `conftest.py` and print their reason rather than failing on an empty read —
 exact counts and the caveat on which of them are freshly re-run versus
 carried over from before `4c852a7` are in [The test
@@ -265,15 +267,13 @@ the 520-email one, below.
 ```
 
 On a fresh clone at `4c852a7`: **431 passed, 142 skipped, 1 xfailed, 0
-errors**. Three commits since (the table two sections up) added 8 tests and
-turned that one `xfail` into a real pass — **440 passed, 142 skipped, 0
-xfailed** is the arithmetic, not a fresh rerun: those three commits were
-verified on this repository's own working checkout, not a clone with no
-`data/`, and that checkout's own skip count does not match 142 for reasons
-that predate this session and are unrelated to it. Re-run this command on an
-actual fresh clone before trusting the skip figure specifically; the pass
-count and the zero `xfailed` are the part every commit message above
-verified directly.
+errors**. Re-run on 24 Sep on a checkout holding no `data/` — the same
+condition as a clone — the suite is **590 tests: 448 passed, 142 skipped, 0
+failed, 0 xfailed**, counted from `pytest --junitxml` rather than remembered:
+sixteen tests added since `4c852a7`, and the former `xfail` now a plain pass.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs this same command
+on every push, on a machine nobody on the team configured — the fresh-clone
+check made permanent rather than repeated by hand.
 
 The skips are not a broken checkout. `data/` is git-ignored — it holds the
 organisers' dataset and, beside it, their answer key (see
@@ -282,7 +282,7 @@ full bundle to read. `backend/tests/conftest.py` guards exactly the tests that
 open it and skips them with the reason printed, rather than letting ~100 tests
 fail on an empty read and read as a broken project. With the participant bundle
 at `data/bundle/`, the same command gave **573 passed, 1 xfailed** at
-`4c852a7`; by the same arithmetic as above, **582 passed, 0 xfailed** since.
+`4c852a7`; by the same arithmetic as above, **590 passed, 0 xfailed** since.
 
 ### The full inbox
 
@@ -359,6 +359,16 @@ number: that one was fixed 2026-09-24, fired on zero real documents before
 the fix and still does after it. Those two are in the output on purpose. A
 harness that only prints zeroes is not measuring anything.
 
+One more thing a clone gets right now that it did not before 24 Sep:
+`.gitattributes` declares every attachment format binary, so a Windows
+checkout with `core.autocrlf` no longer rewrites a PDF's line endings. That
+rewrite moved one file's `startxref` by 74 bytes and turned a real planted
+defect (`email_499`, `gross_weight_kg`) into an unreadable attachment on that
+platform only — 45 mismatches and 21 escalations instead of the 46 and 20
+the same commit produces on Linux and on the deployed API. Found, explained
+and fixed in `docs/STATUS.md`'s 2026-09-24 entry; the numbers on this page
+were always the Linux ones.
+
 ---
 
 ## What the evidence shows, and what it does not
@@ -414,7 +424,11 @@ card: 178 calls, $0.2447 — $0.0013 per document.
 **State this carefully.** The model does **no** work on the graded inbox:
 `decided_by` is `"rule"` for all 520 emails, and the only live calls in a
 normal run are six scan transcriptions, which are reviewer evidence and decide
-nothing. This table is *"here is what happens when a document arrives with
+nothing — and are now on screen: where a deployment permits it
+(`SENTINEL_ALLOW_LLM_RUNS`, on in `render.yaml`), the run page's **Run with
+the model tier** switch produces them, and each of the three `unreadable`
+scan cases shows its transcript as a card marked reviewer evidence, with the
+case still in review. This table is *"here is what happens when a document arrives with
 wording we have never seen"*, never *"our pipeline is 89% AI"*. It is also one
 row of sixteen — the OCR row above is untouched by it.
 
@@ -525,13 +539,36 @@ threshold, and a threshold that forgives a scanning artefact also merges two
 real companies (`docs/DECISIONS.md` §D2). The only safe direction is the one
 taken in §4.4: escalate the ambiguity, never absorb it.
 
+### Adoption path, and how we would know it is working
+
+The first deployment is one desk, not a region. The graded inbox carries four
+desk codes in its subjects and recipients — AFEMY (35 emails), AIE (30), AFRT
+(29), AFPTME (22); the other 404 carry none — and item 5 above is the
+plumbing that makes one desk's label table and escalation policy its own.
+Sentinel sits beside the desk's existing check, not in place of it, until the
+measures below have held for a full cycle of that desk's carriers.
+
+What a pilot would measure, and where each figure stands today:
+
+| Measure | Today (graded inbox) | What the pilot watches |
+|---|---|---|
+| Escalation rate | 20 of 220 comparison requests (9.1%), all 20 correct | that it stays a work list, not an inbox: precision at 1.0 while the share of unfamiliar templates grows |
+| False alarms | 0 of 46 defects on the graded set; 0 invented defects across 16 perturbation modes (`docs/ADVERSARIAL.md`) | the weekly number — one fabricated flag costs the trust every later flag needs |
+| Defects caught before the BL is released | 46 of 46, exact field set | the same, on the desk's real corrections log |
+| Reviewer minutes per escalation | not measured — the review panel records the decision, not the time | the pilot's first new measurement, and the one that decides whether item 1 (confidence calibration) is worth building |
+| Cost per 1,000 emails | $0 at today's mix; $1.30 ceiling at 100% unfamiliar wording (metrics page) | that the ceiling stays a ceiling as templates the rules have never seen arrive |
+| Time to a report | 12.7 s for 520 emails on a free-tier container | seconds, at the desk's daily volume — the metrics page projects it from the run's own ms/email |
+
+The first four columns are results; the last column is a target. They are
+kept apart on purpose.
+
 ## Repository map
 
 ```
 backend/sdoc/          the pipeline — no web, no database, no network imports
 backend/api/           FastAPI surface over it (11 routes, incl. POST /compare)
 backend/tools/         adversarial.py, the perturbation harness; smoke_readers.py
-backend/tests/         582 tests over the traps in docs/DATA_NOTES.md
+backend/tests/         590 tests over the traps in docs/DATA_NOTES.md
 backend/run.py         an inbox -> submission.json + report.json + metrics.json
 web/                   Next.js 16 dashboard (App Router, shadcn/ui, Recharts)
 demo_data/             30-email demo inbox — what a clone can run without the bundle

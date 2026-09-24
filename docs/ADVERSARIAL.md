@@ -1,13 +1,14 @@
 # Adversarial self-consistency — where the reader holds, and where it breaks
 
-> Regenerated 2026-09-19 against the current working tree; the suite is now
-> **573 passed and one `xfail`**. That xfail is not decoration: it is the live
-> defect in §5.4, marked strict so that fixing it breaks the build rather
-> than passing quietly. A second strict xfail recorded the address-line hole
-> in §4.3 and did exactly that when the fix landed — it went red, the fix was
-> confirmed, and the marker came off. Both runs are reproducible: re-running
-> either command reproduces every count in §2 and §3 byte for byte, before
-> those fixes and after them.
+> Regenerated 2026-09-19 against the working tree of that day, and re-run on
+> 2026-09-24 after the fixes in §4.3, §4.4 and §5.4 landed: every count in §2
+> and §3 reproduces byte for byte. The suite is now **590 tests, 0 failed,
+> 0 xfailed**. Two strict `xfail`s have lived in it, and both did what a
+> strict xfail is for: the one that recorded the address-line hole in §4.3
+> went red when that fix landed, and the one that pinned §5.4 did the same on
+> 24 September — the fix was confirmed by the failure, and the marker came
+> off. The one defect still open, §5.2, is not pinned by a test because no
+> small fix exists for it; it is measured instead.
 > Every number here comes from `runs/adversarial.json` and
 > `runs/adversarial_holdout.json` as they stand now. An earlier snapshot was
 > taken *between* two fixes and reported a `wrapped_value` row that the code no
@@ -660,13 +661,16 @@ including `wrapped_value`'s own `masked_discrepancies` staying at exactly
 not touch and was never meant to (§5.2's repair returns before `_extend` is
 ever called, so no locator anchoring reaches it).
 
-It is pinned as a strict `xfail` at
+While it was open it was pinned as a strict `xfail` at
 `backend/tests/test_compare_wrap.py::test_a_continuation_is_read_from_the_block_the_evidence_points_at`,
-so it goes green and loud the day it is fixed. Two things bound it. It has
-fired **zero** times across all four datasets — instrumenting `_extend` over
-520 emails shows the prefix relationship hit once and the repair applied not
-at all. And the fix is known and small: anchor `_extend` on the evidence
-locator instead of on `text.find`, which is what the locator is for.
+so that it would go green and loud the day it was fixed — which is what
+happened on 24 September: the anchor landed, the run reported an `XPASS`,
+and the marker came off; it is a plain passing test now. Two things bounded
+it while it was open. It had fired **zero** times across all four datasets —
+instrumenting `_extend` over 520 emails showed the prefix relationship hit
+once and the repair applied not at all. And the fix was known and small:
+anchor `_extend` on the evidence locator instead of on `text.find`, which is
+what the locator is for.
 
 The harness cannot see this either. It wraps one value at a time, so it never
 builds the two-blocks-same-first-line shape the defect needs.

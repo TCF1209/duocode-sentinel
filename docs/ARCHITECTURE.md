@@ -237,11 +237,41 @@ gate anything else
                                     │
                             ┌───────▼────────┐
                             │ managed Postgres│  runs, cases, review actions
-                            └────────────────┘
+                            │    (planned)   │  today: backend/api/store.py,
+                            └────────────────┘  one process's memory
 ```
 
 The pipeline package has no web or database imports, so the same code runs
 in the API container, in the CLI, and in tests.
+
+**What exists today, and how it scales.** The database in the diagram is not
+built. `backend/api/store.py` is a single process's memory behind one class,
+and every route reaches state only through it — so the Postgres box is a
+one-file change, not a rewrite of the routes, and its own docstring says so.
+The container runs one uvicorn worker on purpose: with two, a `POST /runs`
+served by one process returns a run id the other has never seen
+(`Dockerfile`). The honest scaling story follows from that split:
+
+* **Throughput** is the pipeline's, and the pipeline is a stateless library
+  — about 2.7 ms per email single-threaded, 12.7 s for the whole 520-email
+  inbox on a free-tier container. Once the store is external, more
+  throughput is more copies of the same container behind the same URL;
+  nothing in `backend/sdoc/` knows how many of it are running.
+* **Cost** does not scale with volume on this inbox at all — every decision
+  is a rule — and the metrics page projects both figures to 1,000–50,000
+  emails a day from the run's own measured ms/email and $/email, with the
+  worst case (every field unfamiliar wording, `ADVERSARIAL.md` §8) shown as
+  a ceiling beside it rather than blended into one number.
+* **Per-desk configuration** slots into the stage boundaries that already
+  exist: a label table and an escalation policy per desk (`ROADMAP.md`),
+  selected by the desk code the inbox already carries.
+
+What we deliberately did not do before the final is add that database. It
+buys persistence the demo does not need — the API re-runs the inbox at boot,
+and a judge's own run is seconds away — and it adds an external dependency
+and a credential to the one week the demo has to work on the first try.
+The trade is recorded here so it reads as a decision rather than an
+omission; the day it is reversed, the change is in one file.
 
 ## 6. What is deliberately NOT in this system
 
