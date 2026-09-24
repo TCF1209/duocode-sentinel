@@ -1,0 +1,98 @@
+# What a judge gets if they clone this repository and run it.
+#
+# The README claims a number — "on a fresh clone: 431 passed, 142 skipped, 1
+# xfailed, 0 errors" — and until now that claim was prose. A dry run on one
+# laptop proved it once, on a machine that already had the dataset sitting
+# beside the repo in a git-ignored directory. This proves it on every push,
+# from nothing.
+#
+# Two things are deliberately NOT provided to these jobs, because their absence
+# is the point:
+#
+#   * `data/` and its 520-email bundle. It is git-ignored, so the checkout has
+#     `bundle_data/` (the participant bundle, committed) and no `data/bundle`.
+#     `backend/tests/conftest.py` skips the tests that need the latter and the
+#     run must still be green — that guard is itself what is under test here.
+#   * OPENAI_API_KEY. `CLAUDE.md` rule 5 says the pipeline must run with no API
+#     key and no network; a suite that only passes because a developer's
+#     environment happens to hold a key would make that rule a wish. The job
+#     asserts the variable is absent before pytest starts, so a future "helpful"
+#     addition of the secret to this repository turns the build red instead of
+#     quietly weakening the claim.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: pytest on a clean clone
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: No dataset, no answer key
+        run: |
+          test ! -d data && echo "data/ absent, as a clone has it"
+          test -d bundle_data/inbox && echo "bundle_data/ present: $(ls bundle_data/inbox | wc -l) emails"
+          ! grep -rn "ground_truth" backend/ --include=*.py \
+            && echo "nothing under backend/ names the answer key"
+
+      - name: No API key in this environment
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -n "$OPENAI_API_KEY" ]; then
+            echo "::error::OPENAI_API_KEY is set for CI. The suite must pass without one"
+            echo "(CLAUDE.md rule 5). Remove the secret rather than relaxing this check."
+            exit 1
+          fi
+          echo "no key present"
+
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r backend/requirements.txt
+
+      - name: pytest
+        run: python -m pytest backend/tests -q
+
+      - name: The pipeline runs end to end with no key and no dataset
+        run: |
+          python backend/run.py --data bundle_data --out /tmp/ci-run
+          python - <<'PY'
+          import json
+          sub = json.load(open('/tmp/ci-run/submission.json'))
+          assert len(sub) == 520, f"expected 520 emails, produced {len(sub)}"
+          rules = sum(1 for r in sub.values() if r.get('decided_by') == 'rule')
+          assert rules == 520, f"expected every email decided by rules, got {rules}"
+          print(f"520 emails, {rules} decided by rules, no key present")
+          PY
+
+  web:
+    name: dashboard typecheck and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      # Build before typecheck, not after: Next generates its route types into
+      # .next/types, so a type-check run first fails on files that are correct.
+      # The README says this too; here it is enforced.
+      - run: npm run build
+        working-directory: web
+      - run: npx tsc --noEmit
+        working-directory: web

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { BarChart3, ChevronRight, Filter, ShipCargo } from "lucide-react";
+import { BarChart3, ChevronRight, Filter, Layers, ShipCargo } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CategoryBadge, DecidedByBadge, RunStatusPill, StatusBadge } from "@/components/status-badges";
@@ -211,12 +211,23 @@ export function RunPageView({ runId }: { runId: string }) {
             <span className="font-mono text-sm tabular-nums text-muted-foreground">{progress}%</span>
           )}
           {run?.status === "done" && (
-            <Link href={`/runs/${runId}/metrics`}>
-              <Button variant="outline" size="sm">
-                <BarChart3 className="size-4" />
-                View metrics
-              </Button>
-            </Link>
+            <>
+              {/* Patterns before metrics: metrics is how the run went, patterns
+                  is what the inbox is like, and the second is the one a desk
+                  supervisor opens. */}
+              <Link href={`/runs/${runId}/patterns`}>
+                <Button variant="outline" size="sm">
+                  <Layers className="size-4" />
+                  Patterns
+                </Button>
+              </Link>
+              <Link href={`/runs/${runId}/metrics`}>
+                <Button variant="outline" size="sm">
+                  <BarChart3 className="size-4" />
+                  View metrics
+                </Button>
+              </Link>
+            </>
           )}
         </div>
       </motion.div>
