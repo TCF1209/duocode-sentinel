@@ -1,0 +1,54 @@
+# Two jobs, mirroring the two things a judge is told to run in README.md:
+# the backend suite plus the demo inbox end to end with no key and no
+# network, and the dashboard's build, type-check and lint. Everything here
+# is a command that already appears in the README, so a green run is the
+# README's own claims being re-checked on a machine nobody on the team
+# configured.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: backend · pytest + demo inbox
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # The interpreter every score in docs/SCORING.md was measured on;
+          # the Dockerfile pins the same minor for the same reason.
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install -r backend/requirements.txt
+      # The full 520-email bundle and the organisers' grader are not in the
+      # repository, so the tests that open them skip with their reason
+      # printed (backend/tests/conftest.py). Everything else must pass.
+      - run: python -m pytest backend/tests -q -p no:cacheprovider
+      - name: the demo inbox, end to end, no key and no network
+        run: python backend/run.py --data demo_data --out runs/ci --quiet
+
+  web:
+    name: web · build, types, lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      # Build before type-check, in this order on purpose: Next generates the
+      # route types into .next/types, so tsc run first fails on files that
+      # are perfectly correct (README, "The API and the dashboard").
+      - run: npm run build
+      - run: npx tsc --noEmit
+      - run: npm run lint
