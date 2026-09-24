@@ -40,6 +40,18 @@ class Store:
         self._cases: dict[str, dict[str, CaseResult]] = {}
         self._order: dict[str, list[str]] = {}
         self._reviews: dict[str, dict[str, dict]] = {}
+        # Superseded answers, oldest first, per case -- written only by
+        # `recheck_case` below. `retry` overwrites in place and always has;
+        # a re-check with re-sent documents is the one replacement where the
+        # old answer is worth keeping, because it was reached on different
+        # documents and a reviewer may need to see what the desk said about
+        # the first version of the BL.
+        self._history: dict[str, dict[str, list[dict]]] = {}
+        # The re-sent files themselves, per case and side: (filename, bytes).
+        # A run's own attachments live on disk under its data root; a re-sent
+        # one never touches disk (the data root is the organisers' bundle,
+        # not ours to write into), so the attachment route reads it from here.
+        self._files: dict[str, dict[str, dict[str, tuple[str, bytes]]]] = {}
         self._counter = itertools.count(1)
 
     def new_run_id(self) -> str:
@@ -145,8 +157,13 @@ class Store:
     # directly, and the answer carries `source` so a reader can always see
     # which of the two they are looking at.
     def effective_outcome(self, run_id: str, result: CaseResult) -> dict:
-        review = self.get_review(run_id, result.email_id)
+        return self._effective(result, self.get_review(run_id, result.email_id))
 
+    @staticmethod
+    def _effective(result: CaseResult, review: Optional[dict]) -> dict:
+        """`effective_outcome` with the review passed in, so a superseded
+        version in `_history` (whose review is no longer in `_reviews`) can
+        be reported the same way the live case is."""
         system = {
             "status": result.status,
             "review_reason": result.review_reason,
@@ -194,6 +211,128 @@ class Store:
             "reviewed": len(reviews),
             "confirmed": len(reviews) - len(corrected),
             "corrected": len(corrected),
+        }
+
+    # -- re-checking a case on re-sent documents -------------------------
+    #
+    # The realistic follow-up to a MISMATCH or a NEEDS_REVIEW is not a
+    # correction typed into a form: it is the counterparty re-sending the
+    # document, and the desk wanting the same check run again on what came
+    # back. `retry` cannot do that -- it re-reads the run's own inbox from
+    # disk -- and `/compare` can, but stores nothing and knows no case.
+    #
+    # A re-check replaces the case's system answer the way a retry does, with
+    # two differences that are the whole point. The answer it replaces goes
+    # into `_history` together with whatever review stood against it, so
+    # "Sentinel said MISMATCH on the first BL, a reviewer confirmed it, then
+    # the shipper sent a second BL that matched" stays readable in that
+    # order. And the review itself is reset: it was a judgement about the old
+    # documents, and carrying it forward onto documents it never looked at
+    # would put a person's signature on something they did not sign.
+    def recheck_case(
+        self, run_id: str, result: CaseResult, *, uploaded: dict[str, tuple[str, bytes]],
+    ) -> dict:
+        """Replace one case with `result`, keeping the superseded answer.
+
+        `uploaded` maps the re-sent side(s) ("si"/"bl") to (filename, bytes).
+        A side not in it keeps whatever file the case already had -- the
+        disk original, or an earlier re-sent copy -- which is exactly what
+        the caller compared against, so the served attachment and the
+        reported answer never disagree.
+        """
+        email_id = result.email_id
+        with self._lock:
+            previous = self._cases[run_id][email_id]
+            files_before = dict(self._files.get(run_id, {}).get(email_id, {}))
+            history = self._history.setdefault(run_id, {}).setdefault(email_id, [])
+            entry = {
+                "version": len(history) + 1,
+                "result": previous,
+                "review": self._reviews.get(run_id, {}).pop(email_id, None),
+                # What the case's files were while `previous` stood; a side
+                # absent here was the disk original, at previous.<side>_doc.path.
+                "files": files_before,
+                "replaced_at": time.time(),
+                "resubmitted": sorted(uploaded),
+                "uploaded": {side: name for side, (name, _) in uploaded.items()},
+            }
+            history.append(entry)
+            self._cases[run_id][email_id] = result
+            self._files.setdefault(run_id, {}).setdefault(email_id, {}).update(uploaded)
+        return self._history_entry_view(entry)
+
+    def current_file(self, run_id: str, email_id: str, side: str) -> Optional[tuple[str, bytes]]:
+        """The re-sent file standing in for this side, or None: the case
+        still reads that side from the run's data root."""
+        with self._lock:
+            return self._files.get(run_id, {}).get(email_id, {}).get(side)
+
+    def recheck_count(self, run_id: str, email_id: str) -> int:
+        with self._lock:
+            return len(self._history.get(run_id, {}).get(email_id, []))
+
+    def get_version(self, run_id: str, email_id: str, version: int) -> Optional[dict]:
+        """One superseded version, 1 being the run's original answer. The
+        raw entry (CaseResult and bytes included) -- for the attachment
+        route; `get_history` is the JSON-shaped view."""
+        with self._lock:
+            history = self._history.get(run_id, {}).get(email_id, [])
+            if 1 <= version <= len(history):
+                return history[version - 1]
+            return None
+
+    def get_history(self, run_id: str, email_id: str) -> list[dict]:
+        with self._lock:
+            history = list(self._history.get(run_id, {}).get(email_id, []))
+        return [self._history_entry_view(e) for e in history]
+
+    def recheck_info(self, run_id: str, email_id: str, result: CaseResult) -> Optional[dict]:
+        """What the case detail says about its re-checks, or None when there
+        were none -- so an unchanged case's report is byte-for-byte what it
+        was before this feature existed, plus one null key."""
+        with self._lock:
+            history = list(self._history.get(run_id, {}).get(email_id, []))
+            files = dict(self._files.get(run_id, {}).get(email_id, {}))
+        if not history:
+            return None
+        last = history[-1]
+        return {
+            "count": len(history),
+            "last_at": last["replaced_at"],
+            "last_resubmitted": last["resubmitted"],
+            # Which file each side is currently read from -- "resent" is
+            # served from memory by the attachment route, "original" from
+            # the run's data root. A side with no document at all (the case
+            # never had a BL and none was re-sent) is reported as None.
+            "sources": {
+                side: (
+                    "resent" if side in files
+                    else "original" if getattr(result, f"{side}_doc") is not None
+                    else None
+                )
+                for side in ("si", "bl")
+            },
+        }
+
+    def recheck_summary(self, run_id: str) -> dict:
+        """Counts for the metrics page, beside `review_summary`."""
+        with self._lock:
+            per_case = list(self._history.get(run_id, {}).values())
+        return {
+            "cases": sum(1 for h in per_case if h),
+            "rechecks": sum(len(h) for h in per_case),
+        }
+
+    def _history_entry_view(self, entry: dict) -> dict:
+        result: CaseResult = entry["result"]
+        return {
+            "version": entry["version"],
+            "replaced_at": entry["replaced_at"],
+            "resubmitted": entry["resubmitted"],
+            "uploaded": entry["uploaded"],
+            "report": result.to_report(),
+            "review": entry["review"],
+            "effective": self._effective(result, entry["review"]),
         }
 
 

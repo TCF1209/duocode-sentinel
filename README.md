@@ -38,7 +38,7 @@ of being reported as a discrepancy.*
 | | |
 |---|---|
 | **Accuracy** | **1.0000** final score on the dev set **and** on three held-out draws, generated from the organisers' own generator with seeds we never developed against — 225 planted defects, every one caught with the **exact** field set, no false alarms, all 80 escalations correct. Not four *independent* tests, and `docs/SCORING.md` §4.1 says why. |
-| **Tests** | **590** — up from 574 at `4c852a7`: sixteen new (fourteen test functions, one of them parametrised three ways), re-run 24 Sep as **448 passed, 142 skipped, 0 failed, 0 xfailed**. The one strict `xfail` that used to sit here is gone: it pinned a defect found by review, `docs/ADVERSARIAL.md` §5.4, fixed the same day it was found. The same command runs on every push in [CI](.github/workflows/ci.yml). |
+| **Tests** | **596** — up from 574 at `4c852a7`: twenty-two new (twenty test functions, one of them parametrised three ways; the last six cover `POST /cases/{id}/recheck`), re-run 24 Sep as **454 passed, 142 skipped, 0 failed, 0 xfailed**. The one strict `xfail` that used to sit here is gone: it pinned a defect found by review, `docs/ADVERSARIAL.md` §5.4, fixed the same day it was found. The same command runs on every push in [CI](.github/workflows/ci.yml). |
 | **Speed** | **~3 ms per email**, single-threaded on a laptop: 520 emails end to end in about 1.5 s. |
 | **Cost** | **100% of decisions are made by rules.** `decided_by` is `"rule"` for all 520 emails; no model call decides anything on the graded inbox. |
 
@@ -184,7 +184,7 @@ are reproducible and not re-billed, per-purpose token metering and a run
 budget. Every path is optional: with no `OPENAI_API_KEY` the pipeline still
 runs end to end and escalates what it cannot read (`CLAUDE.md` rule 5).
 
-**The API — `backend/api/`, FastAPI, 11 routes.** Pydantic models at the
+**The API — `backend/api/`, FastAPI, 13 routes.** Pydantic models at the
 boundary only; `store.py` isolates state so the in-memory store is one file to
 replace, not a rewrite of the routes.
 
@@ -194,8 +194,10 @@ replace, not a rewrite of the routes.
 | `POST /runs` · `GET /runs` · `GET /runs/{id}` | start a run over the bundled inbox; list; status and `metrics.json` |
 | `GET /runs/{id}/cases` | case list, filterable by category, status and `decided_by` |
 | `GET /cases/{id}` | one full report — seven fields, both sides, every piece of evidence |
+| `GET /cases/{id}/attachments/{side}` | the SI or BL file itself, inline — the whole document behind the evidence snippet |
 | `POST /cases/{id}/review` | a reviewer confirms or corrects; the report updates |
 | `POST /cases/{id}/retry` | re-process one email in place, re-reading it from disk |
+| `POST /cases/{id}/recheck` | **re-sent documents**: the same check run again on an uploaded SI and/or BL; the answer it replaces, and any review of it, stay readable in the case's history |
 | `POST /compare` | **upload two documents of your own** and get the same report |
 | `GET /metrics` · `GET /submission` | operational counters; the graded artefact |
 
@@ -215,7 +217,7 @@ claimed.*
 and `render.yaml` build the API, `web/vercel.json` the frontend. Runbook and
 the failures worth predicting: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
-**Tests — 590**, up from 574 at `4c852a7` (sixteen new, one former `xfail` now
+**Tests — 596**, up from 574 at `4c852a7` (twenty-two new, one former `xfail` now
 a plain pass — see the table two sections up). The skips are guarded in
 `conftest.py` and print their reason rather than failing on an empty read —
 exact counts and the caveat on which of them are freshly re-run versus
@@ -268,9 +270,9 @@ the 520-email one, below.
 
 On a fresh clone at `4c852a7`: **431 passed, 142 skipped, 1 xfailed, 0
 errors**. Re-run on 24 Sep on a checkout holding no `data/` — the same
-condition as a clone — the suite is **590 tests: 448 passed, 142 skipped, 0
+condition as a clone — the suite is **596 tests: 454 passed, 142 skipped, 0
 failed, 0 xfailed**, counted from `pytest --junitxml` rather than remembered:
-sixteen tests added since `4c852a7`, and the former `xfail` now a plain pass.
+twenty-two tests added since `4c852a7`, and the former `xfail` now a plain pass.
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs this same command
 on every push, on a machine nobody on the team configured — the fresh-clone
 check made permanent rather than repeated by hand.
@@ -282,7 +284,7 @@ full bundle to read. `backend/tests/conftest.py` guards exactly the tests that
 open it and skips them with the reason printed, rather than letting ~100 tests
 fail on an empty read and read as a broken project. With the participant bundle
 at `data/bundle/`, the same command gave **573 passed, 1 xfailed** at
-`4c852a7`; by the same arithmetic as above, **590 passed, 0 xfailed** since.
+`4c852a7`; by the same arithmetic as above, **596 passed, 0 xfailed** since.
 
 ### The full inbox
 
@@ -566,9 +568,9 @@ kept apart on purpose.
 
 ```
 backend/sdoc/          the pipeline — no web, no database, no network imports
-backend/api/           FastAPI surface over it (11 routes, incl. POST /compare)
+backend/api/           FastAPI surface over it (13 routes, incl. POST /compare)
 backend/tools/         adversarial.py, the perturbation harness; smoke_readers.py
-backend/tests/         590 tests over the traps in docs/DATA_NOTES.md
+backend/tests/         596 tests over the traps in docs/DATA_NOTES.md
 backend/run.py         an inbox -> submission.json + report.json + metrics.json
 web/                   Next.js 16 dashboard (App Router, shadcn/ui, Recharts)
 demo_data/             30-email demo inbox — what a clone can run without the bundle
