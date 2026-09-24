@@ -171,7 +171,7 @@ datasets, three from seeds we never developed against — 225 defects, exact
 field set, 80/80 escalations. *Attacked ourselves:* 16 kinds of damage,
 3,008 perturbed documents, 20,496 field reads, no answer key — 13 modes at
 zero movement; silent wrong values 982 → 0. *A real carrier's form:* CMA
-CGM's SI template — one bug found and fixed. *Engineering:* 596 tests, 0
+CGM's SI template — one bug found and fixed. *Engineering:* 646 tests, 0
 failing, CI on every push, a container that runs as a non-root user with no
 secret baked in. And the honest box, in a different colour: **what we
 haven't fixed** — `email_145`, one masked discrepancy in 3,008, the guard
@@ -304,9 +304,9 @@ does not score more.
 | $0.0013 per document; 178 calls, $0.2447 | `ADVERSARIAL.md` §8, pinned rate card `llm/config.py` |
 | 1.0000 × 4; 225 defects; 80/80 escalations | `SCORING.md` §4.1 (dev 520/46, held-out 520/57, 320/31, 820/91) |
 | 16 modes · 3,008 documents · 20,496 reads · 13 at zero · 982 → 0 · 151 → 0 | `ADVERSARIAL.md` §1–§4, re-run 24 Sep, all sixteen modes match |
-| `email_145`, one masked discrepancy in 3,008; the guard flags 92% of real party fields | `ADVERSARIAL.md` §5.2 |
+| `email_145`, one masked discrepancy in 3,008; the guard would flag 114 of 124 SI/BL pairs (92%) | `ADVERSARIAL.md` §5.2; `python backend/tools/party_continuations.py bundle_data`, 25 Sep (per label line it is 328 of 530, 62% — the 24 Sep "485 of 530" was a miscount) |
 | CMA CGM SI template: one bug found and fixed | `EXTERNAL_VALIDATION.md` |
-| 596 tests, 0 failing (454 passed, 142 skipped without the dataset) | `pytest --junitxml`, 24 Sep, after `61aa336` |
+| 646 tests, 0 failing (504 passed, 142 skipped without the dataset) | `pytest --junitxml`, 25 Sep, on the final-round working tree (no `data/bundle`) |
 | 21 pattern groups, largest 7 cases | run page over the real inbox, `STATUS.md` 24 Sep |
 | desk codes AFEMY 35 · AIE 30 · AFRT 29 · AFPTME 22 | counted from `bundle_data/inbox` subjects and recipients, 24 Sep |
 | 9.1% escalation rate, all correct | 20 of 220 comparison requests, gold `NEEDS_REVIEW` 20 |

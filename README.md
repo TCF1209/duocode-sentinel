@@ -38,7 +38,7 @@ of being reported as a discrepancy.*
 | | |
 |---|---|
 | **Accuracy** | **1.0000** final score on the dev set **and** on three held-out draws, generated from the organisers' own generator with seeds we never developed against — 225 planted defects, every one caught with the **exact** field set, no false alarms, all 80 escalations correct. Not four *independent* tests, and `docs/SCORING.md` §4.1 says why. |
-| **Tests** | **641** — forty-five added on 25 Sep for the reply drafts' wording pass (`backend/tests/test_reply_polish.py`), on top of the 596 of 24 Sep; re-run 25 Sep on a copy of the tree with no `data/` as **499 passed, 142 skipped, 0 failed, 0 xfailed**. The one strict `xfail` that used to sit here is gone: it pinned a defect found by review, `docs/ADVERSARIAL.md` §5.4, fixed the same day it was found. The same command runs on every push in [CI](.github/workflows/ci.yml). |
+| **Tests** | **646** — fifty added on 25 Sep: forty-five for the reply drafts' wording pass (`backend/tests/test_reply_polish.py`), four for the in-place review and its value corrections and one for telling a scanned PDF from a corrupt one (`backend/tests/test_api.py`), on top of the 596 of 24 Sep; re-run 25 Sep on a checkout with no `data/bundle` as **504 passed, 142 skipped, 0 failed, 0 xfailed**. The one strict `xfail` that used to sit here is gone: it pinned a defect found by review, `docs/ADVERSARIAL.md` §5.4, fixed the same day it was found. The same command runs on every push in [CI](.github/workflows/ci.yml). |
 | **Speed** | **~3 ms per email**, single-threaded on a laptop: 520 emails end to end in about 1.5 s. |
 | **Cost** | **100% of decisions are made by rules.** `decided_by` is `"rule"` for all 520 emails; no model call decides anything on the graded inbox. |
 
@@ -279,11 +279,12 @@ the 520-email one, below.
 ```
 
 On a fresh clone at `4c852a7`: **431 passed, 142 skipped, 1 xfailed, 0
-errors**. Re-run on 25 Sep on a copy of the tree holding no `data/` — the same
-condition as a clone — the suite is **641 tests: 499 passed, 142 skipped, 0
+errors**. Re-run on 25 Sep on a checkout holding no `data/bundle` — the same
+condition as a clone — the suite is **646 tests: 504 passed, 142 skipped, 0
 failed, 0 xfailed**, read off pytest's own summary line rather than
-remembered: sixty-seven tests added since `4c852a7` (forty-five of them on
-25 Sep, for the reply drafts' wording pass), and the former `xfail` now a
+remembered: seventy-two tests added since `4c852a7` (fifty of them on
+25 Sep: forty-five for the reply drafts' wording pass, five for in-place
+review, value corrections and scan state), and the former `xfail` now a
 plain pass.
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs this same command
 on every push, on a machine nobody on the team configured — the fresh-clone
@@ -582,7 +583,7 @@ kept apart on purpose.
 backend/sdoc/          the pipeline — no web, no database, no network imports
 backend/api/           FastAPI surface over it (13 routes, incl. POST /compare)
 backend/tools/         adversarial.py, the perturbation harness; smoke_readers.py
-backend/tests/         596 tests over the traps in docs/DATA_NOTES.md
+backend/tests/         646 tests over the traps in docs/DATA_NOTES.md
 backend/run.py         an inbox -> submission.json + report.json + metrics.json
 web/                   Next.js 16 dashboard (App Router, shadcn/ui, Recharts)
 demo_data/             30-email demo inbox — what a clone can run without the bundle

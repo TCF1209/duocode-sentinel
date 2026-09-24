@@ -27,7 +27,7 @@ add for eight. Read the portal first, then cut.
         Review with "No label for … could be recognised"; toggle on → Mismatch
         on consignee and notify party, badge **model answered**.
   - [ ] `/compare`, the *scanned* sample, toggle on: transcript card.
-  - [ ] `/pitch` slide 3 chip reads **596 tests · 0 failing**; slide 4's
+  - [ ] `/pitch` slide 3 chip reads **646 tests · 0 failing**; slide 4's
         card is about `email_145`.
   - [ ] GitHub: the CI badge on the README is green (first run after the
         push). If it is red, read the log before the pitch — a red badge on
@@ -57,6 +57,12 @@ add for eight. Read the portal first, then cut.
       the first run after waking took 41.6 s when it was measured, the second
       12.7 s. **Start one run and throw it away** so the one on stage is the
       warm one.
+- [ ] **The re-upload tile has three turns per run.** *Correct by re-upload*
+      opens an email with nothing attached (`email_506`, then `508`, then
+      `510`), and each *Load a sample pair → Re-check* turns one OK for
+      everyone looking at that run. The home page follows the latest finished
+      run, so a fresh run — the one thrown away above, or a Render restart —
+      resets all three. Start another after any rehearsal that used them.
 - [ ] Open, in this tab order, so nothing is typed on stage: `/pitch` (slide
       1) · `/runs` · `/compare` with the unfamiliar-labels sample loaded ·
       the GitHub repository.
@@ -74,20 +80,42 @@ The deck's beats and timings are in `PITCH_DECK.md`. On the product:
    Point at the tally: **46 mismatches, 20 sent to a person with the reason,
    thirteen seconds, 6 model calls — all six are scans read out for the
    reviewer.**
-2. **Patterns worth a second look** — open the top group, say what it is
-   (seven cases from one shipper wrong on the same field), click into one.
-3. A **MISMATCH** case: the two documents side by side, the two fields that
-   disagree, and under every value **the line it was read from**. This is the
-   promise of the first slide, on screen.
-4. A **NEEDS_REVIEW scan** (`email_512`): "no text layer, so it did not
-   decide — but the model read the page for the reviewer" — the transcript
-   card, then the review panel: confirm / correct per field.
-5. `/compare`, unfamiliar labels, **toggle off**: "wording our table has
+2. On the run, flip **Before Sentinel**: the inbox as it arrived — 520
+   subject lines, 220 pairs to find among them, "≈ 17.6 h of work at our
+   own estimate". Classify the first five yourself (the *Your call* column;
+   the clock starts at the first pick). Flip **With Sentinel**: your pace
+   projected over all 520, Sentinel's 1.3 s beside it, and how many of the
+   five it agreed with. *(Light theme on stage. The five calls survive
+   opening a case; "Start over" clears them for the next rehearsal.)*
+3. The filter card: **Sorted into** is step 1 (classify) with the counts;
+   **Outcome** is the check. Click *Mismatch 46*: the list narrows, the
+   mismatched fields are on every row.
+4. **Patterns worth a second look** — it starts collapsed; open it, say what
+   the top group is (seven cases from one shipper wrong on the same field),
+   click into one.
+5. A **MISMATCH** case: the two documents on top (*View original*), only
+   the fields that disagree open (the rest fold under "5 fields agree"),
+   and under every value **the line it was read from**. Then correct it
+   where it is: *Correct* on the BL value, type what the shipper confirmed,
+   Enter — the pair is compared again with the run's own rules, the card
+   turns to *Match* with Sentinel's reading kept underneath, the outcome
+   above follows; *Undo* puts Sentinel's reading back. *Not a mismatch* is
+   the one-click version when the two are the same party. Nothing to scroll
+   to, nothing to submit.
+6. A **NEEDS_REVIEW** case: `email_512` (a scan, needs the model run): "no
+   text layer, so it did not decide — but the model read the page for the
+   reviewer" — the transcript card. Or `email_506` (the BL never arrived):
+   *Re-sent documents* → *No files? Load a sample pair* → *Re-check* → it
+   comes back OK, and the old answer stays on the case as v1.
+7. `/compare`, unfamiliar labels, **toggle off**: "wording our table has
    never seen — the honest answer is *can't read it*, and it says which
    labels." **Toggle on**: "the model reads them, every value is re-located
    in the document before it is adopted, and it surfaces the real
-   discrepancy — badge says *model answered*."
-6. Back to the deck for impact and close.
+   discrepancy — badge says *Model answered*."
+8. Back to the deck for impact and close.
+
+Cut for time: step 2's own five calls (say the numbers instead), step 6's
+second case, step 7's toggle-off half.
 
 If the venue network dies mid-demo: switch to the local tab (`localhost:3000`
 already open behind), say so in one sentence, and continue from the same
@@ -167,7 +195,13 @@ own, and the plumbing to select one per desk is the roadmap's item 5.
 `email_145`: a wrapped party name cut short to exactly what the other
 document says. The repair has nothing to repair, and a real mismatch reads
 as a match — once in 3,008 perturbed documents. The obvious guard would flag
-92% of genuine party fields, so it stays open and documented.
+114 of 124 SI/BL pairs (92%), so it stays open and documented.
+*If asked how the 92% is counted:* the only sign that a name wrapped is a
+line with no label of its own right after it — which is also exactly what an
+address block looks like. 114 of the 124 pairs have a shipper, consignee or
+notify value followed by such a line, so a guard on that sign escalates them
+all. Per label line it is 328 of 530 (a notify party never has an address
+under it); `backend/tools/party_continuations.py` reproduces both.
 
 **"Why exact matching — isn't fuzzy matching smarter?"**
 The entity pools contain `APRIL FINE PAPER TRADING` and `APRIL FINE PAPER
@@ -192,8 +226,9 @@ changes only what survives a restart.
 
 - **"Our pipeline is 89% AI."** It is not; the model does no work on the
   graded inbox. The 168 → 2 is what happens on wording we invented.
-- **"574 tests"**, **"one test pinned to fail"**, **"45 mismatches, 21
-  refused"** — all stale. It is **596 tests, 0 failing** and **46 / 20**.
+- **"574 tests"**, **"596 tests"**, **"one test pinned to fail"**, **"45
+  mismatches, 21 refused"** — all stale. It is **646 tests, 0 failing** and
+  **46 / 20**.
 - **"Thirteen seconds"** is a warm container. A cold one takes 40. Wake it.
 - **"Eleven hours of desk work"** only with *"at a conservative estimate"*
   in front of it. It is arithmetic on an assumed pace, not a measurement.
