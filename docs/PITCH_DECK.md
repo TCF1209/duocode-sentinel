@@ -2,8 +2,17 @@
 
 Written 24 Sep 2026 for Pitch Day on the 26th. Every number below was
 re-measured that day (`STATUS.md`, session 9) and its source is in the
-table at the end. The deck file is generated from this document; when a
-number changes, change it here first.
+table at the end.
+
+**The deck file is [`Sentinel-final-pitch.pptx`](Sentinel-final-pitch.pptx)
+(and a `.pdf` of it beside it)** — ten slides: the nine below plus a dark
+divider for the demo beat, so the running order is on screen while the
+browser is. It is generated from this document's content by
+`scripts/build_pitch_deck.ps1`, which drives PowerPoint itself; the
+screenshots it embeds are under `docs/img/pitch/` and come from a
+model-tier run over the full inbox on 24 Sep (46 / 20 / 454, 6 model
+calls). Speaker notes carry the *Say* paragraphs. When a number changes,
+change it here first, then in the script, then rebuild.
 
 **Built for five minutes plus questions.** The Finalist Portal's actual
 limit was not known when this was written. Below each beat is its cost in
