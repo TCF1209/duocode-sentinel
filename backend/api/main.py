@@ -315,8 +315,27 @@ def get_case_attachment(case_id: str, side: str) -> FileResponse:
     # The remaining .xlsx/.docx have no in-browser renderer either way, so
     # "inline" costs those nothing next to "attachment" -- the browser's own
     # fallback for a type it can't display is to download it regardless.
+    #
+    # Cache-Control: no-store -- found the hard way, not added speculatively.
+    # FileResponse sets last-modified/etag (set_stat_headers), which is enough
+    # for a browser to cache and later revalidate a GET by default; live
+    # testing during this same session hit exactly that path -- one response
+    # cached from an earlier, briefer server state (this route did not exist,
+    # or CORS was not yet configured, at various earlier points tonight) kept
+    # being served/revalidated afterward, reproducibly failing every default-
+    # mode fetch() to the same URL while curl and a cache-bypassed fetch() to
+    # the identical URL always succeeded -- proof it was a stale cache entry,
+    # not the route or its CORS setup. A case's underlying file can also
+    # change under a retry (retry_case re-reads it from disk), which this
+    # would otherwise paper over with a stale copy. There is no scenario
+    # where caching this response is wanted, only ones where it silently
+    # goes stale, so it is turned off outright rather than tuned.
     return FileResponse(
-        full_path, media_type=media_type, filename=full_path.name, content_disposition_type="inline"
+        full_path,
+        media_type=media_type,
+        filename=full_path.name,
+        content_disposition_type="inline",
+        headers={"Cache-Control": "no-store"},
     )
 
 

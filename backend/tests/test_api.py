@@ -241,6 +241,10 @@ class TestRunLifecycle:
         # clicking this from the report should see the document in the tab,
         # not get a save-as dialog. See main.py's comment on this route.
         assert si.headers["content-disposition"].startswith("inline")
+        # Not cacheable -- a stale cached copy of this exact route reproducibly
+        # broke live browser testing during this session (main.py's own
+        # comment on this route has the full story); this pins the fix.
+        assert si.headers["cache-control"] == "no-store"
 
         bl = client.get(f"/cases/{run_id}:email_001/attachments/bl")
         assert bl.status_code == 200, bl.text
