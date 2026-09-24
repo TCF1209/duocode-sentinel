@@ -276,7 +276,7 @@ def _ev(e: Optional[Evidence]) -> Optional[dict[str, str]]:
 def _doc(d: Optional[ParsedDoc]) -> Optional[dict[str, Any]]:
     if d is None:
         return None
-    return {
+    out: dict[str, Any] = {
         "path": d.path,
         "ext": d.ext,
         "doc_type": d.doc_type,
@@ -285,3 +285,15 @@ def _doc(d: Optional[ParsedDoc]) -> Optional[dict[str, Any]]:
         "n_bytes": d.n_bytes,
         "notes": d.notes,
     }
+    # An image-only scan may carry a vision transcript, parked by
+    # readers/scan.py on an attribute no extraction path reads. It is reviewer
+    # evidence, not an extraction -- the case still escalates as unreadable --
+    # and the report carries it so the reviewer receives the page already read
+    # instead of a note saying it could not be. Imported here rather than at
+    # module level because readers/scan.py imports this module.
+    from .readers import scan as _scan  # noqa: PLC0415 - avoids a circular import
+
+    transcript = _scan.transcript_of(d)
+    if transcript is not None:
+        out["scan_transcript"] = transcript.as_dict()
+    return out

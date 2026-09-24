@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fadeUp, stagger } from "@/lib/motion";
 import { FIELD_LABELS, REVIEW_REASON_TEXT, STATUS_LABELS } from "@/lib/labels";
+import { ScanTranscriptCard, transcriptOf } from "@/components/scan-transcript-card";
 import { cn } from "@/lib/utils";
 
 // The backend computes `model_offered` and `model_used` so the page can say
@@ -194,6 +195,7 @@ function DocumentStatus({ side, doc, caseId }: { side: "si" | "bl"; doc: Documen
     text = `Read as a ${SIDE_NAME[side]}`;
   }
   const Icon = tone === "ok" ? CheckCircle2 : tone === "warn" ? AlertTriangle : XCircle;
+  const transcript = transcriptOf(doc);
   return (
     <div className="flex flex-wrap items-start gap-x-2 gap-y-1 rounded-md border bg-background p-2.5 text-sm">
       <Icon className={cn("mt-0.5 size-4 shrink-0", TONE_TEXT[tone])} strokeWidth={2} />
@@ -203,6 +205,16 @@ function DocumentStatus({ side, doc, caseId }: { side: "si" | "bl"; doc: Documen
         {doc && (
           <div className="text-xs text-muted-foreground">
             {doc.path} · {doc.n_bytes}b
+          </div>
+        )}
+        {/* An image-only scan that a vision model was allowed to read arrives
+            with the page already read out for the reviewer. It sits under the
+            "could not be read" line on purpose: the document is still
+            unreadable to the pipeline and the case is still here, the card
+            only saves the reviewer from starting at zero. */}
+        {transcript && (
+          <div className="mt-2">
+            <ScanTranscriptCard role={side === "si" ? "SI" : "BL"} transcript={transcript} />
           </div>
         )}
       </div>
