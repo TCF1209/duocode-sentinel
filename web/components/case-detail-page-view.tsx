@@ -78,6 +78,7 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
         <CardContent className="p-6">
           <CaseReportView
             report={report}
+            caseId={`${runId}:${emailId}`}
             onReview={async (body) => {
               await reviewCase(runId, emailId, body);
               toast.success("Review saved");

@@ -15,6 +15,7 @@ or, with backend/ as the working directory:
 """
 from __future__ import annotations
 
+import mimetypes
 import os
 import sys
 from contextlib import asynccontextmanager
@@ -23,6 +24,7 @@ from typing import Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 BACKEND = Path(__file__).resolve().parents[1]
 if str(BACKEND) not in sys.path:
@@ -264,6 +266,58 @@ def get_case(case_id: str) -> dict:
     # said X, a reviewer said Y" has both without diffing anything.
     report["effective"] = store.effective_outcome(run_id, result)
     return report
+
+
+@app.get("/cases/{case_id}/attachments/{side}")
+def get_case_attachment(case_id: str, side: str) -> FileResponse:
+    """The original SI or BL file a case was read from, not just its evidence.
+
+    An evidence snippet is deliberately short (SNIPPET_MAX in
+    extract/fields.py) -- enough to confirm a value in place, not to read
+    the whole document. This is the document itself, for the reviewer who
+    wants more context than one line gives. Only ever the file a *run*
+    read off disk: /compare holds an upload in memory and writes nothing
+    (direct_compare.py's own docstring says so), so there is no case_id in
+    the run_id:email_id shape this route expects and nothing to serve.
+    """
+    if side not in ("si", "bl"):
+        raise HTTPException(status_code=404, detail="side must be 'si' or 'bl'")
+    run_id, email_id = _split_case_id(case_id)
+    result = store.get_case(run_id, email_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"no case '{case_id}'")
+    doc = result.si_doc if side == "si" else result.bl_doc
+    if doc is None or not doc.path:
+        raise HTTPException(status_code=404, detail=f"no {side} attachment on this case")
+
+    run = store.get_run(run_id)
+    if run is None or not run.data_root:
+        raise HTTPException(status_code=404, detail=f"no data root recorded for run '{run_id}'")
+
+    # doc.path is the attachment path exactly as the inbox JSON's own
+    # "attachments" list wrote it (readers/__init__.py's read_attachment) --
+    # not request input, but resolved and contained anyway as a cheap,
+    # correct habit rather than a trust judgement call on data that happens
+    # to come from this dataset today.
+    data_root = Path(run.data_root).resolve()
+    full_path = (data_root / doc.path).resolve()
+    if data_root not in full_path.parents and full_path != data_root:
+        raise HTTPException(status_code=400, detail="attachment path escapes the data root")
+    if not full_path.is_file():
+        raise HTTPException(status_code=404, detail=f"{doc.path} is no longer on disk")
+
+    media_type = mimetypes.guess_type(full_path.name)[0] or "application/octet-stream"
+    # inline, not FileResponse's own "attachment" default: docs/DATA_NOTES.md's
+    # own attachment-format count is 192 .txt + 28 .pdf out of 250 total, and a
+    # browser renders both of those in the tab when told "inline" -- the whole
+    # point of this route is a reviewer looking at the document, not a forced
+    # save-as dialog for a file they have to go find in Downloads afterward.
+    # The remaining .xlsx/.docx have no in-browser renderer either way, so
+    # "inline" costs those nothing next to "attachment" -- the browser's own
+    # fallback for a type it can't display is to download it regardless.
+    return FileResponse(
+        full_path, media_type=media_type, filename=full_path.name, content_disposition_type="inline"
+    )
 
 
 @app.post("/cases/{case_id}/review")

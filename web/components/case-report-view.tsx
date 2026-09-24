@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
-import { AlertTriangle } from "lucide-react";
-import type { CaseReport, CaseStatus } from "@/lib/api";
+import { AlertTriangle, ExternalLink } from "lucide-react";
+import { attachmentUrl, type CaseReport, type CaseStatus } from "@/lib/api";
 import { CategoryBadge, DecidedByBadge, StatusBadge } from "@/components/status-badges";
 import { FieldComparisonRow } from "@/components/field-comparison-row";
 import { ReviewPanel } from "@/components/review-panel";
@@ -39,6 +39,25 @@ function ModelTier({ offered, used }: { offered?: boolean; used?: boolean }) {
   );
 }
 
+/** Opens the real file a run read off disk in a new tab -- backend/api/main.py
+ *  serves it `inline`, so a .txt or .pdf (220 of the dataset's 250 attachments,
+ *  docs/DATA_NOTES.md) renders right there instead of forcing a download the
+ *  reviewer then has to go find. A .docx/.xlsx has no browser-native viewer
+ *  either way and just downloads, same as it would have without this link. */
+function AttachmentLink({ caseId, side }: { caseId: string; side: "si" | "bl" }) {
+  return (
+    <a
+      href={attachmentUrl(caseId, side)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 text-primary hover:underline"
+    >
+      <ExternalLink className="size-3" />
+      View original
+    </a>
+  );
+}
+
 /**
  * The discrepancy report — "the screen the whole project exists to produce"
  * (docs/ROADMAP.md 3b). Shared by the run case-detail page and the judge
@@ -46,9 +65,15 @@ function ModelTier({ offered, used }: { offered?: boolean; used?: boolean }) {
  */
 export function CaseReportView({
   report,
+  caseId,
   onReview,
 }: {
   report: CaseReport;
+  /** `<run_id>:<email_id>`, only when this report came from a run -- gates
+   *  the "View original" links below. /compare has no persisted file to
+   *  point at (its own docstring says it writes nothing), so it is left
+   *  unset there and the links simply don't render, same as `onReview`. */
+  caseId?: string;
   onReview?: (body: { decision: "confirm" | "correct"; status?: CaseStatus; defect_fields?: string[]; note?: string }) => Promise<void>;
 }) {
   // classify/intent.py's signal ids (e.g. "attach.attached-are") ride in the
@@ -155,13 +180,19 @@ export function CaseReportView({
 
       <motion.div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2" variants={fadeUp}>
         {report.documents.si && (
-          <div>
-            SI: {report.documents.si.path} ({report.documents.si.doc_type}, {report.documents.si.n_bytes}b)
+          <div className="flex flex-wrap items-center gap-x-2">
+            <span>
+              SI: {report.documents.si.path} ({report.documents.si.doc_type}, {report.documents.si.n_bytes}b)
+            </span>
+            {caseId && <AttachmentLink caseId={caseId} side="si" />}
           </div>
         )}
         {report.documents.bl && (
-          <div>
-            BL: {report.documents.bl.path} ({report.documents.bl.doc_type}, {report.documents.bl.n_bytes}b)
+          <div className="flex flex-wrap items-center gap-x-2">
+            <span>
+              BL: {report.documents.bl.path} ({report.documents.bl.doc_type}, {report.documents.bl.n_bytes}b)
+            </span>
+            {caseId && <AttachmentLink caseId={caseId} side="bl" />}
           </div>
         )}
       </motion.div>

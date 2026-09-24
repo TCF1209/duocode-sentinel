@@ -210,6 +210,48 @@ class TestRunLifecycle:
         assert set(submission) == {"email_001", "email_002", "email_003"}
         assert submission["email_001"]["status"] == "OK"
 
+    def test_case_attachment_serves_the_real_file_a_run_read(
+        self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The document itself, not just the evidence snippet cut from it.
+
+        Reads back exactly the bytes _write_attachment put on disk for
+        email_001's SI side -- the point is this is the real file the
+        pipeline actually read, not a reconstruction from report.json.
+        """
+        monkeypatch.setattr(api_main, "DEFAULT_DATA_ROOT", synthetic_inbox)
+        run_id = client.post("/runs", json={"use_llm": False}).json()["run_id"]
+        for _ in range(100):
+            if client.get(f"/runs/{run_id}").json()["status"] != "running":
+                break
+            time.sleep(0.05)
+
+        # Normalises \r\n: Path.write_text (_write_attachment, above) writes
+        # the platform's own newline translation, CRLF on Windows, while
+        # _SI_TEXT is a plain-\n literal -- a fact about this fixture on
+        # this OS, not something the endpoint should paper over by
+        # rewriting bytes it reads off disk. It exists to serve the file
+        # verbatim; asserting on content should not care which newline a
+        # given OS happened to write.
+        si = client.get(f"/cases/{run_id}:email_001/attachments/si")
+        assert si.status_code == 200, si.text
+        assert si.text.replace("\r\n", "\n") == _SI_TEXT
+        assert si.headers["content-type"].startswith("text/")
+        # "inline", not FileResponse's own "attachment" default -- a reviewer
+        # clicking this from the report should see the document in the tab,
+        # not get a save-as dialog. See main.py's comment on this route.
+        assert si.headers["content-disposition"].startswith("inline")
+
+        bl = client.get(f"/cases/{run_id}:email_001/attachments/bl")
+        assert bl.status_code == 200, bl.text
+        assert bl.text.replace("\r\n", "\n") == _BL_TEXT_MATCH
+
+        # email_003 has only an SI attached (see synthetic_inbox) -- the
+        # missing BL side must 404, not serve a stale or empty file.
+        assert client.get(f"/cases/{run_id}:email_003/attachments/bl").status_code == 404
+        assert client.get(f"/cases/{run_id}:email_001/attachments/upside-down").status_code == 404
+        assert client.get(f"/cases/{run_id}:email_999/attachments/si").status_code == 404
+
     def test_unknown_run_is_404(self, client: TestClient) -> None:
         assert client.get("/runs/does-not-exist").status_code == 404
 

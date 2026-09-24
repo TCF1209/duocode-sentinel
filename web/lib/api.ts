@@ -211,6 +211,17 @@ export function getCase(runId: string, emailId: string) {
   return request<CaseReport>(`/cases/${encodeURIComponent(runId)}:${encodeURIComponent(emailId)}`);
 }
 
+/** A direct link to the original SI or BL file a run read off disk, for an
+ *  `<a href>` -- never fetched with `request()`, since the point is letting
+ *  the browser open or download the raw bytes itself, not JSON. Only ever
+ *  valid for a case that came from a run (`caseId` is `<run_id>:<email_id>`);
+ *  /compare holds its upload in memory and writes nothing, so there is
+ *  nothing this could point at there (backend/api/main.py's own docstring
+ *  on this route says the same). */
+export function attachmentUrl(caseId: string, side: "si" | "bl"): string {
+  return `${API_BASE}/cases/${encodeURIComponent(caseId)}/attachments/${side}`;
+}
+
 export function reviewCase(
   runId: string,
   emailId: string,
