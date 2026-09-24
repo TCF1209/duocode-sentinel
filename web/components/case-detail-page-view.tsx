@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { RotateCw } from "lucide-react";
 import { CaseReportView } from "@/components/case-report-view";
 import { BackLink } from "@/components/back-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { getCase, retryCase, reviewCase, type CaseReport } from "@/lib/api";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getCase, listCases, retryCase, reviewCase, type CaseReport, type CaseSummary } from "@/lib/api";
 import { toast } from "sonner";
 
 /** See run-page-view.tsx's file comment: kept out of app/runs/[runId]/... on purpose. */
@@ -14,22 +15,63 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
   const [report, setReport] = useState<CaseReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  // For "this shipper has already had N mismatches on this field in this
+  // run" in the Correct it panel below -- a case detail page otherwise has
+  // no reason to know about any case but its own. Fetched alongside the
+  // case itself, not gated behind opening the panel, so the hint is ready
+  // the moment a reviewer clicks Correct it rather than popping in late.
+  // Best-effort: a failure here should not block the case report itself
+  // from rendering, so it is swallowed rather than surfaced as a page error.
+  const [allCases, setAllCases] = useState<CaseSummary[]>([]);
 
   const refresh = useCallback(() => {
     getCase(runId, emailId)
       .then(setReport)
       .catch((e) => setError(e.message));
+    listCases(runId, {})
+      .then((r) => setAllCases(r.cases))
+      .catch(() => {});
   }, [runId, emailId]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
+  const priorDefectCounts = useMemo(() => {
+    const self = allCases.find((c) => c.email_id === emailId);
+    if (!self?.shipper) return undefined;
+    const counts: Record<string, number> = {};
+    for (const c of allCases) {
+      if (c.email_id === emailId || c.shipper !== self.shipper) continue;
+      for (const f of c.defect_fields) counts[f] = (counts[f] ?? 0) + 1;
+    }
+    return counts;
+  }, [allCases, emailId]);
+
   if (error) {
     return <p className="text-sm text-danger">{error}</p>;
   }
   if (!report) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    // Shaped like the page it's standing in for (back link, header, review
+    // panel, a few field rows) rather than a bare "Loading…" line, which
+    // read as "the page is empty" more than "the page is working" -- this
+    // was raised directly, not a guess at what needed fixing.
+    return (
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-8 w-36 rounded-full" />
+        <Card>
+          <CardContent className="flex flex-col gap-4 p-6">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-20 w-full" />
+            <div className="flex flex-col gap-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-20 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // Retry is offered where it is the plausible next action and hidden where it
@@ -79,6 +121,7 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
           <CaseReportView
             report={report}
             caseId={`${runId}:${emailId}`}
+            priorDefectCounts={priorDefectCounts}
             onReview={async (body) => {
               await reviewCase(runId, emailId, body);
               toast.success("Review saved");

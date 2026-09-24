@@ -165,6 +165,7 @@ export function CaseReportView({
   report,
   caseId,
   onReview,
+  priorDefectCounts,
 }: {
   report: CaseReport;
   /** `<run_id>:<email_id>`, only when this report came from a run -- gates
@@ -173,6 +174,8 @@ export function CaseReportView({
    *  unset there and the links simply don't render, same as `onReview`. */
   caseId?: string;
   onReview?: (body: { decision: "confirm" | "correct"; status?: CaseStatus; defect_fields?: string[]; note?: string }) => Promise<void>;
+  /** Passed straight through to ReviewPanel -- see its own prop comment. */
+  priorDefectCounts?: Record<string, number>;
 }) {
   // classify/intent.py's signal ids (e.g. "attach.attached-are") ride in the
   // same `notes` list as human-written sentences. Every human sentence in
@@ -226,7 +229,7 @@ export function CaseReportView({
           there at all, not just easy to reach late. */}
       {onReview && (
         <motion.div variants={fadeUp}>
-          <ReviewPanel report={report} onSubmit={onReview} />
+          <ReviewPanel report={report} onSubmit={onReview} priorDefectCounts={priorDefectCounts} />
         </motion.div>
       )}
 
