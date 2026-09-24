@@ -4,6 +4,122 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-24 (night, continued a third time) — Claude session 8 · the attachment link became a dialog; two real bugs it took to get there; scroll restoration; a pattern-emailed badge
+
+Two things raised directly after the entry below shipped: (1) clicking
+"View original" then pressing the browser's back button lost the
+reviewer's place in the run table -- asked for a full check of every
+"back" path in the app, not just a patch for this one; (2) sending a
+pattern's summary email left no trace that it had been sent, so a
+pattern looked exactly as untouched five minutes after being emailed as
+it did before. Both investigated properly before touching code, per this
+session's own standing rule against deciding alone on an ambiguous
+design tradeoff -- see the two AskUserQuestion calls this session logged
+for the actual choices put to the user (dialog + fix scroll app-wide;
+local-only "emailed" marker over a backend one) rather than picked here.
+
+**Done**
+- **"View original" is now a dialog, not a link.** The investigation
+  found the `target="_blank"` version never opened a second tab in this
+  app's own preview surface -- confirmed with `tabs_context` before and
+  after a click, same tab, origin changed under it -- so the click was a
+  full navigation away, and the back button's return landed scrolled to
+  the top, not where the reviewer had been. A dialog removes the
+  navigation entirely rather than patching around its side effect:
+  nothing to come back from. txt/pdf render inline (fetched text in a
+  themed `<pre>`, a PDF in an `<iframe>` using `inline`
+  Content-Disposition from earlier tonight); docx/xlsx fall back to a
+  plain download link, since neither browser-renders regardless.
+- **Found and fixed a real, reproducible bug building it, not a
+  hypothetical one.** The dialog's fetch failed on click with a
+  CORS-shaped `net::ERR_FAILED` while curl and a manually-typed
+  `fetch()` to the identical URL never once failed. Root-caused, not
+  guessed: forcing one cache-bypassed request immediately fixed every
+  later default-mode fetch to that same URL too, which is the signature
+  of a stale cached response -- `FileResponse` sets `last-modified`/
+  `etag`, enough for a browser to cache and revalidate by default, and
+  at some earlier point tonight (before this route existed, or before
+  CORS was configured on it) a response without correct CORS headers got
+  cached under that URL and kept being served afterward. Fixed with
+  `Cache-Control: no-store` on the response in `backend/api/main.py` --
+  there was never a reason to want this cached, and `retry_case` can
+  change the underlying file, so a cached copy would go stale on its own
+  even ignoring the CORS angle. A short retry-with-backoff stays in the
+  dialog too, as a separate, real mitigation for ordinary transient
+  network blips, not as the fix for this bug.
+- **`useScrollRestoration` (`web/lib/use-scroll-restoration.ts`),
+  applied to the run table.** The *general* case behind the bug above:
+  clicking into any case from partway down the 520-row table and using
+  the browser's own back button reset to the top regardless of the
+  attachment feature, because this page's case list is fetched
+  client-side after mount -- at the moment restoration would normally
+  run, the page is still its pre-fetch height. Saves `scrollY`
+  continuously (rAF-throttled), restores once the list has actually
+  loaded, keyed by path so each run remembers its own position.
+- **A pattern's card now shows when it was last emailed.** Raised
+  directly: sending "Email this" on a pattern changed nothing anyone
+  could see later, so there was no way to tell "I already followed up
+  here" without remembering or re-checking. Recorded in `localStorage`
+  (`web/lib/pattern-contact.ts`) rather than the backend -- matches this
+  system's existing persistence level (the in-memory `Store` already
+  resets on every restart) rather than adding new backend state two days
+  out. Deliberately kept separate from case-review state: a sent email
+  does not mean the shipper fixed anything, so it must not make the
+  pattern disappear the way a real correction already does (confirmed
+  live tonight, not just from reading the code: correcting one case in a
+  real 5-case pattern dropped it to 4 immediately, `has_defect` threading
+  through `store.effective_outcome` exactly as designed). Shown on the
+  collapsed row, not only inside the opened drafting panel.
+- **A second, unrelated bug the new attachment test surfaced**:
+  `_write_attachment`'s `Path.write_text()` writes CRLF on Windows while
+  the fixture's text constants are plain `\n`, invisible until a test
+  did a byte-exact comparison against a served file, which nothing did
+  before this route existed. Fixed in the test's assertion, not the
+  route -- serving the literal on-disk bytes is correct, the
+  fixture/OS mismatch is not.
+
+**Verification**
+- `backend/tests`: full suite green after every change (exit 0, zero
+  `F`/`E` markers in the run); new assertions lock in the `inline` and
+  `no-store` headers and the CRLF-normalised comparison.
+- `npx tsc --noEmit`, `npm run lint`, `npm run build`: clean after each
+  of the three commits.
+- Live, repeatedly, against a fresh run over the real 520-email
+  `bundle_data/`: reproduced the CORS/cache failure on a poisoned URL,
+  fixed it, then confirmed a completely fresh run (a URL never fetched
+  by this browser before) opens the dialog cleanly three separate times
+  in a row across fresh page loads; confirmed browser-back scroll
+  restoration by scrolling to `scrollY` 3000, clicking into a case, and
+  checking the exact value came back after a real back navigation, not
+  this page's own in-app link; confirmed the emailed badge appears
+  immediately, only on the pattern actually emailed, and survives a
+  reload.
+- Three commits on `feat/final-round-differentiators`, each scoped to
+  one of the three pieces above, `git status` checked clean before and
+  after each stage.
+
+**Next**
+- Same open items as the entries below: slide deck, branch push/merge
+  decision, Mentor Session reply.
+- Both local servers left running (backend on `bundle_data/`, frontend
+  dev server) so this is ready to look at directly rather than needing a
+  cold-start re-verify.
+
+**Careful**
+- **The CORS/cache bug above was very likely self-inflicted by this
+  session's own extended, iterative testing** -- restarting the backend
+  repeatedly across many hours, at points with the route not yet added
+  or CORS not yet configured, is what let a bad response get cached in
+  the first place. `Cache-Control: no-store` closes the door regardless
+  of cause, but it is worth knowing this was probably never reachable by
+  an actual end user against a normally-deployed, stably-running
+  backend, not a defect this session's users would necessarily have hit.
+- **The in-memory run created to verify this
+  (`run_000002_1790220546`) is local test state only**, gone on the next
+  backend restart, same as every prior session's note on this.
+
+---
+
 ## 2026-09-24 (night, continued again) — Claude session 8 · view the original SI/BL, not just its evidence snippet
 
 The previous entry below closed the session out and stopped both local
