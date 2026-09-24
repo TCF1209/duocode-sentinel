@@ -1,5 +1,13 @@
 # Demo video — the reasoning behind the script
 
+> **Superseded on 24 Sep 2026 — final round.** No video this round. Kept for
+> the reasoning and the number-provenance table, with the same three
+> corrections as `VIDEO_NARRATION.md`: **596 tests, 0 failing** (not 574 with
+> one pinned to fail — §5.4 is fixed, §5.2 is the open one); **46 MISMATCH /
+> 20 NEEDS_REVIEW** (not 45/21, a Windows line-ending artefact fixed by
+> `.gitattributes`); and scan transcriptions now visible via the run page's
+> model-tier switch. Final-round deck: `PITCH_DECK.md`; day-of: `PITCH_DAY.md`.
+
 > **Read this once, before the first take. Do not record from it.**
 >
 > [`VIDEO_NARRATION.md`](VIDEO_NARRATION.md) is the one to have open while

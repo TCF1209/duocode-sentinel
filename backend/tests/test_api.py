@@ -168,7 +168,25 @@ class TestRunLifecycle:
         }, by_status
         assert all(0.0 <= c["category_confidence"] <= 1.0 for c in cases["cases"])
 
+        # The case-list summary carries the shipper's name too, read off the
+        # same comparison the pipeline already produced -- no extra request
+        # per case, so the dashboard's pattern view can group by counterparty
+        # without doing an N+1 fetch over the whole run.
+        by_shipper = {c["email_id"]: c["shipper"] for c in cases["cases"]}
+        assert by_shipper["email_001"] == "TEST EXPORT COMPANY LTD"
+        assert by_shipper["email_002"] == "TEST EXPORT COMPANY LTD"
+
+        # The inbox record's own "from" address, carried through for a
+        # mailto: link -- never read by backend/sdoc/ itself, never sent
+        # anywhere by Sentinel. _write_email's fixture puts the same address
+        # on every email, which is realistic: one contact often sends a
+        # whole thread of comparison requests.
+        by_sender = {c["email_id"]: c["sender"] for c in cases["cases"]}
+        assert by_sender["email_001"] == "ops@example.com"
+        assert by_sender["email_002"] == "ops@example.com"
+
         case_detail = client.get(f"/cases/{run_id}:email_002").json()
+        assert case_detail["sender"] == "ops@example.com"
         assert case_detail["defect_fields"] == ["consignee"]
         assert case_detail["review"] is None
 
@@ -192,6 +210,52 @@ class TestRunLifecycle:
         assert set(submission) == {"email_001", "email_002", "email_003"}
         assert submission["email_001"]["status"] == "OK"
 
+    def test_case_attachment_serves_the_real_file_a_run_read(
+        self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The document itself, not just the evidence snippet cut from it.
+
+        Reads back exactly the bytes _write_attachment put on disk for
+        email_001's SI side -- the point is this is the real file the
+        pipeline actually read, not a reconstruction from report.json.
+        """
+        monkeypatch.setattr(api_main, "DEFAULT_DATA_ROOT", synthetic_inbox)
+        run_id = client.post("/runs", json={"use_llm": False}).json()["run_id"]
+        for _ in range(100):
+            if client.get(f"/runs/{run_id}").json()["status"] != "running":
+                break
+            time.sleep(0.05)
+
+        # Normalises \r\n: Path.write_text (_write_attachment, above) writes
+        # the platform's own newline translation, CRLF on Windows, while
+        # _SI_TEXT is a plain-\n literal -- a fact about this fixture on
+        # this OS, not something the endpoint should paper over by
+        # rewriting bytes it reads off disk. It exists to serve the file
+        # verbatim; asserting on content should not care which newline a
+        # given OS happened to write.
+        si = client.get(f"/cases/{run_id}:email_001/attachments/si")
+        assert si.status_code == 200, si.text
+        assert si.text.replace("\r\n", "\n") == _SI_TEXT
+        assert si.headers["content-type"].startswith("text/")
+        # "inline", not FileResponse's own "attachment" default -- a reviewer
+        # clicking this from the report should see the document in the tab,
+        # not get a save-as dialog. See main.py's comment on this route.
+        assert si.headers["content-disposition"].startswith("inline")
+        # Not cacheable -- a stale cached copy of this exact route reproducibly
+        # broke live browser testing during this session (main.py's own
+        # comment on this route has the full story); this pins the fix.
+        assert si.headers["cache-control"] == "no-store"
+
+        bl = client.get(f"/cases/{run_id}:email_001/attachments/bl")
+        assert bl.status_code == 200, bl.text
+        assert bl.text.replace("\r\n", "\n") == _BL_TEXT_MATCH
+
+        # email_003 has only an SI attached (see synthetic_inbox) -- the
+        # missing BL side must 404, not serve a stale or empty file.
+        assert client.get(f"/cases/{run_id}:email_003/attachments/bl").status_code == 404
+        assert client.get(f"/cases/{run_id}:email_001/attachments/upside-down").status_code == 404
+        assert client.get(f"/cases/{run_id}:email_999/attachments/si").status_code == 404
+
     def test_unknown_run_is_404(self, client: TestClient) -> None:
         assert client.get("/runs/does-not-exist").status_code == 404
 
@@ -204,3 +268,214 @@ class TestRunLifecycle:
         monkeypatch.setattr(api_main, "DEFAULT_DATA_ROOT", tmp_path / "nowhere")
         resp = client.post("/runs", json={})
         assert resp.status_code == 400
+
+
+def _finished_run(client: TestClient, data_root: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    """Start a deterministic run over `data_root` and wait for it to finish."""
+    monkeypatch.setattr(api_main, "DEFAULT_DATA_ROOT", data_root)
+    run_id = client.post("/runs", json={"use_llm": False}).json()["run_id"]
+    for _ in range(100):
+        if client.get(f"/runs/{run_id}").json()["status"] != "running":
+            break
+        time.sleep(0.05)
+    assert client.get(f"/runs/{run_id}").json()["status"] == "done"
+    return run_id
+
+
+# A third SI, differing from _SI_TEXT on container count only -- so a re-check
+# that re-sends the SI against a BL identical to _SI_TEXT must flag exactly
+# that field, and a re-check that wrongly fell back to the disk BL (which
+# differs on consignee) would flag two.
+_SI_TEXT_THREE_BOXES = _SI_TEXT.replace("Container Count: 2", "Container Count: 3")
+
+
+class TestRecheck:
+    """POST /cases/{id}/recheck -- the same check, run again on re-sent documents."""
+
+    def test_resent_bl_replaces_the_answer_and_keeps_the_old_one(
+        self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run_id = _finished_run(client, synthetic_inbox, monkeypatch)
+        case = f"{run_id}:email_002"
+
+        # A reviewer has already confirmed the mismatch against the first BL.
+        confirmed = client.post(f"/cases/{case}/review", json={"decision": "confirm", "note": "asked shipper"})
+        assert confirmed.status_code == 200, confirmed.text
+        before = client.get(f"/cases/{case}").json()
+        assert before["status"] == "MISMATCH"
+        assert before["recheck"] is None
+        assert before["history"] == []
+
+        # The shipper re-sends a BL that matches. SI is not re-sent.
+        resp = client.post(
+            f"/cases/{case}/recheck",
+            files={"bl": ("test0002_BL_rev2.txt", _BL_TEXT_MATCH.encode(), "text/plain")},
+        )
+        assert resp.status_code == 200, resp.text
+        after = resp.json()
+        assert after["status"] == "OK"
+        assert after["defect_fields"] == []
+        # The email is still the email: identity and classification are the
+        # run's, only the comparison is new.
+        assert after["email_id"] == "email_002"
+        assert after["sender"] == "ops@example.com"
+        assert after["category"] == "BL_COMPARISON"
+        assert after["category_confidence"] == before["category_confidence"]
+        # The re-sent file is the BL now; the SI is still the run's own.
+        assert after["documents"]["bl"]["path"] == "test0002_BL_rev2.txt"
+        assert after["documents"]["si"]["path"] == "attachments/test0002_SI.txt"
+        # The old review was about the old BL -- reset, not carried over.
+        assert after["review"] is None
+        assert after["effective"]["status"] == "OK"
+        assert after["effective"]["reviewed"] is False
+        assert after["recheck"]["count"] == 1
+        assert after["recheck"]["last_resubmitted"] == ["bl"]
+        assert after["recheck"]["sources"] == {"si": "original", "bl": "resent"}
+        # ...and the superseded answer is kept, review and all.
+        assert len(after["history"]) == 1
+        old = after["history"][0]
+        assert old["version"] == 1
+        assert old["resubmitted"] == ["bl"]
+        assert old["uploaded"] == {"bl": "test0002_BL_rev2.txt"}
+        assert old["report"]["status"] == "MISMATCH"
+        assert old["report"]["defect_fields"] == ["consignee"]
+        assert old["review"]["decision"] == "confirm"
+        assert old["review"]["note"] == "asked shipper"
+        assert old["effective"]["status"] == "MISMATCH"
+        assert old["effective"]["reviewed"] is True
+
+        # GET /cases/{id} says the same thing the POST answered with.
+        assert client.get(f"/cases/{case}").json() == after
+
+        # Everything downstream follows the new answer: the list, the graded
+        # submission, the review counts (the reset review is not counted).
+        rows = {c["email_id"]: c for c in client.get(f"/runs/{run_id}/cases").json()["cases"]}
+        assert rows["email_002"]["status"] == "OK"
+        assert rows["email_002"]["reviewed"] is False
+        assert rows["email_002"]["recheck_count"] == 1
+        assert rows["email_001"]["recheck_count"] == 0
+        assert client.get("/submission", params={"run_id": run_id}).json()["email_002"]["status"] == "OK"
+        metrics = client.get("/metrics", params={"run_id": run_id}).json()
+        assert metrics["review"] == {"reviewed": 0, "confirmed": 0, "corrected": 0}
+        assert metrics["recheck"] == {"cases": 1, "rechecks": 1}
+
+    def test_attachments_serve_the_resent_file_and_the_superseded_one(
+        self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run_id = _finished_run(client, synthetic_inbox, monkeypatch)
+        case = f"{run_id}:email_002"
+        resent = _BL_TEXT_MATCH.encode()
+        assert client.post(
+            f"/cases/{case}/recheck", files={"bl": ("BL rev 2.txt", resent, "text/plain")},
+        ).status_code == 200
+
+        # The BL is now the re-sent one, served from memory with the same
+        # headers the disk route uses; the SI is still the disk original.
+        bl = client.get(f"/cases/{case}/attachments/bl")
+        assert bl.status_code == 200, bl.text
+        assert bl.content == resent
+        assert bl.headers["content-type"].startswith("text/plain")
+        assert bl.headers["content-disposition"].startswith("inline")
+        assert "BL%20rev%202.txt" in bl.headers["content-disposition"]
+        assert bl.headers["cache-control"] == "no-store"
+        si = client.get(f"/cases/{case}/attachments/si")
+        assert si.status_code == 200
+        assert si.text.replace("\r\n", "\n") == _SI_TEXT
+
+        # Version 1 is what the run originally read: the mismatching BL.
+        old_bl = client.get(f"/cases/{case}/attachments/bl", params={"version": 1})
+        assert old_bl.status_code == 200, old_bl.text
+        assert old_bl.text.replace("\r\n", "\n") == _BL_TEXT_MISMATCH
+        assert old_bl.headers["cache-control"] == "no-store"
+        assert client.get(f"/cases/{case}/attachments/bl", params={"version": 2}).status_code == 404
+        assert client.get(f"/cases/{case}/attachments/bl", params={"version": 0}).status_code == 404
+
+    def test_second_recheck_keeps_the_earlier_resent_side(
+        self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run_id = _finished_run(client, synthetic_inbox, monkeypatch)
+        case = f"{run_id}:email_002"
+        first = client.post(
+            f"/cases/{case}/recheck", files={"bl": ("bl2.txt", _BL_TEXT_MATCH.encode(), "text/plain")},
+        ).json()
+        assert first["status"] == "OK"
+
+        # Now only the SI is re-sent. It must be compared against the BL
+        # from the first re-check, not the disk BL the desk has moved past.
+        second = client.post(
+            f"/cases/{case}/recheck", files={"si": ("si2.txt", _SI_TEXT_THREE_BOXES.encode(), "text/plain")},
+        ).json()
+        assert second["status"] == "MISMATCH"
+        assert second["defect_fields"] == ["container_count"]
+        assert second["recheck"]["count"] == 2
+        assert second["recheck"]["sources"] == {"si": "resent", "bl": "resent"}
+        assert [h["version"] for h in second["history"]] == [1, 2]
+        assert [h["report"]["status"] for h in second["history"]] == ["MISMATCH", "OK"]
+        assert second["history"][1]["resubmitted"] == ["si"]
+
+        # Version 2's BL was the first re-sent copy; version 1's the disk one.
+        v2 = client.get(f"/cases/{case}/attachments/bl", params={"version": 2})
+        assert v2.content == _BL_TEXT_MATCH.encode()
+        v1 = client.get(f"/cases/{case}/attachments/bl", params={"version": 1})
+        assert v1.text.replace("\r\n", "\n") == _BL_TEXT_MISMATCH
+
+    def test_missing_side_can_be_supplied_but_not_skipped(
+        self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run_id = _finished_run(client, synthetic_inbox, monkeypatch)
+        case = f"{run_id}:email_003"          # SI only; the BL never arrived
+        assert client.get(f"/cases/{case}").json()["status"] == "NEEDS_REVIEW"
+
+        # Re-sending only the SI leaves nothing to compare it against.
+        no_bl = client.post(
+            f"/cases/{case}/recheck", files={"si": ("si.txt", _SI_TEXT.encode(), "text/plain")},
+        )
+        assert no_bl.status_code == 422, no_bl.text
+        assert "no BL on file" in no_bl.json()["detail"]
+        assert client.get(f"/cases/{case}").json()["recheck"] is None
+
+        # The BL arriving is the whole scenario: the case resolves.
+        resp = client.post(
+            f"/cases/{case}/recheck", files={"bl": ("bl.txt", _BL_TEXT_MATCH.encode(), "text/plain")},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == "OK"
+        assert resp.json()["recheck"]["sources"] == {"si": "original", "bl": "resent"}
+        assert resp.json()["history"][0]["report"]["status"] == "NEEDS_REVIEW"
+
+    def test_refusals(
+        self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run_id = _finished_run(client, synthetic_inbox, monkeypatch)
+        case = f"{run_id}:email_002"
+        bl_ok = {"bl": ("bl.txt", _BL_TEXT_MATCH.encode(), "text/plain")}
+
+        assert client.post(f"/cases/{case}/recheck").status_code == 422             # nothing attached
+        empty = client.post(f"/cases/{case}/recheck", files={"bl": ("bl.txt", b"", "text/plain")})
+        assert empty.status_code == 422, empty.text                                  # a slip, not a document
+        assert client.post(f"/cases/{run_id}:email_999/recheck", files=bl_ok).status_code == 404
+        assert client.post("/cases/not-a-valid-id/recheck", files=bl_ok).status_code == 400
+        # None of those touched the case.
+        assert client.get(f"/cases/{case}").json()["recheck"] is None
+
+        # A case that is not a comparison request has no SI/BL pair to
+        # re-check. The classifier's verdict on a synthetic body is not what
+        # this test is about, so the stored category is set directly.
+        api_main.store.get_case(run_id, "email_001").category = "GENERAL"
+        not_a_comparison = client.post(f"/cases/{run_id}:email_001/recheck", files=bl_ok)
+        assert not_a_comparison.status_code == 409, not_a_comparison.text
+        assert "GENERAL" in not_a_comparison.json()["detail"]
+
+    def test_retry_is_refused_once_a_case_was_rechecked(
+        self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run_id = _finished_run(client, synthetic_inbox, monkeypatch)
+        case = f"{run_id}:email_002"
+        assert client.post(f"/cases/{case}/retry").status_code == 200        # fine before
+        assert client.post(
+            f"/cases/{case}/recheck", files={"bl": ("bl.txt", _BL_TEXT_MATCH.encode(), "text/plain")},
+        ).status_code == 200
+        # A retry would re-read the disk BL over the re-sent one, silently.
+        refused = client.post(f"/cases/{case}/retry")
+        assert refused.status_code == 409, refused.text
+        assert client.get(f"/cases/{case}").json()["status"] == "OK"        # untouched

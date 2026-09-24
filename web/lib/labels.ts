@@ -45,7 +45,7 @@ export const REVIEW_REASON_TEXT: Record<ReviewReason, string> = {
   wrong_doc_type: "An attachment doesn't look like the document type it claims to be.",
   missing_attachment: "An expected document is missing from this email.",
   unreadable: "A document couldn't be read.",
-  missing_value: "One or more required fields are missing or blank.",
+  missing_value: "One or more required fields are blank, or printed under a label Sentinel could not recognise.",
 };
 
 /** "An expected document is missing from this email." -> "an expected document is missing from this email" */

@@ -1,0 +1,20 @@
+# Byte-exact attachments, on every platform.
+#
+# The pipeline reads the organisers' documents as bytes, and a PDF's xref
+# table is a table of byte offsets. A PDF-1.3 file from their generator can
+# contain no NUL byte at all, so git's text heuristic calls it text, and a
+# Windows checkout with core.autocrlf=true then rewrites every LF to CRLF:
+# `startxref` points 74 bytes short, pdfplumber reports "Unexpected EOF", and
+# email_499_BL.pdf -- a real planted defect on gross_weight_kg -- was read as
+# an unreadable attachment on this platform only (docs/STATUS.md 2026-09-24,
+# the 45/21 vs 46/20 discrepancy). Thirty-four committed PDFs were exposed to
+# that conversion; one broke. Declaring every binary format here means no
+# checkout, on any OS, can alter a byte of what the readers are measured on.
+*.pdf   binary
+*.docx  binary
+*.xlsx  binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.mp4   binary
+*.pptx  binary

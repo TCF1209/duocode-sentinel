@@ -1,13 +1,14 @@
 # Adversarial self-consistency — where the reader holds, and where it breaks
 
-> Regenerated 2026-09-19 against the current working tree; the suite is now
-> **573 passed and one `xfail`**. That xfail is not decoration: it is the live
-> defect in §5.4, marked strict so that fixing it breaks the build rather
-> than passing quietly. A second strict xfail recorded the address-line hole
-> in §4.3 and did exactly that when the fix landed — it went red, the fix was
-> confirmed, and the marker came off. Both runs are reproducible: re-running
-> either command reproduces every count in §2 and §3 byte for byte, before
-> those fixes and after them.
+> Regenerated 2026-09-19 against the working tree of that day, and re-run on
+> 2026-09-24 after the fixes in §4.3, §4.4 and §5.4 landed: every count in §2
+> and §3 reproduces byte for byte. The suite is now **596 tests, 0 failed,
+> 0 xfailed**. Two strict `xfail`s have lived in it, and both did what a
+> strict xfail is for: the one that recorded the address-line hole in §4.3
+> went red when that fix landed, and the one that pinned §5.4 did the same on
+> 24 September — the fix was confirmed by the failure, and the marker came
+> off. The one defect still open, §5.2, is not pinned by a test because no
+> small fix exists for it; it is measured instead.
 > Every number here comes from `runs/adversarial.json` and
 > `runs/adversarial_holdout.json` as they stand now. An earlier snapshot was
 > taken *between* two fixes and reported a `wrapped_value` row that the code no
@@ -571,6 +572,31 @@ if we do take it on: the reader, not the comparison, should mark a value it
 truncated at a wrap, and the comparison should refuse to auto-decide a *match*
 that depends on a truncated value — escalate, do not guess.
 
+**Checked, 2026-09-24, before deciding whether to take that on: the mitigation
+as stated would cost far more than it buys.** The only signal available for
+"this value might have been truncated at a wrap" is the same signal that
+already exists for the ordinary case a value is *not* truncated: does a
+line with no label of its own follow it. Measured directly against
+`bundle_data/` — every `Shipper`/`Consignee`/`Notify` label line, and
+whether the next line looks like a labelless continuation — **485 of 530
+(92%)** do. That is not a rare shape to guard against; it is what a party
+field looks like on this dataset's forms almost every time, because a name
+is almost always followed by its address block. A reader that flagged
+"possibly truncated" on that signal would flag 92% of real party fields,
+and a comparison stage that refused to auto-match a flagged value would
+send the overwhelming majority of genuinely correct matches to
+`NEEDS_REVIEW` instead — trading one masked discrepancy in 188 for a false
+escalation on nearly every comparison email, unmeasurable against the real
+score on this machine because `data/_grader/` is not on it.
+
+So the mitigation needs a sharper signal than "is there a continuation" —
+something closer to "would completing the value from that continuation
+still fail to reproduce the other side," which is a second extraction pass
+in substance, not a flag. That is real design work, not a two-day fix
+under a submission clock, and the wrong version of it risks the score this
+page exists to protect. Left open on purpose, not for lack of a fix
+attempt.
+
 ### 5.3 Unseen label wording — safe, and still useless
 
 `unseen_labels` loses 1,100 of 1,281 fields (1,003 of 1,169 held out), escalates
@@ -583,14 +609,20 @@ entire inbox to a human. The assisted path (`extract/llm.py`) is wired and is
 meant for exactly this, but every number on this page is the deterministic
 pipeline, so none of them describes what it recovers.
 
-### 5.4 The truncation repair can mask a real discrepancy — found by review
+### 5.4 The truncation repair could mask a real discrepancy — found by review, fixed 2026-09-24
 
-§4.2 says the repair "cannot invent agreement". In the ordinary case that is
-true, and the harness agrees: false discrepancies went to zero and stayed
-there on both draws. But there is a case where it does invent one, and it
-comes from the mechanism named in §4.2 — `text.find(value.raw)` locates the
-**first** textual occurrence of the value, not the span the evidence locator
-points at.
+**Resolved**, the same day it was found reachable by a second review (below).
+Left here rather than deleted, same reason every other row on this page stays
+even after its number goes to zero: a reader checking this page against
+`docs/STATUS.md`'s 2026-09-24 entry should find the same story, not a page
+quietly edited to look like the gap was never there.
+
+§4.2 says the repair "cannot invent agreement". In the ordinary case that was
+true, and the harness agreed: false discrepancies were zero and stayed there
+on both draws. But there was a case where it invented one, and it came from
+the mechanism named in §4.2 — `text.find(value.raw)` located the **first**
+textual occurrence of the value, not the span the evidence locator pointed
+at.
 
 In this dataset the consignee and the notify party are frequently the same
 company, so a document can carry the same first line twice with *different*
@@ -603,19 +635,42 @@ Notify:       APRIL FINE PAPER TRADING (MIDDLE
                 EAST ASIA) PTE LTD
 ```
 
-Repairing the notify party reads from the consignee's block three lines above,
-completes it to `...(MIDDLE EAST) FZE`, and reports `MATCH` against a BL that
-says exactly that — while the document's own notify party is a different
-company. A real discrepancy is masked, and unlike §5.2 this one is
+Repairing the notify party read from the consignee's block three lines above,
+completed it to `...(MIDDLE EAST) FZE`, and reported `MATCH` against a BL that
+said exactly that — while the document's own notify party is a different
+company. A real discrepancy was masked, and unlike §5.2 this one was
 manufactured *by* the repair rather than missed by it.
 
-It is pinned as a strict `xfail` at
+**The fix**: `compare._extend` now anchors on `evidence.locator` when it
+names a line (`"line N"`, the format a plain-text or PDF-derived reader
+produces), and only falls back to the old whole-document search for any
+other locator shape or none. `backend/tests/test_compare_wrap.py`'s
+`test_a_continuation_is_read_from_the_block_the_evidence_points_at` pinned
+the wanted behaviour as a strict `xfail` for exactly this reason — the day
+the anchor landed it turned into a loud `XPASS`, not a silent green, and the
+marker came off only after that was seen to happen.
+
+**Why this is safe on the graded data, not just plausible**: the harness
+already recorded that this bug "fired 0 times on real data" before the fix
+(`docs/STATUS.md`), because the triggering shape — two fields sharing an
+identical first line before either wraps, within one document — never
+occurs in `bundle_data/` or its perturbations. A full re-run of this harness
+after the fix confirms it: all 16 modes, byte-identical to the run before,
+including `wrapped_value`'s own `masked_discrepancies` staying at exactly
+**1** — that is §5.2's `email_145` case, a different mechanism this fix does
+not touch and was never meant to (§5.2's repair returns before `_extend` is
+ever called, so no locator anchoring reaches it).
+
+While it was open it was pinned as a strict `xfail` at
 `backend/tests/test_compare_wrap.py::test_a_continuation_is_read_from_the_block_the_evidence_points_at`,
-so it goes green and loud the day it is fixed. Two things bound it. It has
-fired **zero** times across all four datasets — instrumenting `_extend` over
-520 emails shows the prefix relationship hit once and the repair applied not
-at all. And the fix is known and small: anchor `_extend` on the evidence
-locator instead of on `text.find`, which is what the locator is for.
+so that it would go green and loud the day it was fixed — which is what
+happened on 24 September: the anchor landed, the run reported an `XPASS`,
+and the marker came off; it is a plain passing test now. Two things bounded
+it while it was open. It had fired **zero** times across all four datasets —
+instrumenting `_extend` over 520 emails showed the prefix relationship hit
+once and the repair applied not at all. And the fix was known and small:
+anchor `_extend` on the evidence locator instead of on `text.find`, which is
+what the locator is for.
 
 The harness cannot see this either. It wraps one value at a time, so it never
 builds the two-blocks-same-first-line shape the defect needs.

@@ -484,10 +484,10 @@ const MODEL = [
 
 const INFRA = [
   "Python 3.10",
-  "FastAPI · 11 routes",
+  "FastAPI · 13 routes",
   "Docker on Render",
   "Next.js 16 on Vercel",
-  "574 tests, 1 held failing on purpose",
+  "596 tests · 0 failing",
 ];
 
 function TechStack() {
@@ -648,14 +648,17 @@ function Proof() {
             What we haven&rsquo;t fixed
           </div>
           <p className="text-sm leading-relaxed">
-            When two parties share an identical first line, the repair that rejoins a name split
-            across two lines can complete the notify party from the <em>consignee&rsquo;s</em>{" "}
-            block above it — and report a real mismatch as a match. One masked discrepancy in
-            3,008 perturbed documents.
+            A party name that wraps onto a second line can be cut short to <em>exactly</em> what
+            the other document says — <em>APRIL FINE PAPER TRADING</em> against{" "}
+            <em>APRIL FINE PAPER TRADING (MIDDLE EAST) FZE</em>, two different companies — and
+            the repair that rejoins wrapped names has nothing left to repair. A real mismatch is
+            reported as a match: one masked discrepancy in 3,008 perturbed documents.
           </p>
           <p className="mt-auto border-t border-warn/30 pt-2 text-xs text-muted-foreground">
-            A defect we hide is worse than one we miss, so one of our 574 tests is pinned to
-            fail on purpose until this is fixed — we cannot quietly stop caring about it.
+            A defect we hide is worse than one we miss. The obvious guard would flag 92% of
+            genuine party fields, so this one stays open and written down (ADVERSARIAL.md
+            §5.2) rather than quietly patched. The defect we had pinned to fail on purpose was
+            fixed on 24 September — this is the one that is left.
           </p>
         </motion.div>
       </motion.div>

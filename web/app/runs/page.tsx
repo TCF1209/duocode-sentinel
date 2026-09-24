@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, Info, ShipCargo, X } from "lucide-react";
+import { ArrowRight, Info, ShipCargo, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RunStatusPill } from "@/components/status-badges";
 import { createRun, listRuns, type CaseStatus, type RunStatus } from "@/lib/api";
+import { fetchHealth, type ApiHealth } from "@/lib/health";
 import { DURATION, EASE_OUT, fadeUp, stagger, TAP, TAP_TRANSITION } from "@/lib/motion";
 import { useHasHover } from "@/lib/use-has-hover";
 import { STATUS_LABELS } from "@/lib/labels";
@@ -25,6 +26,42 @@ export default function RunsPage() {
   // (backend/api/models.py). A blank field reading as "all" needs no label
   // to explain it; a 0 sitting in the box would.
   const [limitInput, setLimitInput] = useState("");
+
+  // Off by default, and off for the number the README quotes: the rules
+  // answer all 520 emails of the graded inbox and a rules-only run is what
+  // was scored. Switching this on adds the model tier to the run. On this
+  // inbox that is six image-only scans transcribed for the reviewer and
+  // nothing else -- the classifier and the extractor are never asked, which
+  // is measured rather than assumed (docs/STATUS.md 2026-09-24) -- so a
+  // model run costs cents, is capped per run, and answers from the cache
+  // the second time. The server decides whether it is permitted at all
+  // (SENTINEL_ALLOW_LLM_RUNS, reported by GET /), so when it is not the box
+  // is disabled and explained rather than hidden: a judge should see that
+  // the choice exists and why this deployment keeps it closed.
+  const [withModel, setWithModel] = useState(false);
+  const [health, setHealth] = useState<ApiHealth | null>(null);
+  const modelAllowed = health?.llm_runs_allowed === true;
+
+  useEffect(() => {
+    let cancelled = false;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    const probe = () => {
+      fetchHealth()
+        .then((h) => {
+          if (!cancelled) setHealth(h);
+        })
+        .catch(() => {
+          // A cold container answers this in 30-60s like everything else on
+          // this page; keep asking rather than leaving the switch unexplained.
+          if (!cancelled) retry = setTimeout(probe, 10000);
+        });
+    };
+    probe();
+    return () => {
+      cancelled = true;
+      if (retry) clearTimeout(retry);
+    };
+  }, []);
 
   // The poll fires every 3s and the API is on Render's free tier, which sleeps
   // after 15 minutes idle and takes 30-60s to wake. Toasting every failure
@@ -67,8 +104,10 @@ export default function RunsPage() {
     }
     setStarting(true);
     try {
-      const { run_id } = await createRun({ use_llm: false, limit });
-      toast.success(limit ? `Started ${run_id} (${limit} emails)` : `Started ${run_id}`);
+      const useLlm = withModel && modelAllowed;
+      const { run_id } = await createRun({ use_llm: useLlm, limit });
+      const scope = limit ? `${run_id} (${limit} emails)` : run_id;
+      toast.success(useLlm ? `Started ${scope} · model tier on` : `Started ${scope}`);
       // Straight into the run rather than back to this list. The run page is
       // where the work is visible -- the ring, the rate, the categories
       // filling in -- and it is live for the ~13s a 520-email run takes on the
@@ -112,6 +151,35 @@ export default function RunsPage() {
           </motion.div>
         </div>
       </motion.div>
+
+      <motion.label
+        variants={fadeUp}
+        className={cn(
+          "flex items-start gap-3 rounded-md border border-dashed p-3 transition-colors",
+          modelAllowed ? "cursor-pointer hover:bg-muted/40" : "cursor-not-allowed opacity-75",
+        )}
+      >
+        <input
+          type="checkbox"
+          checked={withModel && modelAllowed}
+          disabled={!modelAllowed}
+          onChange={(e) => setWithModel(e.target.checked)}
+          className="mt-0.5 size-4 accent-primary"
+        />
+        <span className="text-sm">
+          <span className="flex items-center gap-1.5 font-medium">
+            <Sparkles className="size-3.5 text-primary" />
+            Run with the model tier
+          </span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            {health === null
+              ? "Checking whether this server permits model-enabled runs…"
+              : modelAllowed
+                ? "Adds the model tier to this run. On this inbox that means the six image-only scans are read out for the reviewer and shown on their Needs Review cases, and the model is asked about any label the rules cannot resolve — nothing it returns is adopted until it is found again in the document. Every decision on the graded inbox is still made by rules; the cost is capped per run and a re-run answers from the cache."
+                : "This server keeps model-enabled inbox runs switched off (SENTINEL_ALLOW_LLM_RUNS), so every run here is rules only — which is also exactly how the graded inbox was scored. The model tier is still demonstrable on Compare, one document pair at a time."}
+          </span>
+        </span>
+      </motion.label>
 
       <AnimatePresence mode="wait" initial={false}>
         {runs === null ? (

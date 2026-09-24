@@ -361,6 +361,46 @@ def _blank_signals_from_fields(
     return signals
 
 
+def _side_absent(v: Optional[FieldValue]) -> bool:
+    """No chunk resolved to this field at all — narrower than "unusable".
+
+    `extract/fields.py` leaves `raw` as None when no label in the document
+    resolved to the field; a blank carries its placeholder text instead. The
+    same distinction `extract/llm.py` draws when deciding what to ask about.
+    """
+    return v is None or (v.raw is None and not v.present)
+
+
+def _absent_sides(fields: Iterable[str], comparisons: Sequence[FieldComparison]) -> dict[str, list[str]]:
+    """Which of `fields` no label resolved to, and in which document(s)."""
+    wanted = set(fields)
+    out: dict[str, list[str]] = {}
+    for c in comparisons:
+        if c.field not in wanted:
+            continue
+        sides = [role for role, v in (("SI", c.si), ("BL", c.bl)) if _side_absent(v)]
+        if sides:
+            out[c.field] = sides
+    return out
+
+
+def _no_label_sentence(absent: dict[str, list[str]]) -> str:
+    """"No label for shipper in the SI; consignee in either document could be
+    recognised ..." — grouped by where the label was not found, so the
+    operator knows which page to open."""
+    by_where: dict[str, list[str]] = {}
+    for name in _sorted_fields(absent):
+        sides = absent[name]
+        where = "either document" if len(sides) == 2 else _role_label(sides[0])
+        by_where.setdefault(where, []).append(name.replace("_", " "))
+    clauses = [f"{', '.join(names)} in {where}" for where, names in by_where.items()]
+    return (
+        "No label for " + "; ".join(clauses) + " could be recognised — the wording "
+        "may be one the label table has not seen, so the value was left unread "
+        "rather than guessed at."
+    )
+
+
 def _decided_fields(comparisons: Sequence[FieldComparison]) -> list[FieldComparison]:
     """The comparisons a reported outcome would actually rest on."""
     return [c for c in comparisons if c.verdict in (MATCH, MISMATCH)]
@@ -554,16 +594,38 @@ def _evaluate(
 
     if blank_fields:
         fields = _sorted_fields(blank_fields)
+        # Two different things end here and the operator needs to know which.
+        # A *blank* is a field the document prints and leaves empty ("???",
+        # "TBA"): the sender has to supply it. An *absent* field is one no
+        # label resolved to at all -- the document may well state it, under a
+        # wording the label table has never seen -- and telling the operator
+        # "the documents do not state the consignee" while they are looking
+        # straight at a consignee line would cost the trust every other
+        # escalation depends on. Same status, same review reason; different
+        # sentence, different recovery.
+        absent = _absent_sides(fields, comparisons)
+        blank_only = [f for f in fields if f not in absent]
+        sentences: list[str] = []
+        recoveries: list[str] = []
+        if blank_only:
+            sentences.append(
+                "The documents do not state "
+                + ", ".join(f.replace("_", " ") for f in blank_only)
+                + " — a blank value is uncertainty, not a discrepancy."
+            )
+            recoveries.append("Ask the sender to confirm the missing field(s) before the BL is released.")
+        if absent:
+            sentences.append(_no_label_sentence(absent))
+            recoveries.append(
+                "Read the field(s) off the document by hand; if the label wording is new, "
+                "add it to the label table so the next one is read automatically."
+            )
         return GateDecision(
             status="blank_value",
             review_reason="missing_value",
-            reason=(
-                "The documents do not state "
-                + ", ".join(f.replace("_", " ") for f in fields)
-                + " — a blank value is uncertainty, not a discrepancy."
-            ),
+            reason=" ".join(sentences),
             blocked_signals=blank_signals,
-            recovery="Ask the sender to confirm the missing field(s) before the BL is released.",
+            recovery=" ".join(recoveries),
         )
 
     # ---- 5b. the two readings differ only where OCR confuses glyphs -------

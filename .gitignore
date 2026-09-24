@@ -28,3 +28,6 @@ out/
 .DS_Store
 Thumbs.db
 .cache/
+
+# Office lock files, left beside a .pptx/.docx while it is open in PowerPoint/Word.
+~$*

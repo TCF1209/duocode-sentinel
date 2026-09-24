@@ -15,14 +15,17 @@ or, with backend/ as the working directory:
 """
 from __future__ import annotations
 
+import mimetypes
 import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, Response
 
 BACKEND = Path(__file__).resolve().parents[1]
 if str(BACKEND) not in sys.path:
@@ -30,7 +33,7 @@ if str(BACKEND) not in sys.path:
 
 from sdoc.pipeline import build_client  # noqa: E402
 
-from .direct_compare import compare_uploads  # noqa: E402
+from .direct_compare import MAX_BYTES, compare_uploads  # noqa: E402
 from .patterns import summarise as summarise_patterns  # noqa: E402
 from .models import (  # noqa: E402
     ReviewRequest,
@@ -194,6 +197,20 @@ def get_run(run_id: str) -> RunStatusResponse:
     return _record_to_status(_run_or_404(run_id))
 
 
+def _shipper_name(c) -> Optional[str]:
+    """The shipper's name as read off whichever side has it.
+
+    Read-only projection of a value `pipeline.py` already computed — no new
+    extraction, no new comparison, nothing that touches a decision. Exists so
+    the dashboard's pattern view (docs/ROADMAP.md backlog) can group cases by
+    counterparty without an extra request per case.
+    """
+    for comp in c.comparisons:
+        if comp.field == "shipper":
+            return comp.si.raw or comp.bl.raw
+    return None
+
+
 @app.get("/runs/{run_id}/cases")
 def list_cases(
     run_id: str,
@@ -218,12 +235,14 @@ def list_cases(
         out.append({
             "case_id": f"{run_id}:{c.email_id}",
             "email_id": c.email_id,
+            "sender": c.sender,
             "category": c.category,
             "category_confidence": round(c.category_confidence, 3),
             "status": eff["status"],
             "review_reason": eff["review_reason"],
             "has_defect": eff["has_defect"],
             "defect_fields": eff["defect_fields"],
+            "shipper": _shipper_name(c),
             "decided_by": c.decided_by,
             # Both halves stay visible. A row the system called NEEDS_REVIEW
             # and a person corrected to OK is not the same thing as a row the
@@ -232,8 +251,30 @@ def list_cases(
             "reviewed": eff["reviewed"],
             "outcome_source": eff["source"],
             "system_status": c.status,
+            # How many times this case's answer was replaced by a re-check on
+            # re-sent documents (0 for almost every row). The list is the
+            # place a reviewer notices "this one has moved on since the run".
+            "recheck_count": store.recheck_count(run_id, c.email_id),
         })
     return {"run_id": run_id, "count": len(out), "cases": out}
+
+
+def _case_report(run_id: str, email_id: str, result) -> dict:
+    """The case detail's shape, shared by every route that returns one case.
+
+    The system's own answer stays where it was, under the keys it has always
+    used; `effective` is what the case is now. A UI that wants to show "we
+    said X, a reviewer said Y" has both without diffing anything. `recheck`
+    and `history` are null / empty for a case whose documents were never
+    re-sent, so those cases read exactly as they did before re-checking
+    existed.
+    """
+    report = result.to_report()
+    report["review"] = store.get_review(run_id, email_id)
+    report["effective"] = store.effective_outcome(run_id, result)
+    report["recheck"] = store.recheck_info(run_id, email_id, result)
+    report["history"] = store.get_history(run_id, email_id)
+    return report
 
 
 @app.get("/cases/{case_id}")
@@ -242,13 +283,119 @@ def get_case(case_id: str) -> dict:
     result = store.get_case(run_id, email_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"no case '{case_id}'")
-    report = result.to_report()
-    report["review"] = store.get_review(run_id, email_id)
-    # The system's own answer stays where it was, under the keys it has always
-    # used; `effective` is what the case is now. A UI that wants to show "we
-    # said X, a reviewer said Y" has both without diffing anything.
-    report["effective"] = store.effective_outcome(run_id, result)
-    return report
+    return _case_report(run_id, email_id, result)
+
+
+def _disk_attachment(run_id: str, rel_path: str) -> Path:
+    """Resolve an attachment path under the run's data root, or refuse.
+
+    `rel_path` is the attachment path exactly as the inbox JSON's own
+    "attachments" list wrote it (readers/__init__.py's read_attachment) --
+    not request input, but resolved and contained anyway as a cheap,
+    correct habit rather than a trust judgement call on data that happens
+    to come from this dataset today.
+    """
+    run = store.get_run(run_id)
+    if run is None or not run.data_root:
+        raise HTTPException(status_code=404, detail=f"no data root recorded for run '{run_id}'")
+    data_root = Path(run.data_root).resolve()
+    full_path = (data_root / rel_path).resolve()
+    if data_root not in full_path.parents and full_path != data_root:
+        raise HTTPException(status_code=400, detail="attachment path escapes the data root")
+    if not full_path.is_file():
+        raise HTTPException(status_code=404, detail=f"{rel_path} is no longer on disk")
+    return full_path
+
+
+def _inline_bytes(filename: str, data: bytes) -> Response:
+    """A re-sent file, served from memory the way `FileResponse` serves one
+    from disk: inline, named, never cached (see get_case_attachment)."""
+    media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    # Same rule FileResponse applies to its own filename: plain quoting when
+    # the name is ASCII-safe, RFC 5987's filename* form otherwise.
+    quoted = quote(filename)
+    disposition = (
+        f"inline; filename*=utf-8''{quoted}" if quoted != filename else f'inline; filename="{filename}"'
+    )
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={"Content-Disposition": disposition, "Cache-Control": "no-store"},
+    )
+
+
+@app.get("/cases/{case_id}/attachments/{side}")
+def get_case_attachment(case_id: str, side: str, version: Optional[int] = None) -> Response:
+    """The original SI or BL file a case was read from, not just its evidence.
+
+    An evidence snippet is deliberately short (SNIPPET_MAX in
+    extract/fields.py) -- enough to confirm a value in place, not to read
+    the whole document. This is the document itself, for the reviewer who
+    wants more context than one line gives. Only ever the file a *run*
+    read off disk: /compare holds an upload in memory and writes nothing
+    (direct_compare.py's own docstring says so), so there is no case_id in
+    the run_id:email_id shape this route expects and nothing to serve.
+
+    After a re-check (POST /cases/{id}/recheck) a side may instead be the
+    re-sent file, held in memory -- this serves whichever the case's current
+    answer was actually reached on. `version=N` serves the file that side
+    was at superseded version N (1 = the run's original answer), so the
+    history a re-check leaves behind can be read against its documents.
+    """
+    if side not in ("si", "bl"):
+        raise HTTPException(status_code=404, detail="side must be 'si' or 'bl'")
+    run_id, email_id = _split_case_id(case_id)
+    result = store.get_case(run_id, email_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"no case '{case_id}'")
+
+    if version is None:
+        resent = store.current_file(run_id, email_id, side)
+    else:
+        entry = store.get_version(run_id, email_id, version)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"case '{case_id}' has no superseded version {version}")
+        result = entry["result"]
+        resent = entry["files"].get(side)
+    if resent is not None:
+        return _inline_bytes(*resent)
+
+    doc = result.si_doc if side == "si" else result.bl_doc
+    if doc is None or not doc.path:
+        raise HTTPException(status_code=404, detail=f"no {side} attachment on this case")
+    full_path = _disk_attachment(run_id, doc.path)
+
+    media_type = mimetypes.guess_type(full_path.name)[0] or "application/octet-stream"
+    # inline, not FileResponse's own "attachment" default: docs/DATA_NOTES.md's
+    # own attachment-format count is 192 .txt + 28 .pdf out of 250 total, and a
+    # browser renders both of those in the tab when told "inline" -- the whole
+    # point of this route is a reviewer looking at the document, not a forced
+    # save-as dialog for a file they have to go find in Downloads afterward.
+    # The remaining .xlsx/.docx have no in-browser renderer either way, so
+    # "inline" costs those nothing next to "attachment" -- the browser's own
+    # fallback for a type it can't display is to download it regardless.
+    #
+    # Cache-Control: no-store -- found the hard way, not added speculatively.
+    # FileResponse sets last-modified/etag (set_stat_headers), which is enough
+    # for a browser to cache and later revalidate a GET by default; live
+    # testing during this same session hit exactly that path -- one response
+    # cached from an earlier, briefer server state (this route did not exist,
+    # or CORS was not yet configured, at various earlier points tonight) kept
+    # being served/revalidated afterward, reproducibly failing every default-
+    # mode fetch() to the same URL while curl and a cache-bypassed fetch() to
+    # the identical URL always succeeded -- proof it was a stale cache entry,
+    # not the route or its CORS setup. A case's underlying file can also
+    # change under a retry (retry_case re-reads it from disk), which this
+    # would otherwise paper over with a stale copy. There is no scenario
+    # where caching this response is wanted, only ones where it silently
+    # goes stale, so it is turned off outright rather than tuned.
+    return FileResponse(
+        full_path,
+        media_type=media_type,
+        filename=full_path.name,
+        content_disposition_type="inline",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.post("/cases/{case_id}/review")
@@ -294,6 +441,17 @@ def retry_one_case(case_id: str) -> dict:
     run_id, email_id = _split_case_id(case_id)
     if store.get_case(run_id, email_id) is None:
         raise HTTPException(status_code=404, detail=f"no case '{case_id}'")
+    # A retry re-reads the inbox on disk. Once a case has been re-checked on
+    # re-sent documents, the disk copy is precisely the version the desk has
+    # moved past -- a retry here would quietly reinstate it over the re-sent
+    # one, and leave no history of having done so. Refused rather than
+    # reinterpreted: the re-check route is the one that runs this case again.
+    if store.recheck_count(run_id, email_id):
+        raise HTTPException(
+            status_code=409,
+            detail="this case has been re-checked on re-sent documents; a retry would "
+                   "re-read the run's original files over them. Re-check it again instead.",
+        )
 
     try:
         result = retry_case(store, run_id, email_id)
@@ -302,10 +460,119 @@ def retry_one_case(case_id: str) -> dict:
     except FileNotFoundError as exc:
         raise HTTPException(status_code=410, detail=str(exc)) from exc
 
-    report = result.to_report()
-    report["review"] = store.get_review(run_id, email_id)
-    report["effective"] = store.effective_outcome(run_id, result)
-    return report
+    return _case_report(run_id, email_id, result)
+
+
+def _safe_filename(raw: Optional[str], side: str) -> str:
+    """The uploaded name as a bare file name -- it is echoed in a
+    Content-Disposition header and shown in the report, never used as a
+    path, so a directory prefix or a quote in it has no business surviving."""
+    name = Path(raw or "").name
+    name = "".join(ch for ch in name if ch not in '"\r\n')
+    return name or f"resent_{side}"
+
+
+@app.post("/cases/{case_id}/recheck")
+async def recheck_one_case(
+    case_id: str,
+    si: Optional[UploadFile] = File(None, description="the re-sent Shipping Instruction"),
+    bl: Optional[UploadFile] = File(None, description="the re-sent draft Bill of Lading"),
+) -> dict:
+    """Run the check again on documents the counterparty re-sent.
+
+    The realistic follow-up to a MISMATCH or an unreadable attachment is not
+    a correction typed into a form: someone emails the shipper, a corrected
+    BL comes back, and the desk wants the same check run on what came back.
+    `retry` cannot do that -- it re-reads the run's own inbox -- and
+    `/compare` can, but stores nothing and knows no case. This does both:
+    the same comparison `/compare` runs, stored against this case.
+
+    One side or both. A side not re-sent keeps the file the case already
+    has (its disk original, or the copy from an earlier re-check). The
+    answer this replaces goes into the case's history together with any
+    review that stood against it, and the review is reset: it was a
+    judgement about the old documents, not these. The email's category is
+    kept as the run decided it -- re-sent documents change what the
+    documents say, not what kind of email asked for them -- which is also
+    why a case that is not a BL_COMPARISON has nothing here to re-check.
+    """
+    run_id, email_id = _split_case_id(case_id)
+    result = store.get_case(run_id, email_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"no case '{case_id}'")
+    if result.category != "BL_COMPARISON":
+        raise HTTPException(
+            status_code=409,
+            detail=f"this email was classified {result.category}, which has no SI/BL "
+                   f"pair to compare; there is nothing to re-check.",
+        )
+    if si is None and bl is None:
+        raise HTTPException(status_code=422, detail="attach the re-sent SI, the re-sent BL, or both")
+    run = store.get_run(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail=f"no run '{run_id}'")
+
+    uploaded: dict[str, tuple[str, bytes]] = {}
+    for side, upload in (("si", si), ("bl", bl)):
+        if upload is None:
+            continue
+        data = await upload.read()
+        # An empty upload is a slip, not a document: `/compare` lets one
+        # through as NEEDS_REVIEW because it stores nothing, but here it
+        # would push a real answer into history under a blank one.
+        if not data:
+            raise HTTPException(status_code=422, detail=f"the re-sent {side.upper()} is empty (0 bytes)")
+        if len(data) > MAX_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"the re-sent {side.upper()} is {len(data)} bytes, above the {MAX_BYTES} limit",
+            )
+        uploaded[side] = (_safe_filename(upload.filename, side), data)
+
+    inputs: dict[str, tuple[str, bytes]] = {}
+    for side in ("si", "bl"):
+        if side in uploaded:
+            inputs[side] = uploaded[side]
+            continue
+        current = store.current_file(run_id, email_id, side)
+        if current is not None:
+            inputs[side] = current
+            continue
+        doc = result.si_doc if side == "si" else result.bl_doc
+        if doc is None or not doc.path:
+            raise HTTPException(
+                status_code=422,
+                detail=f"this case has no {side.upper()} on file to compare against; attach it as well",
+            )
+        # The relative path stays as the file name on purpose: read_upload
+        # keeps it as the document's `path`, which is what the attachment
+        # route resolves under the data root for a side still read from disk.
+        inputs[side] = (doc.path, _disk_attachment(run_id, doc.path).read_bytes())
+
+    # Same rule `retry_case` applies: the model is offered exactly when the
+    # run it belongs to was allowed it, never because a re-check asked.
+    #
+    # The SHARED client, not a fresh one -- for the reason written out ninety
+    # lines below, where the same mistake was found and fixed for /compare:
+    # SENTINEL_RUN_BUDGET_USD lives on the client's own usage counter, so a new
+    # client per request resets the ceiling every time and bounds nothing. This
+    # route is public, unauthenticated and takes uploads, and `render.yaml` now
+    # sets SENTINEL_ALLOW_LLM_RUNS=1, so an unshared client here is an
+    # unbounded spend path. `build_client(enabled=False)` returns None and so
+    # does `_shared_compare_client()` with no key configured, so the
+    # model-disabled behaviour is unchanged.
+    client = _shared_compare_client() if run.llm_enabled else None
+    fresh = compare_uploads(*inputs["si"], *inputs["bl"], llm=client)
+    # What the run decided about the *email* is carried over untouched;
+    # only what the documents say has changed. `decided_by` is left as the
+    # comparison set it -- which tier answered this time is its own fact.
+    fresh.email_id = result.email_id
+    fresh.sender = result.sender
+    fresh.category = result.category
+    fresh.category_confidence = result.category_confidence
+    fresh.category_rationale = list(result.category_rationale)
+    store.recheck_case(run_id, fresh, uploaded=uploaded)
+    return _case_report(run_id, email_id, fresh)
 
 
 @app.get("/metrics")
@@ -319,7 +586,8 @@ def metrics(run_id: Optional[str] = None) -> dict:
     # they are what Sentinel did, and a human confirming a case afterwards
     # must not retro-improve them. What humans did is reported beside them.
     return {"run_id": rec.run_id, **rec.metrics,
-            "review": store.review_summary(rec.run_id)}
+            "review": store.review_summary(rec.run_id),
+            "recheck": store.recheck_summary(rec.run_id)}
 
 
 @app.get("/runs/{run_id}/patterns")

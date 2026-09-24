@@ -15,7 +15,16 @@ function Side({ value, side }: { value: FieldValueReport; side: "SI" | "BL" }) {
   return (
     <div className="flex-1 rounded-md border p-3">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{side}</div>
-      <div className="mt-1 font-mono text-sm">{value.raw}</div>
+      {/* Not font-mono: the source data is almost always an already-
+          upper-case company name, and monospace on a long upper-case run
+          is one of the harder combinations to actually read at a glance —
+          it is built for fixed-width tokens (an email id, a line number),
+          not a party name. A proportional font reads names the way a
+          person reading the real document would. The text itself is
+          untouched either way — only the typeface changes, never the
+          case, since the case is part of what "exact evidence" means
+          here. */}
+      <div className="mt-1 text-sm font-medium">{value.raw}</div>
       {value.evidence && (
         <div className="mt-2 border-t pt-2 text-xs text-muted-foreground">
           <div>
@@ -24,7 +33,15 @@ function Side({ value, side }: { value: FieldValueReport; side: "SI" | "BL" }) {
               <span className="ml-1 rounded bg-ai-bg px-1 py-0.5 text-ai">{value.extractor}</span>
             )}
           </div>
-          <div className="mt-1 font-mono italic">&ldquo;{value.evidence.snippet.trim()}&rdquo;</div>
+          {/* A left border reads as "this is a quote" on its own, so the
+              snippet no longer needs a distinct typeface to tell it apart
+              from the value above — freeing it from font-mono fixes the
+              same crowding here, and the two are visually distinct now by
+              role (bordered quote vs. plain value) rather than by both
+              fighting for attention in the same dense typeface. */}
+          <div className="mt-1.5 border-l-2 border-muted-foreground/25 pl-2 italic">
+            &ldquo;{value.evidence.snippet.trim()}&rdquo;
+          </div>
         </div>
       )}
     </div>
@@ -53,7 +70,7 @@ const REASON_TEXT: Record<string, string> = {
 // "bl_missing" -> "BL missing", not "Bl missing" -- si/bl are the document
 // acronyms this whole app is built around, so a generic capitalize-first-
 // letter reads like a typo of them.
-function formatReason(reason: string) {
+export function formatReason(reason: string) {
   const override = REASON_TEXT[reason];
   if (override) return override;
   const words = reason.split("_").map((w) => (w === "si" || w === "bl" ? w.toUpperCase() : w));
@@ -61,12 +78,79 @@ function formatReason(reason: string) {
   return joined.charAt(0).toUpperCase() + joined.slice(1);
 }
 
-export function FieldComparisonRow({ comparison }: { comparison: FieldComparisonReport }) {
+/** How a reviewer's correction bears on this one field, when it does at all.
+ *  "cleared": Sentinel called it a mismatch, the reviewer took it off the
+ *  defect list. "flagged": Sentinel passed it (or couldn't compare it), the
+ *  reviewer added it. Absent for every field a correction didn't touch, for
+ *  every field of an unreviewed or merely-confirmed case, and on /compare,
+ *  where nothing can be reviewed at all -- so this row renders exactly as it
+ *  always has unless a person actually changed something about this field. */
+export type ReviewerView = "cleared" | "flagged";
+
+const REVIEWER_BADGE: Record<ReviewerView, { label: string; className: string; fallbackTitle: string }> = {
+  cleared: {
+    label: "Cleared by reviewer",
+    className: "border-ok/40 bg-ok-bg text-ok",
+    fallbackTitle: "Sentinel flagged this field as a mismatch; a reviewer took it off the defect list.",
+  },
+  flagged: {
+    label: "Flagged by reviewer",
+    className: "border-danger/40 bg-danger-bg text-danger",
+    fallbackTitle: "Sentinel did not flag this field; a reviewer added it to the defect list.",
+  },
+};
+
+// The reviewer's note is written once per case, not per field, so it is
+// surfaced as a hover on every reviewer badge rather than pretended to
+// belong to one of them -- "why was this cleared when the two values are
+// visibly different" is exactly the question a reader has at this spot.
+function ReviewerBadge({ view, note }: { view: ReviewerView; note?: string | null }) {
+  const spec = REVIEWER_BADGE[view];
   return (
-    <div className={cn("rounded-lg border p-3 transition-colors", CARD_STYLE[comparison.verdict])}>
-      <div className="mb-2 flex items-center justify-between">
+    <span
+      className={cn("whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium", spec.className)}
+      title={note ? `Reviewer's note: ${note}` : spec.fallbackTitle}
+    >
+      {spec.label}
+    </span>
+  );
+}
+
+export function FieldComparisonRow({
+  comparison,
+  reviewerView = null,
+  reviewerNote,
+}: {
+  comparison: FieldComparisonReport;
+  reviewerView?: ReviewerView | null;
+  reviewerNote?: string | null;
+}) {
+  // The card's colour follows whichever judgement currently stands, but
+  // Sentinel's own badge is never removed -- dimmed, still legible, still
+  // titled -- and the SI/BL values and their evidence below are untouched.
+  // "The system said X, a person said Y, here is what both were looking
+  // at" is the whole point; hiding X would turn an audit trail into a
+  // silent overwrite.
+  const cardStyle =
+    reviewerView === "cleared"
+      ? CARD_STYLE.MATCH
+      : reviewerView === "flagged"
+        ? CARD_STYLE.MISMATCH
+        : CARD_STYLE[comparison.verdict];
+  return (
+    <div className={cn("rounded-lg border p-3 transition-colors", cardStyle)}>
+      <div className="mb-2 flex items-center justify-between gap-2">
         <div className="font-medium">{FIELD_LABELS[comparison.field] ?? comparison.field}</div>
-        <VerdictBadge verdict={comparison.verdict} />
+        {reviewerView ? (
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <span className="opacity-40" title="What Sentinel itself said">
+              <VerdictBadge verdict={comparison.verdict} />
+            </span>
+            <ReviewerBadge view={reviewerView} note={reviewerNote} />
+          </div>
+        ) : (
+          <VerdictBadge verdict={comparison.verdict} />
+        )}
       </div>
       {comparison.reason && <p className="mb-2 text-xs text-muted-foreground">{formatReason(comparison.reason)}</p>}
       <div className="flex flex-col gap-2 sm:flex-row">

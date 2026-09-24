@@ -1,9 +1,14 @@
 # Sentinel — shipping document verification
 
+[![CI](https://github.com/TCF1209/duocode-sentinel/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/TCF1209/duocode-sentinel/actions/workflows/ci.yml)
+
 > **Every answer comes with its evidence.**
 
 *From email inbox to discrepancy report.*
-Built by **DuoCode** for the Averis × Monash Hackathon 2026.
+Built by **DuoCode** for the Averis × Monash Hackathon 2026. DuoCode also
+builds [**Agenticcs**](https://agenticcs.net), an auditable AI
+customer-service platform — the same evidence-first discipline shows up in
+both, independently.
 
 > ### ▶ [duocode-sentinel.vercel.app](https://duocode-sentinel.vercel.app)
 >
@@ -33,7 +38,7 @@ of being reported as a discrepancy.*
 | | |
 |---|---|
 | **Accuracy** | **1.0000** final score on the dev set **and** on three held-out draws, generated from the organisers' own generator with seeds we never developed against — 225 planted defects, every one caught with the **exact** field set, no false alarms, all 80 escalations correct. Not four *independent* tests, and `docs/SCORING.md` §4.1 says why. |
-| **Tests** | **574** — 573 pass, and 1 strict `xfail` pinning a defect we have found and not yet fixed (`docs/ADVERSARIAL.md` §5.4). |
+| **Tests** | **596** — up from 574 at `4c852a7`: twenty-two new (twenty test functions, one of them parametrised three ways; the last six cover `POST /cases/{id}/recheck`), re-run 24 Sep as **454 passed, 142 skipped, 0 failed, 0 xfailed**. The one strict `xfail` that used to sit here is gone: it pinned a defect found by review, `docs/ADVERSARIAL.md` §5.4, fixed the same day it was found. The same command runs on every push in [CI](.github/workflows/ci.yml). |
 | **Speed** | **~3 ms per email**, single-threaded on a laptop: 520 emails end to end in about 1.5 s. |
 | **Cost** | **100% of decisions are made by rules.** `decided_by` is `"rule"` for all 520 emails; no model call decides anything on the graded inbox. |
 
@@ -42,17 +47,41 @@ written — the commands are in [Verify it yourself](#verify-it-yourself).
 
 The accuracy row is the only one a reader cannot reproduce without the
 organisers' dataset, so here is its provenance instead of asking for trust. It
-was measured at `4c852a7`, and **no commit since has touched
-`backend/sdoc/`** — the pipeline the score is a function of, and the library
-both the CLI and the API call. One command checks that:
+was measured at `4c852a7`. **Six** commits since have touched `backend/sdoc/`
+— the pipeline the score is a function of — and the run it produces today is
+**byte-identical** to the one measured then, `submission.json` at md5
+`1c08cd21`. Run the command, count the commits, re-run the pipeline and
+compare the hashes; the paragraph is checkable rather than asking for trust:
 
 ```bash
-git log 4c852a7..HEAD -- backend/sdoc/     # empty
+git log --oneline 4c852a7..HEAD -- backend/sdoc/
 ```
 
-Everything committed after that point is the API surface, the dashboard, the
-demo inbox and these documents. The score cannot have moved, because nothing
-that computes it has.
+Three of the six change what is *reported* and cannot reach the scorer at all:
+the vision transcript is attached to `to_report()` only, the sender likewise,
+and the evidence gate's new sentence names which label was not recognised
+instead of saying the documents do not state it — a better message for the
+same escalation. The other three change reading or comparison, and each was
+found by testing against a real document from *outside* the organisers'
+generator ([`docs/EXTERNAL_VALIDATION.md`](docs/EXTERNAL_VALIDATION.md)):
+
+| Commit | What, and why it cannot have moved the score |
+|---|---|
+| `labels.py` | Ignores one more reference-number label. The string it ignores appears in zero of the 520 graded documents (`grep`, checked). |
+| `readers/office.py` | Reads a container-manifest table shape none of the 8 real `.docx` attachments in the graded set has (checked directly). |
+| `compare.py` | Anchors a repair on its evidence locator instead of the first text match. The bug this closes had already been measured firing on **zero** of the real documents, and still does after the fix. |
+
+Each one was re-verified the same way: `backend/tools/adversarial.py` against
+the committed `bundle_data/` — the same 520-email set the score is measured
+on, no answer key required — reports all 16 perturbation modes
+**byte-identical** to the run before that commit. Full detail, commit by
+commit: `docs/STATUS.md`'s 2026-09-24 entry.
+
+What this page cannot do is re-run the organisers' own scorer here — 
+`data/_grader/` is git-ignored and was not on the machine that made these
+three commits. The claim above is therefore evidence of the same *kind* as
+the original one, not a rerun of it: measured, not assumed, and the harness
+above is what a judge can run to check it independently.
 
 What those numbers do **not** prove is in
 [What the evidence shows](#what-the-evidence-shows-and-what-it-does-not), and
@@ -163,7 +192,7 @@ are reproducible and not re-billed, per-purpose token metering and a run
 budget. Every path is optional: with no `OPENAI_API_KEY` the pipeline still
 runs end to end and escalates what it cannot read (`CLAUDE.md` rule 5).
 
-**The API — `backend/api/`, FastAPI, 11 routes.** Pydantic models at the
+**The API — `backend/api/`, FastAPI, 13 routes.** Pydantic models at the
 boundary only; `store.py` isolates state so the in-memory store is one file to
 replace, not a rewrite of the routes.
 
@@ -173,8 +202,10 @@ replace, not a rewrite of the routes.
 | `POST /runs` · `GET /runs` · `GET /runs/{id}` | start a run over the bundled inbox; list; status and `metrics.json` |
 | `GET /runs/{id}/cases` | case list, filterable by category, status and `decided_by` |
 | `GET /cases/{id}` | one full report — seven fields, both sides, every piece of evidence |
+| `GET /cases/{id}/attachments/{side}` | the SI or BL file itself, inline — the whole document behind the evidence snippet |
 | `POST /cases/{id}/review` | a reviewer confirms or corrects; the report updates |
 | `POST /cases/{id}/retry` | re-process one email in place, re-reading it from disk |
+| `POST /cases/{id}/recheck` | **re-sent documents**: the same check run again on an uploaded SI and/or BL; the answer it replaces, and any review of it, stay readable in the case's history |
 | `POST /compare` | **upload two documents of your own** and get the same report |
 | `GET /metrics` · `GET /submission` | operational counters; the graded artefact |
 
@@ -194,10 +225,11 @@ claimed.*
 and `render.yaml` build the API, `web/vercel.json` the frontend. Runbook and
 the failures worth predicting: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
-**Tests — 574.** 431 pass on a fresh clone with no dataset and no key, 573
-with the bundle in place, and 1 strict `xfail` pinning a defect we have found
-and not yet fixed. The skips are guarded in `conftest.py` and print their
-reason rather than failing on an empty read — see [The test
+**Tests — 596**, up from 574 at `4c852a7` (twenty-two new, one former `xfail` now
+a plain pass — see the table two sections up). The skips are guarded in
+`conftest.py` and print their reason rather than failing on an empty read —
+exact counts and the caveat on which of them are freshly re-run versus
+carried over from before `4c852a7` are in [The test
 suite](#the-test-suite).
 
 ---
@@ -244,7 +276,14 @@ the 520-email one, below.
 .venv/Scripts/python.exe -m pytest backend/tests
 ```
 
-On a fresh clone: **431 passed, 142 skipped, 1 xfailed, 0 errors**.
+On a fresh clone at `4c852a7`: **431 passed, 142 skipped, 1 xfailed, 0
+errors**. Re-run on 24 Sep on a checkout holding no `data/` — the same
+condition as a clone — the suite is **596 tests: 454 passed, 142 skipped, 0
+failed, 0 xfailed**, counted from `pytest --junitxml` rather than remembered:
+twenty-two tests added since `4c852a7`, and the former `xfail` now a plain pass.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs this same command
+on every push, on a machine nobody on the team configured — the fresh-clone
+check made permanent rather than repeated by hand.
 
 The skips are not a broken checkout. `data/` is git-ignored — it holds the
 organisers' dataset and, beside it, their answer key (see
@@ -252,7 +291,8 @@ organisers' dataset and, beside it, their answer key (see
 full bundle to read. `backend/tests/conftest.py` guards exactly the tests that
 open it and skips them with the reason printed, rather than letting ~100 tests
 fail on an empty read and read as a broken project. With the participant bundle
-at `data/bundle/`, the same command gives **573 passed, 1 xfailed**.
+at `data/bundle/`, the same command gave **573 passed, 1 xfailed** at
+`4c852a7`; by the same arithmetic as above, **596 passed, 0 xfailed** since.
 
 ### The full inbox
 
@@ -323,9 +363,21 @@ including the `control_rewrite` sanity row, `ocr_confusions` at **0** silent
 wrong values and **0** invented defects, unfamiliar wording escalating **168**
 documents rather than guessing at them, and `wrapped_value` still carrying its
 74 short reads and the **1** masked discrepancy that
-[§5.4](docs/ADVERSARIAL.md) pins with a strict `xfail`. Those last two are in
-the output on purpose. A harness that only prints zeroes is not measuring
-anything.
+[§5.2](docs/ADVERSARIAL.md) describes — `email_145`, unfixable by this
+repair *by construction*, not the §5.4 defect that used to share this
+number: that one was fixed 2026-09-24, fired on zero real documents before
+the fix and still does after it. Those two are in the output on purpose. A
+harness that only prints zeroes is not measuring anything.
+
+One more thing a clone gets right now that it did not before 24 Sep:
+`.gitattributes` declares every attachment format binary, so a Windows
+checkout with `core.autocrlf` no longer rewrites a PDF's line endings. That
+rewrite moved one file's `startxref` by 74 bytes and turned a real planted
+defect (`email_499`, `gross_weight_kg`) into an unreadable attachment on that
+platform only — 45 mismatches and 21 escalations instead of the 46 and 20
+the same commit produces on Linux and on the deployed API. Found, explained
+and fixed in `docs/STATUS.md`'s 2026-09-24 entry; the numbers on this page
+were always the Linux ones.
 
 ---
 
@@ -356,7 +408,7 @@ is no answer key in it: the unperturbed reading is the reference.
 | **Holds** | Punctuation drift, case and spacing noise, reflowed values, indented labels, reordered fields — **zero** movement on both draws. The `control_rewrite` row is zero too, so the instrument itself is sound. |
 | **Costs recall, safely** | Unfamiliar label wording loses 1,100 of 1,281 fields and escalates every one: zero false discrepancies, zero silent wrong values. The right failure direction, and useless to an operator — see the next section. |
 | **Bends, safely** | OCR character confusion (`NANTONG` → `NANT0NG`) still moves 972 of 1,281 dev reads, and always will: the document genuinely says something else, and nothing separates "the scanner misread a digit" from "the document says that" from one source. What it no longer does is *decide*. Silent wrong values and invented defects are both **zero**, down from 982 and 151, because a damaged number is now refused rather than parsed short and a value differing only on confusable glyphs is escalated rather than reported (`docs/ADVERSARIAL.md` §4.4). Fuzzy value matching is still banned and still the wrong fix — this veto never produces a match, so it cannot clear a bad BL (`docs/DECISIONS.md` §D2). |
-| **Open** | The truncation repair can mask a real discrepancy (§5.4). It is pinned by a **strict** `xfail`, so fixing it turns the build red rather than passing quietly. |
+| **Open** | One masked discrepancy the repair cannot catch *by construction* — `email_145`, `docs/ADVERSARIAL.md` §5.2 — its first guard returns before either document is re-examined, so closing it means a second extraction pass, not a smaller fix. (A different masking bug, §5.4, was found and fixed the same day — see the commit table above.) |
 
 ## What the model layer recovers
 
@@ -382,7 +434,11 @@ card: 178 calls, $0.2447 — $0.0013 per document.
 **State this carefully.** The model does **no** work on the graded inbox:
 `decided_by` is `"rule"` for all 520 emails, and the only live calls in a
 normal run are six scan transcriptions, which are reviewer evidence and decide
-nothing. This table is *"here is what happens when a document arrives with
+nothing — and are now on screen: where a deployment permits it
+(`SENTINEL_ALLOW_LLM_RUNS`, on in `render.yaml`), the run page's **Run with
+the model tier** switch produces them, and each of the three `unreadable`
+scan cases shows its transcript as a card marked reviewer evidence, with the
+case still in review. This table is *"here is what happens when a document arrives with
 wording we have never seen"*, never *"our pipeline is 89% AI"*. It is also one
 row of sixteen — the OCR row above is untouched by it.
 
@@ -441,10 +497,19 @@ catastrophic regression. All three are the same class of bug: something that
 fails without saying so.
 
 **What is still open**, and pinned rather than hidden: the truncation repair
-can mask a real discrepancy when both canonical values already match
-(§5.2, §5.4). It has fired zero times on real data. It is held by a **strict**
-`xfail`, so the day someone fixes it the build turns red instead of passing
-quietly.
+cannot catch a masked discrepancy *by construction* when both canonical
+values already match before either side is re-examined (§5.2, `email_145`
+— one case in 188 on dev, none on the held-out seed). Closing it means a
+second extraction pass over values that already agree, not a smaller fix,
+so it stays open.
+
+A related but different bug — §5.4, the repair completing a value from the
+*wrong* occurrence of matching text elsewhere in the document — was found
+the same way (review, not the harness) and fixed the same day: see the
+commit table earlier on this page and `docs/STATUS.md`'s 2026-09-24 entry.
+It had fired on zero real documents before the fix, and the harness
+confirms it still does after — the fix could not have moved a number that
+was already at zero.
 
 ## Future roadmap
 
@@ -461,13 +526,18 @@ Beyond the hackathon, in the order we would actually build them:
    correction into `labels.py`. That is the learning loop, and it is the one
    place this system should learn — the label vocabulary, never the value
    comparison.
-3. **Batch patterns.** "Twelve emails from this carrier all mismatch on port of
-   discharge" is a different and more valuable statement than twelve separate
-   reports. The data is already in `report.json`; this is an aggregation the
-   dashboard does not yet do.
-4. **Throughput and cost at real inbox volume.** We measure ~3 ms per email and
-   $0 on the graded set. A desk needs the projection at its own volume, with
-   the model tier's cost as a function of how unfamiliar its documents are.
+3. **Batch patterns — built.** The run page now groups `MISMATCH` cases by
+   shipper and field, surfacing any group of two or more, largest first, each
+   expandable to the affected emails. Real signal on the graded inbox, not a
+   demo fixture: 21 such patterns, the largest seven cases from one shipper's
+   gross weight. No new extraction — the shipper name was already read by
+   the pipeline; the API just started including it in the case list.
+4. **Throughput and cost at real inbox volume — built.** The metrics page now
+   projects both onto a desk's own volume: processing time scales the run's
+   own measured ms/email, and cost shows two figures rather than one guess —
+   "at today's mix" (this run's own measured $/email, $0 on the graded set)
+   and a worst-case ceiling at $0.0013/document, the rate measured when every
+   field carries wording the rules have never seen (§8 below).
 5. **Per-desk rules.** The four desks in this dataset (AIE, AFPTME, AFRT,
    AFEMY) have different forms and different tolerances. The stage boundaries
    already allow a per-desk label table and a per-desk escalation policy; the
@@ -479,13 +549,36 @@ threshold, and a threshold that forgives a scanning artefact also merges two
 real companies (`docs/DECISIONS.md` §D2). The only safe direction is the one
 taken in §4.4: escalate the ambiguity, never absorb it.
 
+### Adoption path, and how we would know it is working
+
+The first deployment is one desk, not a region. The graded inbox carries four
+desk codes in its subjects and recipients — AFEMY (35 emails), AIE (30), AFRT
+(29), AFPTME (22); the other 404 carry none — and item 5 above is the
+plumbing that makes one desk's label table and escalation policy its own.
+Sentinel sits beside the desk's existing check, not in place of it, until the
+measures below have held for a full cycle of that desk's carriers.
+
+What a pilot would measure, and where each figure stands today:
+
+| Measure | Today (graded inbox) | What the pilot watches |
+|---|---|---|
+| Escalation rate | 20 of 220 comparison requests (9.1%), all 20 correct | that it stays a work list, not an inbox: precision at 1.0 while the share of unfamiliar templates grows |
+| False alarms | 0 of 46 defects on the graded set; 0 invented defects across 16 perturbation modes (`docs/ADVERSARIAL.md`) | the weekly number — one fabricated flag costs the trust every later flag needs |
+| Defects caught before the BL is released | 46 of 46, exact field set | the same, on the desk's real corrections log |
+| Reviewer minutes per escalation | not measured — the review panel records the decision, not the time | the pilot's first new measurement, and the one that decides whether item 1 (confidence calibration) is worth building |
+| Cost per 1,000 emails | $0 at today's mix; $1.30 ceiling at 100% unfamiliar wording (metrics page) | that the ceiling stays a ceiling as templates the rules have never seen arrive |
+| Time to a report | 12.7 s for 520 emails on a free-tier container | seconds, at the desk's daily volume — the metrics page projects it from the run's own ms/email |
+
+The first four columns are results; the last column is a target. They are
+kept apart on purpose.
+
 ## Repository map
 
 ```
 backend/sdoc/          the pipeline — no web, no database, no network imports
-backend/api/           FastAPI surface over it (11 routes, incl. POST /compare)
+backend/api/           FastAPI surface over it (13 routes, incl. POST /compare)
 backend/tools/         adversarial.py, the perturbation harness; smoke_readers.py
-backend/tests/         574 tests over the traps in docs/DATA_NOTES.md
+backend/tests/         596 tests over the traps in docs/DATA_NOTES.md
 backend/run.py         an inbox -> submission.json + report.json + metrics.json
 web/                   Next.js 16 dashboard (App Router, shadcn/ui, Recharts)
 demo_data/             30-email demo inbox — what a clone can run without the bundle

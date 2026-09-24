@@ -34,6 +34,7 @@ Two rules here are non-negotiable, and both come from `docs/DATA_NOTES.md` §4:
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, replace
 from typing import Callable, Optional
 
@@ -427,6 +428,27 @@ def compare_documents(si: DocFields, bl: DocFields) -> list[FieldComparison]:
 _REPAIRABLE = PARTY_FIELDS + PORT_FIELDS
 _CONTINUATION_SEARCH = 200
 
+# A locator this specific -- a plain-text or PDF-derived reader's "line N" --
+# names the exact line a value came from, so `_extend` can start its search
+# there instead of at whatever occurrence of the same text comes first in the
+# document. docx's own locators ("para N", "table T row R") do not match this
+# and are unaffected: `_extend` falls back to the original whole-document
+# search for anything this does not recognise.
+_LINE_LOCATOR = re.compile(r"^line (\d+)$")
+
+
+def _line_start_offset(text: str, line_number: int) -> Optional[int]:
+    """Character offset where 1-indexed `line_number` starts in `text`.
+
+    `None` when the locator names a line the text does not have -- stale
+    evidence should fall back to the old search, not raise.
+    """
+    lines = text.split("\n")
+    idx = line_number - 1
+    if idx < 0 or idx >= len(lines):
+        return None
+    return sum(len(line) + 1 for line in lines[:idx])
+
 
 def _repaired(si: DocFields, bl: DocFields, field: str) -> tuple[FieldValue, FieldValue]:
     si_value, bl_value = _side_of(si, field), _side_of(bl, field)
@@ -462,7 +484,19 @@ def _extend(fields: DocFields, value: FieldValue, field: str,
     if not value.raw or not text:
         return value
 
-    start = text.find(value.raw)
+    # Anchor on the evidence locator when it names a line, so a value that
+    # recurs earlier in the document -- two fields sharing an identical first
+    # line, docs/ADVERSARIAL.md §5.4 -- is completed from where it actually
+    # is, not from whichever occurrence text.find meets first.
+    search_from = 0
+    locator = value.evidence.locator if value.evidence else None
+    match = _LINE_LOCATOR.match(locator) if locator else None
+    if match:
+        offset = _line_start_offset(text, int(match.group(1)))
+        if offset is not None:
+            search_from = offset
+
+    start = text.find(value.raw, search_from)
     if start < 0:
         return value
     tail = text[start + len(value.raw): start + len(value.raw) + _CONTINUATION_SEARCH]

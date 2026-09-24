@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ShipCargo } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RunStatusPill, STATUS_COLOR_VAR } from "@/components/status-badges";
@@ -79,6 +80,33 @@ export function MetricsPageView({ runId }: { runId: string }) {
           accent={metrics.documents_unreadable > 0 ? "warn" : undefined}
         />
         {metrics.llm?.available && <Stat label="Model cost" value={costUsd} format={(v) => `$${v.toFixed(4)}`} />}
+      </motion.div>
+
+      {/* Its own row, under its own heading, not three more tiles in the
+          grid above: the grid is what Sentinel did, this is what people
+          did to it afterwards, and /metrics reports them beside each other
+          for exactly that reason (main.py's own comment on the route).
+          The backend has returned these counts since the review feature
+          shipped; nothing on this page showed them until now. */}
+      {metrics.review && (
+        <motion.div className="flex flex-col gap-2" variants={fadeUp}>
+          <div className="text-xs font-medium text-muted-foreground">Human review of this run</div>
+          <motion.div
+            className={cn("grid gap-3", metrics.recheck ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}
+            variants={stagger()}
+          >
+            <Stat label="Reviewed" value={metrics.review.reviewed} />
+            <Stat label="Confirmed as-is" value={metrics.review.confirmed} accent="ok" />
+            <Stat label="Corrected" value={metrics.review.corrected} />
+            {/* Cases re-run on documents the sender re-sent -- the other
+                thing a person does to a run after it finished. */}
+            {metrics.recheck && <Stat label="Re-checked" value={metrics.recheck.cases} />}
+          </motion.div>
+        </motion.div>
+      )}
+
+      <motion.div variants={fadeUp}>
+        <ThroughputProjection metrics={metrics} costUsd={costUsd} />
       </motion.div>
 
       <motion.div className="grid gap-4 sm:grid-cols-2" variants={stagger()}>
@@ -184,6 +212,74 @@ export function MetricsPageView({ runId }: { runId: string }) {
         )}
       </motion.div>
     </motion.div>
+  );
+}
+
+// Volume this desk might actually see, in emails/day. Presets, not a free
+// slider — the whole card is a projection, so a handful of round numbers
+// says that honestly; a slider invites reading one exact figure as measured.
+const VOLUME_PRESETS = [1_000, 5_000, 10_000, 50_000] as const;
+
+// docs/ADVERSARIAL.md §8: 178 calls (172 live) for $0.2447 when every field
+// on the unseen_labels set carries wording the rules have never met — the
+// rate measured on the hardest case we have, not a typical one. On the
+// graded inbox the model makes zero calls, which is the other number this
+// card shows, measured on whatever run is actually loaded.
+const WORST_CASE_USD_PER_DOCUMENT = 0.0013;
+
+function formatDuration(totalSeconds: number): string {
+  if (totalSeconds < 60) return `${totalSeconds.toFixed(1)} s`;
+  if (totalSeconds < 3600) return `${(totalSeconds / 60).toFixed(1)} min`;
+  return `${(totalSeconds / 3600).toFixed(2)} h`;
+}
+
+function ThroughputProjection({ metrics, costUsd }: { metrics: PipelineMetrics; costUsd: number }) {
+  const [volume, setVolume] = useState<number>(5_000);
+
+  const totalSeconds = (volume * metrics.mean_ms_per_email) / 1000;
+  const ruleSharePct = Math.round(metrics.rule_share * 100);
+  const measuredUsdPerEmail = metrics.emails > 0 ? costUsd / metrics.emails : 0;
+  const projectedAtTodaysMix = volume * measuredUsdPerEmail;
+  const projectedWorstCase = volume * WORST_CASE_USD_PER_DOCUMENT;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm font-medium">Throughput &amp; cost at volume</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-wrap gap-2">
+          {VOLUME_PRESETS.map((v) => (
+            <Button key={v} variant={v === volume ? "default" : "outline"} size="sm" onClick={() => setVolume(v)}>
+              {v.toLocaleString()} / day
+            </Button>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <MiniStat label="Processing time" value={formatDuration(totalSeconds)} />
+          <MiniStat
+            label={`At today's mix (${ruleSharePct}% by rule)`}
+            value={`$${projectedAtTodaysMix.toFixed(projectedAtTodaysMix < 1 ? 4 : 2)}`}
+          />
+          <MiniStat label="Worst case — every email unfamiliar" value={`$${projectedWorstCase.toFixed(2)}`} accent="warn" />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Processing time scales this run&apos;s own measured {metrics.mean_ms_per_email.toFixed(2)} ms/email — nothing
+          assumed. &quot;Today&apos;s mix&quot; scales this run&apos;s own measured cost per email. The worst case uses
+          $0.0013/document, the rate measured when every field carries wording the rules have never seen
+          (<code className="text-[0.7rem]">docs/ADVERSARIAL.md</code> §8) — a ceiling, not a forecast.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MiniStat({ label, value, accent }: { label: string; value: string; accent?: keyof typeof ACCENT_STYLE }) {
+  return (
+    <div className="rounded-lg border bg-card p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className={cn("font-heading text-lg font-semibold tabular-nums", accent && ACCENT_STYLE[accent])}>{value}</div>
+    </div>
   );
 }
 

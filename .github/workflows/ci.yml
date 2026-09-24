@@ -19,6 +19,12 @@
 #     asserts the variable is absent before pytest starts, so a future "helpful"
 #     addition of the secret to this repository turns the build red instead of
 #     quietly weakening the claim.
+#
+# Two workflows were written for this file independently (f8b2e2f on the
+# feature branch, 360a7a0 on main) and merged into one: this is main's, plus
+# the two steps only the other had — the demo inbox end to end, and
+# `npm run lint` — because README.md describes CI as "pytest + the demo inbox
+# end to end, then build/tsc/lint" and the badge points at this file's path.
 
 name: CI
 
@@ -77,6 +83,11 @@ jobs:
           print(f"520 emails, {rules} decided by rules, no key present")
           PY
 
+      # The README also tells a judge to run the small demo inbox; that command
+      # stays under test too (it was the feature branch's own end-to-end step).
+      - name: The demo inbox, end to end, no key and no network
+        run: python backend/run.py --data demo_data --out runs/ci --quiet
+
   web:
     name: dashboard typecheck and build
     runs-on: ubuntu-latest
@@ -95,4 +106,7 @@ jobs:
       - run: npm run build
         working-directory: web
       - run: npx tsc --noEmit
+        working-directory: web
+      # Lint is the third thing the README tells a judge to run.
+      - run: npm run lint
         working-directory: web
