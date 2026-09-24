@@ -65,10 +65,10 @@ function groupIntoPatterns(cases: CaseSummary[]): Pattern[] {
  *  fetched for the table below; no extra request. */
 export function PatternAlerts({ runId, cases }: { runId: string; cases: CaseSummary[] }) {
   const patterns = useMemo(() => groupIntoPatterns(cases), [cases]);
-  // Open by default. Collapsing it lets the case table below come up to the
-  // top of the page for a reviewer working through the list; the heading
-  // keeps the count, so a collapsed box still says there is something here.
-  const [collapsed, setCollapsed] = useState(false);
+  // Collapsed by default, so the case table below is what a reviewer lands
+  // on; the heading keeps the count, so a collapsed box still says there is
+  // something here, and one click opens it.
+  const [collapsed, setCollapsed] = useState(true);
   if (patterns.length === 0) return null;
 
   return (
