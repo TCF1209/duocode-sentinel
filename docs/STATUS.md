@@ -4,6 +4,149 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-24 (afternoon) — Claude session 9 · the final-round rubric read against the repository; a Windows line-ending bug that hid a real defect; the model tier made visible; the pitch's numbers re-measured
+
+Asked to read the organisers' final-round judging rubric (the three PDFs
+under `Judging/`), every document and data file this project has, and the
+preliminary judges' written feedback, and to say — rigorously, nothing
+skipped — where the project stands against each criterion and what to do
+about it; then, after a decision round with the user, to close every finding
+rather than list it. The mentor session moved to 25 Sep, so the day went on
+the fixes. Two other parties (Claude session 8 and the teammate, who pushed
+`dbfd528` to `main` mid-afternoon) were committing to this same checkout
+throughout; file ownership was negotiated by message, every `git add` here
+names its paths, and nothing of anyone else's was staged.
+
+**Done**
+- **Found and fixed the reason this checkout has reported 45 MISMATCH /
+  21 NEEDS_REVIEW since 21 Sep while the deployed API reports 46 / 20.**
+  Not a regression and not the code: no `.gitattributes`, `core.autocrlf`
+  on, and `bundle_data/attachments/email_499_BL.pdf` is a PDF-1.3 with no
+  NUL byte, so git called it text and the Windows checkout rewrote its 74
+  line endings; `startxref` then pointed 74 bytes short, pdfplumber said
+  "Unexpected EOF", and a real planted defect (`gross_weight_kg`) came back
+  `unreadable` — safe, and wrong, on this platform only. Proven by restoring
+  LF in a scratch copy of that one file and re-running: 46 / 20 / 454, 8
+  unreadable documents, identical to Render. `git ls-files --eol` showed 34
+  committed PDFs exposed to the same rewrite (26 `bundle_data`, 6
+  `demo_data`, the two scanned samples under `web/public/samples`); only
+  this one broke. `.gitattributes` now declares every attachment format
+  binary (`c97f192`), the 34 working files were re-checked-out and read
+  `i/lf w/lf`, and `run.py` over `bundle_data` on this machine gives
+  **46 / 20 / 454, unreadable 8, decided_by rule 520** — the deployed
+  numbers. **Correction to this file's 2026-09-21 entry and to
+  `VIDEO_SCRIPT.md`: the "45 MISMATCH · 21 NEEDS_REVIEW" recorded there was
+  this artefact, not the pipeline. The README's "46 defects" was always
+  right.** Anyone with an older Windows clone: after pulling, delete the 34
+  files and `git checkout -- bundle_data demo_data web/public/samples`, or
+  re-clone.
+- **Measured where the AI actually runs on the real inbox, instead of
+  quoting it.** Rule classifier: 0 of 520 emails have `needs_llm`, 0 have
+  confidence below the 0.45 floor (lowest is 1.0), so the LLM classifier
+  would be asked zero times even with a key. Extractor fallback: 5 readable
+  documents have a field no label resolved to, and all 5 are the `BL` side
+  of the `wrong_doc_type` pairs (501–505), where `pipeline.py` deliberately
+  sets `assisted=False` — zero asks. Scans: exactly 6 attachments are
+  `no_text_layer` (512–514, both sides). So "the only live calls in a normal
+  run are six scan transcriptions" (`ADVERSARIAL.md` §8) is now a
+  measurement on this checkout, not a sentence. Also verified on the
+  deployed API with the repo's own public sample pair: `/compare` with the
+  model off → `NEEDS_REVIEW`; with it on → `MISMATCH [consignee,
+  notify_party]`, `model_used: true` — **Render has a key configured and the
+  AI beat works live** (two calls, a fraction of a cent, disclosed to the
+  user). Locally there is no `.env`, so the model path cannot run here yet.
+- **The six transcriptions are now visible** (`96cf84c`, `49f2f10`). The
+  vision transcript never reached `report.json`; `schema._doc` now carries
+  `ScanTranscript.as_dict()` on the document, the API passes it through
+  unchanged, and `ScanTranscriptCard` renders it inside the needs-review
+  workspace's per-document card — model name, legible count, seven values or
+  "not legible — blank rather than guessed", and the sentence that nothing
+  here entered a comparison. The run page gained **Run with the model
+  tier**, off by default, disabled-with-reason when `GET /` reports
+  `llm_runs_allowed: false`; `render.yaml` turns that flag on for the
+  deployed API with the guards spelled out. Every decision on the inbox is
+  still a rule's; a model run there is six vision calls, cached after the
+  first. This is the direct answer to the preliminary judge's "using AI
+  less than most other teams": the AI is small, specific, and now on screen.
+- **The gate no longer says "the documents do not state X" when X is on the
+  page under wording it did not recognise** (`b26579d`). Same status and
+  review reason; the sentence now distinguishes a blank from an
+  unrecognised label and names the document, and the recovery points at the
+  label table instead of the sender. Inert on the graded inbox: identical
+  metrics, byte-identical `submission.json`, zero cases' notes changed (the
+  five `missing_value` cases are genuine blanks), and the adversarial harness
+  re-run over `bundle_data` matches `ADVERSARIAL.md` §2 on all sixteen
+  modes, every column. Five new tests run the whole `/compare` path on
+  inline text.
+- **The pitch's numbers re-measured** (`1c691e0`): `/pitch` said "574 tests,
+  1 held failing on purpose" and slide 4 described §5.4 — fixed on 24 Sep —
+  as the open defect. Now 590 tests · 0 failing, and the card describes
+  §5.2 (`email_145`), with the 92% figure for why the obvious guard is worse
+  than the gap. README, `ADVERSARIAL.md`'s header and §5.4 tail, and both
+  video scripts (banner: no video this round; the three stale figures not to
+  say aloud) corrected in `0ceaa15`.
+- **`docs/ARCHITECTURE.md` §5 stops drawing a database that does not
+  exist.** Postgres marked planned, with what stands in for it and a
+  paragraph on how the system scales as built. **Decision, taken by this
+  session after the user asked for the lowest-risk call: no database before
+  the final.** Render's free disk resets on redeploy, so SQLite would not
+  persist there either; a managed Postgres is a new external dependency and
+  a credential in the last 36 hours before a live demo that does not need
+  persistence (the API re-runs the inbox at boot). The trade is written
+  where a judge will read it.
+- **README gains an adoption path and the measures a pilot would watch**
+  (Impact & Future Potential is a 10-point criterion whose Excellent band
+  asks for exactly "a credible adoption path and clear measures of
+  success"), with today's measured figures kept apart from targets, and the
+  desk counts from the inbox itself (AFEMY 35, AIE 30, AFRT 29, AFPTME 22;
+  404 emails carry no desk code).
+- **CI** (`f8b2e2f`): `.github/workflows/ci.yml` runs the README's own
+  commands — pytest + the demo inbox, then build/tsc/lint — on every push;
+  badge in the README. Each step verified locally; the first run on GitHub
+  happens when `main` is next pushed.
+- Verification, on this checkout after every change: **590 tests, 448
+  passed, 142 skipped, 0 failed, 0 xfailed** (`--junitxml`); `run.py` over
+  `bundle_data` 46 / 20 / 454; harness sixteen-for-sixteen; `npm run build`,
+  `npx tsc --noEmit`, `npm run lint` clean. Seven commits, each naming its
+  own paths.
+
+**Next**
+- **The one path not yet exercised end to end: a model-enabled run.** Needs
+  `OPENAI_API_KEY` in a local `.env` (the user places it) and
+  `SENTINEL_ALLOW_LLM_RUNS=1` on a local API; then a run over the three scan
+  emails should show six calls in `metrics.json`, `scan_transcript` on
+  512–514's documents, and the card on their case pages. Also `/compare`
+  with the scanned sample and the toggle on.
+- `docs/PITCH_DECK.md` (slide-by-slide, rubric-mapped, numbers with their
+  source) and `docs/PITCH_DAY.md` (day-of checklist, Q&A bank) — then the
+  PPTX from the Markdown.
+- **(T)** Push and merge (owner push for Vercel), then on the deployed
+  URLs: `GET /` → `llm_runs_allowed: true`; a model-tier run shows six
+  calls and the transcript cards; CI green on GitHub. The pitch time limit
+  and Q&A format from the Finalist Portal are still unknown to this session.
+- Mentor session: 25 Sep.
+
+**Careful**
+- **Three parties commit to this checkout.** The protocol that worked
+  today: announce the file list by message before touching anything,
+  `git add` explicit paths only, and STATUS entries in an agreed order.
+  Session 8's running backend still holds a run made with the CRLF-mangled
+  PDFs; it will show 45/21 until restarted.
+- The test count in README, `ADVERSARIAL.md` and `/pitch` is **590 as of
+  this entry**. Any test added after it moves the number; update all three
+  in the same commit, not one.
+- `SENTINEL_ALLOW_LLM_RUNS=1` on a public URL is bounded by the $2 per-run
+  budget, the cache and `SENTINEL_MAX_ACTIVE_RUNS`, and on this inbox costs
+  six vision calls per fresh run — but the container's cache directory is
+  emptied on every redeploy, so the first model run after each deploy pays
+  again. Cents, not dollars; still worth knowing.
+- The gate's new wording changes `notes` text only. Nothing in
+  `submission.json` moved and the harness proves no decision changed; if
+  `review_reason` is ever made to distinguish absent from blank as an enum,
+  that *would* be a graded-shape change and needs the scorer.
+
+---
+
 ## 2026-09-24 (night, continued a fifth time) — Claude session 8 · the case page now shows the reviewer's correction beside Sentinel's answer, not instead of it
 
 Raised with a screenshot after the previous entry's field-level
