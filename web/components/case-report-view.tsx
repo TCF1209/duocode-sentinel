@@ -192,7 +192,14 @@ export function CaseReportView({
   // `effective` at all. Everything below that reads `correction` renders
   // exactly as it always did when this is null -- the system's answer is
   // never replaced, only joined by the person's where they differ.
-  const correction = report.effective?.source === "review" ? report.effective : null;
+  const liveCorrection = report.effective?.source === "review" ? report.effective : null;
+  // "Sentinel's original" view: the whole page rendered exactly as Sentinel
+  // produced it, correction set aside -- asked for as "let me see the
+  // unchanged version too". Everything below keys off `correction`, so
+  // flipping this one value flips the header, the banner and every field
+  // card together; nothing is re-fetched and nothing is written.
+  const [showOriginal, setShowOriginal] = useState(false);
+  const correction = showOriginal ? null : liveCorrection;
 
   // Per field. NEEDS_REVIEW as a corrected status is "couldn't tell", which
   // is not a claim about any one field in either direction, so it gets no
@@ -239,6 +246,36 @@ export function CaseReportView({
         <ModelTier offered={report.model_offered} used={report.model_used} />
         <span className="text-xs text-muted-foreground">{report.duration_ms}ms</span>
         {report.llm_calls > 0 && <span className="text-xs text-muted-foreground">{report.llm_calls} model call(s)</span>}
+        {liveCorrection && (
+          <div
+            className="ml-auto flex items-center rounded-full border p-0.5 text-xs"
+            role="group"
+            aria-label="Which view of this case to show"
+          >
+            <button
+              type="button"
+              onClick={() => setShowOriginal(false)}
+              aria-pressed={!showOriginal}
+              className={cn(
+                "rounded-full px-2.5 py-0.5 transition-colors",
+                !showOriginal ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              With correction
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowOriginal(true)}
+              aria-pressed={showOriginal}
+              className={cn(
+                "rounded-full px-2.5 py-0.5 transition-colors",
+                showOriginal ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Sentinel&apos;s original
+            </button>
+          </div>
+        )}
       </motion.div>
 
       {report.review_reason && (

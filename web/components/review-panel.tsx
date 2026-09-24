@@ -15,6 +15,14 @@ const STATUS_OPTIONS: CaseStatus[] = ["OK", "MISMATCH", "NEEDS_REVIEW"];
 // spelled out -- reused here rather than a second hardcoded list.
 const ALL_FIELDS = Object.keys(FIELD_LABELS);
 
+/** "Mismatch on Container Count, Port of Discharge" / "Matched" -- one
+ *  outcome as a phrase, for the before/after lines in the reviewed state. */
+function describeOutcome(status: CaseStatus, defectFields: string[]): string {
+  const label = STATUS_LABELS[status];
+  if (status !== "MISMATCH" || defectFields.length === 0) return label;
+  return `${label} on ${defectFields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}`;
+}
+
 // How urgently this panel should read, keyed to the same status the rest of
 // the app already colors by — an OK case can still be reviewed, but it
 // hasn't earned a warn/danger-tinted card the way an actual problem has.
@@ -80,6 +88,14 @@ export function ReviewPanel({
   const [error, setError] = useState<string | null>(null);
 
   if (report.review) {
+    // What changed, in one glance, for a correction: Sentinel's own answer
+    // on the left, what now stands on the right. The field cards below show
+    // the same thing one field at a time; this is the whole case at once,
+    // asked for as "keep the unchanged version visible to whoever changed it".
+    const after = report.effective ?? {
+      status: report.review.status,
+      defect_fields: report.review.defect_fields,
+    };
     return (
       <div className="rounded-lg border bg-muted/40 p-4 text-sm">
         <div className="flex items-center gap-2 font-medium">
@@ -91,7 +107,15 @@ export function ReviewPanel({
             </>
           )}
         </div>
-        {report.review.reviewer && <div className="text-muted-foreground">by {report.review.reviewer}</div>}
+        {report.review.decision === "correct" && (
+          <div className="mt-2 grid gap-x-3 gap-y-0.5 text-xs sm:grid-cols-[auto_1fr]">
+            <span className="text-muted-foreground">Sentinel said</span>
+            <span>{describeOutcome(report.status, report.defect_fields)}</span>
+            <span className="text-muted-foreground">Now</span>
+            <span className="font-medium">{describeOutcome(after.status, after.defect_fields)}</span>
+          </div>
+        )}
+        {report.review.reviewer && <div className="mt-1 text-muted-foreground">by {report.review.reviewer}</div>}
         {report.review.note && <div className="mt-1 text-muted-foreground">&ldquo;{report.review.note}&rdquo;</div>}
       </div>
     );
