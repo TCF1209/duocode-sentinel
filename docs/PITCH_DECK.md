@@ -146,7 +146,7 @@ datasets, three from seeds we never developed against — 225 defects, exact
 field set, 80/80 escalations. *Attacked ourselves:* 16 kinds of damage,
 3,008 perturbed documents, 20,496 field reads, no answer key — 13 modes at
 zero movement; silent wrong values 982 → 0. *A real carrier's form:* CMA
-CGM's SI template — one bug found and fixed. *Engineering:* 590 tests, 0
+CGM's SI template — one bug found and fixed. *Engineering:* 596 tests, 0
 failing, CI on every push, a container that runs as a non-root user with no
 secret baked in. And the honest box, in a different colour: **what we
 haven't fixed** — `email_145`, one masked discrepancy in 3,008, the guard
@@ -257,7 +257,7 @@ does not score more.
 | 16 modes · 3,008 documents · 20,496 reads · 13 at zero · 982 → 0 · 151 → 0 | `ADVERSARIAL.md` §1–§4, re-run 24 Sep, all sixteen modes match |
 | `email_145`, one masked discrepancy in 3,008; the guard flags 92% of real party fields | `ADVERSARIAL.md` §5.2 |
 | CMA CGM SI template: one bug found and fixed | `EXTERNAL_VALIDATION.md` |
-| 590 tests, 0 failing (448 passed, 142 skipped without the dataset) | `pytest --junitxml`, 24 Sep |
+| 596 tests, 0 failing (454 passed, 142 skipped without the dataset) | `pytest --junitxml`, 24 Sep, after `61aa336` |
 | 21 pattern groups, largest 6 cases | run page over the real inbox, `STATUS.md` 24 Sep |
 | desk codes AFEMY 35 · AIE 30 · AFRT 29 · AFPTME 22 | counted from `bundle_data/inbox` subjects and recipients, 24 Sep |
 | 9.1% escalation rate, all correct | 20 of 220 comparison requests, gold `NEEDS_REVIEW` 20 |
