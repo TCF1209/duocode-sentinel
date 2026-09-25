@@ -4,6 +4,75 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-25 (midday) — Claude session · the review box asks one question: do the SI and the BL match?
+
+Discussed with the user first, then four decisions taken on the recommended
+option each time. Their reading of the old box: "Confirm outcome" confirmed
+an abstract word, and a first-time reviewer took it for "I confirm this
+email is wrong"; "I can't tell" and the whole-case form both asked for a
+"Why?"; the Needs review page still ran the old form; the other four
+categories showed a review box with nothing behind it.
+
+**Done**
+- **Findings, not "Confirm outcome"** (`review-panel.tsx` `ReviewBox`,
+  `case-report-view.tsx`): the box states what Sentinel found in one line
+  ("Consignee and Notify Party differ between the SI and the BL — each value
+  below carries the line it was read from") and the row is the reviewer's
+  finding in plain words, Sentinel's own first so agreeing is one click.
+  Mismatch: *Agree — it's a mismatch · No mismatch · Can't tell*. No
+  mismatch: *Agree — no mismatch · Mismatch… · Can't tell*. Needs review
+  with fields: *No mismatch · Mismatch… · Still can't tell* (and *Use the
+  scan read-out* on a scan). Needs review with nothing on file: *Attach
+  re-sent SI/BL* leads, *Still can't tell* beside it. Every button is one of
+  the draft's own operations (`decisions` / `corrections` / `cant_tell`);
+  the backend derives the outcome as before, the API is untouched.
+- **Mismatch… is a field picker** (`FieldPicker`): seven checkboxes with
+  both readings beside each, *Save — mismatch on N fields*; the pills on the
+  cards stay for one field at a time.
+- **The scan read-out can be adopted** (`ScanAdoptPanel`): on an image-only
+  pair the button lists the model's reading per field and side, illegible
+  ones "left blank"; nothing is saved until the reviewer ticks what they
+  checked against the image and presses *Adopt N values — I checked them
+  against the scan*. The values become the reviewer's own corrections,
+  compared by the run's rules, and the note records "adopted from the scan
+  read-out (gpt-5-mini) by the reviewer". readers/scan.py's rule holds: a
+  transcript is evidence for a person, never grounds for a decision.
+- **No "Why?" anywhere**: the whole-case form is gone; after a finding the
+  summary offers a small *Add a note* link. The summary keeps both answers
+  where they differ ("Reviewed — you said: No mismatch · Sentinel said
+  Mismatch on … — kept on the record with its evidence").
+- **Only a document check is reviewed**: SI request / Invoice query /
+  General / Spam pages say "Sorted as … — not a document check, so there is
+  nothing to review" instead of a box. The run page's Review filter is
+  *All · Not reviewed · Agreed · Corrected · Can't tell* (row tags the same
+  words), "Reviewed n / 220 checks" counts comparison cases only, and the
+  select is disabled on a non-comparison category. The metrics page's
+  "Confirmed as-is" is "Agreed".
+- **Uncomparable fields are rows too** (`QuietFieldRow`): amber, with both
+  sides and the reason, so a scan case shows its seven fields without seven
+  identical cards; the "All 7 fields uncomparable" fold is gone.
+- Verified on the live backend: agree / no mismatch / can't tell / picker /
+  adopt / still can't tell, each undone after; the note saved on blur; the
+  list tags and the five-way filter; light and dark; 1280 and 375 px
+  (buttons wrap, the panels go to one column). tsc / eslint / `next build`
+  clean; deck slide 3 rebuilt ("Agree with it, correct a single field, or
+  re-upload") with a fresh run-page capture; PITCH_DAY steps 5 and 6 and
+  PITCH_DECK's slide 3 text follow.
+
+**Next**
+- The reason on an unreadable scan's rows reads "SI missing" (the
+  pipeline's own reason code, the same the cards show); "not read — no text
+  layer" would be kinder, but it is a pipeline string, not a page one.
+
+**Careful**
+- `web/lib/api.ts`'s `ReviewBody` still carries `status` / `defect_fields`
+  for the backend's whole-case path and its tests; the page no longer sends
+  them.
+- The picker and the scan panel are page state: leaving the page discards
+  an unsaved tick, by design -- nothing is saved until the button.
+
+---
+
 ## 2026-09-25 (morning, later) — Claude session · the case page as the user wanted it: all seven fields on the page, one row of actions, "Edit"
 
 The user, awake, looked at the case page and asked whether it was user

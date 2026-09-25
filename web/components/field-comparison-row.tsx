@@ -406,12 +406,14 @@ export function FieldComparisonRow({
 }
 
 /**
- * A field that agrees and nobody has touched, as one line: the field, the
- * value both documents carry, and the Match badge -- so all seven fields
- * stay on the page, in order, without five clean cards pushing the ones
- * that differ down (the user's ask: "I only saw the ones I had to
- * change"). A click opens the full card, evidence and all, right under
- * the line; `children` is that card.
+ * A field nobody has touched that is not a mismatch, as one line: the
+ * field, what the documents carry, and its badge -- so all seven fields
+ * stay on the page, in order, without clean cards pushing the ones that
+ * differ down (the user's ask: "I only saw the ones I had to change"). A
+ * field Sentinel could not compare is the same line in amber, with its
+ * reason, instead of seven near-identical amber cards when a document
+ * could not be read at all. A click opens the full card, evidence and
+ * controls and all, right under the line; `children` is that card.
  */
 export function QuietFieldRow({
   comparison,
@@ -425,12 +427,24 @@ export function QuietFieldRow({
   children?: ReactNode;
 }) {
   const label = FIELD_LABELS[comparison.field] ?? comparison.field;
+  const uncomparable = comparison.verdict === "UNCOMPARABLE";
   const si = (comparison.si.raw ?? "").trim();
   const bl = (comparison.bl.raw ?? "").trim();
+  const sideText = (present: boolean, text: string) => (present && text ? text : "—");
   // The two readings agree once normalised; where they differ to the eye
   // (case, spacing, a trailing "LTD.") both are shown, so the line never
   // lets one stand in for the other.
   const differs = si !== bl;
+  const value = uncomparable
+    ? `SI: ${sideText(comparison.si.present, si)} · BL: ${sideText(comparison.bl.present, bl)}`
+    : si || bl;
+  const tail = uncomparable
+    ? comparison.reason
+      ? formatReason(comparison.reason)
+      : null
+    : differs
+      ? `BL: ${bl}`
+      : null;
   const Chevron = open ? ChevronDown : ChevronRight;
   return (
     <div className="flex flex-col gap-1.5">
@@ -438,8 +452,11 @@ export function QuietFieldRow({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        title={open ? "Fold this field back to one line" : "Open this field: both readings and the lines they came from"}
-        className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-card px-3 py-2 text-left transition-colors hover:bg-muted/40"
+        title={open ? "Fold this field back to one line" : "Open this field: both readings, the lines they came from, and your choices"}
+        className={cn(
+          "flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2 text-left transition-colors",
+          uncomparable ? "border-warn/30 bg-warn-bg/40 hover:bg-warn-bg/70" : "bg-card hover:bg-muted/40",
+        )}
       >
         <Chevron className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} />
         <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:w-36">{label}</span>
@@ -448,14 +465,14 @@ export function QuietFieldRow({
             few characters wide); from `sm` up all four sit on one line and
             the value is truncated, the title holding all of it. */}
         <span className="ml-auto sm:order-last sm:ml-0">
-          <VerdictBadge verdict="MATCH" />
+          <VerdictBadge verdict={comparison.verdict} />
         </span>
         <span
           className="basis-full pl-7 text-sm font-medium break-words sm:min-w-0 sm:flex-1 sm:basis-auto sm:truncate sm:pl-0"
-          title={differs ? `SI: ${si} · BL: ${bl}` : si}
+          title={tail ? `${value} · ${tail}` : value}
         >
-          {si || bl}
-          {differs && <span className="font-normal text-muted-foreground"> · BL: {bl}</span>}
+          {value}
+          {tail && <span className="font-normal text-muted-foreground"> · {tail}</span>}
         </span>
       </button>
       {open && children}

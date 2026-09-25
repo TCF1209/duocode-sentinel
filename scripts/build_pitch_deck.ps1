@@ -161,7 +161,7 @@ foreach ($st in $stats) {
   Add-Body $s $st[1] $x ($y + 46) 292 30 12 $C.ink | Out-Null
   $y += 92
 }
-Add-Text $s "How a desk uses it:   1  Run the inbox   ·   2  Open a flagged case   ·   3  Confirm it, correct a single field, or re-upload the corrected document   ·   4  Send the drafted reply" $M 450 ($W - 2 * $M) 30 11.5 $C.ink 0 $BODY 1 1 | Out-Null
+Add-Text $s "How a desk uses it:   1  Run the inbox   ·   2  Open a flagged case   ·   3  Agree with it, correct a single field, or re-upload the corrected document   ·   4  Send the drafted reply" $M 450 ($W - 2 * $M) 30 11.5 $C.ink 0 $BODY 1 1 | Out-Null
 Add-Tag $s "Criterion 1 · End-to-end functionality" $false | Out-Null
 Set-Notes $s "This is the whole inbox, live on Render and Vercel - not a sample, the organisers' 520 emails. Every email classified, every document pair compared, every case Sentinel can't decide sent to a person with the reason attached. Thirteen seconds. And this is how a desk uses it, four steps: run the inbox, open a flagged case, confirm it or correct one field or re-upload the corrected document, send the drafted reply. Do not say the accuracy here - that is slide 6. (0:40-1:05)"
 

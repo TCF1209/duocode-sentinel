@@ -1,24 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { AlertTriangle, CheckCircle2, Upload, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Sparkles, Upload, XCircle } from "lucide-react";
 import type { CaseReport, DocumentReport, FieldComparisonReport, FieldDecision, Verdict } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { CategoryBadge, DecidedByBadge, StatusBadge } from "@/components/status-badges";
+import { FieldComparisonRow, QuietFieldRow, type DocSideKey, type ReviewerView } from "@/components/field-comparison-row";
 import {
-  FieldComparisonRow,
-  QuietFieldRow,
-  formatReason,
-  type DocSideKey,
-  type ReviewerView,
-} from "@/components/field-comparison-row";
-import { EMPTY_DRAFT, ReviewPanel, type ReviewController } from "@/components/review-panel";
+  EMPTY_DRAFT,
+  FieldPicker,
+  ReviewBox,
+  ReviewSummary,
+  RowEnd,
+  ScanAdoptPanel,
+  type ReadOutRow,
+  type ReviewController,
+} from "@/components/review-panel";
 import { ReplyDraftPanel } from "@/components/reply-draft-panel";
 import { replyDraftKey } from "@/lib/reply-draft";
 import { AttachmentAction } from "@/components/attachment-action";
 import { RecheckHistory, RecheckPanel, type RecheckFiles } from "@/components/recheck-panel";
 import { Separator } from "@/components/ui/separator";
 import { fadeUp, stagger } from "@/lib/motion";
-import { FIELD_LABELS, REVIEW_REASON_TEXT, STATUS_LABELS } from "@/lib/labels";
+import { CATEGORY_BADGE_LABELS, FIELD_LABELS, REVIEW_REASON_TEXT, STATUS_LABELS } from "@/lib/labels";
 import { ScanTranscriptCard, transcriptOf } from "@/components/scan-transcript-card";
 import { cn } from "@/lib/utils";
 
@@ -303,7 +306,9 @@ export function CaseReportView({
     offerRecheck && onRecheck ? (
       <Button
         size="sm"
-        variant="outline"
+        // On a case with nothing on file, attaching the documents *is* the
+        // action, so the button leads.
+        variant={showWorkspace && report.fields.length === 0 ? "default" : "outline"}
         aria-expanded={recheckOpen}
         onClick={() => setRecheckOpen((o) => !o)}
         title="Got a corrected SI or BL back from the sender? Attach it and the same check runs again"
@@ -335,14 +340,9 @@ export function CaseReportView({
   const suggestedAction = suggestedNote ? suggestedNote.replace(/^Suggested action:\s*/, "") : null;
   const notesToShow = showWorkspace && suggestedNote ? readableNotes.filter((n) => n !== suggestedNote) : readableNotes;
 
-  // Seven near-identical amber "UNCOMPARABLE" cards say one thing seven
-  // times when a document could not be read at all; one line says it once,
-  // and the cards stay a click away for anyone who wants them.
-  const collapseFields =
-    showWorkspace && report.fields.length > 0 && report.fields.every((f) => f.verdict === "UNCOMPARABLE");
-  const uncomparableReasons = Array.from(new Set(report.fields.map((f) => f.reason ?? "")));
-  const uncomparableReason =
-    uncomparableReasons.length === 1 && uncomparableReasons[0] ? formatReason(uncomparableReasons[0]) : "see each field";
+  // A document that could not be read at all leaves seven UNCOMPARABLE
+  // fields; they render as seven one-line rows below (QuietFieldRow), each
+  // with its reason, instead of seven near-identical amber cards.
 
   // The first mismatched field this shipper has been flagged on before is
   // where a "shipper history" spotlight lands (home page tile).
@@ -352,14 +352,14 @@ export function CaseReportView({
 
   // In-place review: the reviewer decides each field on its own card, and
   // each choice is saved as it is made (case-detail-page-view.tsx owns the
-  // requests; the panel at the top only holds the whole-case actions and,
-  // once reviewed, the summary). Only where there are cards to decide on
-  // -- a case whose documents were missing or unreadable has nothing
-  // comparable, and picks its outcome in the panel directly -- and never
-  // on /compare, which has no review at all. A case already reviewed keeps
-  // its cards live: the saved review is the draft, and any choice on it is
-  // changed the same way it was made.
-  const inPlace = Boolean(review) && report.fields.length > 0 && !collapseFields;
+  // requests; the box at the top holds the whole-case findings and, once
+  // reviewed, the summary). Only a document check is reviewed at all: the
+  // other categories have nothing to compare, so their page says so in one
+  // line instead of a box. Never on /compare, which has no review. A case
+  // already reviewed keeps its cards live: the saved review is the draft,
+  // and any choice on it is changed the same way it was made.
+  const comparison = report.category === "BL_COMPARISON";
+  const inPlace = Boolean(review) && comparison && report.fields.length > 0;
   const draft = review?.draft ?? EMPTY_DRAFT;
   function decide(field: string, d: FieldDecision | null) {
     if (!review) return;
@@ -391,8 +391,9 @@ export function CaseReportView({
   // Sentinel's own under "Sentinel's original". All seven fields stay on
   // the page in the documents' order (the user's ask: "I only saw the ones
   // I had to change"): a field that differs, or that the reviewer touched,
-  // is a full card; a field that agrees and nobody touched is one line
-  // (QuietFieldRow) that opens into its card on a click.
+  // is a full card; a field that agrees, or that Sentinel could not
+  // compare, and nobody touched is one line (QuietFieldRow, amber with its
+  // reason when uncomparable) that opens into its card on a click.
   function standsOn(f: FieldComparisonReport): Verdict {
     if (showOriginal) return f.verdict;
     const d = draft.decisions[f.field];
@@ -401,7 +402,7 @@ export function CaseReportView({
     return report.review?.field_verdicts?.[f.field]?.verdict ?? f.verdict;
   }
   const isQuiet = (f: FieldComparisonReport) =>
-    standsOn(f) === "MATCH" && (showOriginal || !(draft.decisions[f.field] || draft.corrections[f.field]));
+    standsOn(f) !== "MISMATCH" && (showOriginal || !(draft.decisions[f.field] || draft.corrections[f.field]));
   const [openQuiet, setOpenQuiet] = useState<Record<string, boolean>>({});
   const renderCard = (f: FieldComparisonReport) => (
     <FieldComparisonRow
@@ -421,6 +422,202 @@ export function CaseReportView({
       justSaved={review?.flash === f.field}
     />
   );
+
+  // -- the whole-case findings ---------------------------------------------
+  //
+  // The review box asks one question, "do the SI and the BL match?", and
+  // every button is a finding in plain words; Sentinel's own answer comes
+  // first so agreeing is one click. Each finding is one of the draft's own
+  // operations (the same choices the field cards make, for several fields
+  // at once); the backend derives the outcome, never the page.
+  const [panel, setPanel] = useState<"picker" | "adopt" | null>(null);
+  const saving = review ? review.busy !== null : false;
+  const standingDefects = report.fields.filter((f) => standsOn(f) === "MISMATCH").map((f) => f.field);
+  function noMismatch() {
+    if (!review) return;
+    const decisions = { ...draft.decisions };
+    for (const f of report.fields) {
+      if (f.verdict === "MISMATCH") decisions[f.field] = "cleared";
+      else if (f.verdict === "UNCOMPARABLE") decisions[f.field] = "fine";
+      else delete decisions[f.field];
+    }
+    setPanel(null);
+    review.commit({ ...draft, decisions, cantTell: false }, "case");
+  }
+  function mismatchOn(chosen: string[]) {
+    if (!review) return;
+    const picked = new Set(chosen);
+    const decisions = { ...draft.decisions };
+    for (const f of report.fields) {
+      if (picked.has(f.field)) {
+        if (f.verdict === "MISMATCH") delete decisions[f.field];
+        else decisions[f.field] = "flagged";
+      } else if (f.verdict === "MISMATCH") decisions[f.field] = "cleared";
+      else if (decisions[f.field] === "flagged") delete decisions[f.field];
+    }
+    setPanel(null);
+    review.commit({ ...draft, decisions, cantTell: false }, "case");
+  }
+  function cantTell() {
+    if (!review) return;
+    setPanel(null);
+    review.commit({ ...draft, cantTell: true }, "case");
+  }
+  // The scan read-out (scan-transcript-card.tsx): what the model read on an
+  // image-only page, per side, for the fields Sentinel itself could not
+  // read. Evidence for a person, never a decision -- readers/scan.py's own
+  // rule -- so the button opens a list the reviewer ticks after checking
+  // each value against the image, and only their click saves anything;
+  // illegible fields are left blank, never guessed. What they adopt is
+  // saved as their own corrections and compared by the run's rules.
+  const transcripts = { si: transcriptOf(report.documents.si), bl: transcriptOf(report.documents.bl) };
+  const readOutRows: ReadOutRow[] = report.fields.map((f) => {
+    const read = (side: "si" | "bl") => {
+      if (f[side].present) return null;
+      const t = transcripts[side]?.fields.find((x) => x.field === f.field);
+      return t && t.legible && t.value.trim() ? t.value.trim() : null;
+    };
+    return { field: f.field, si: read("si"), bl: read("bl") };
+  });
+  const hasReadOut = readOutRows.some((r) => r.si || r.bl);
+  const readOutModel = Array.from(new Set([transcripts.si?.model, transcripts.bl?.model].filter(Boolean))).join(" / ");
+  function adoptReadOut(chosen: string[]) {
+    if (!review) return;
+    const corrections = { ...draft.corrections };
+    for (const r of readOutRows) {
+      if (!chosen.includes(r.field)) continue;
+      const sides = { ...(corrections[r.field] ?? {}) };
+      if (r.si) sides.si = r.si;
+      if (r.bl) sides.bl = r.bl;
+      corrections[r.field] = sides;
+    }
+    const provenance = `Values adopted from the scan read-out (${readOutModel}) by the reviewer after checking them against the scan.`;
+    setPanel(null);
+    review.commit({ ...draft, corrections, cantTell: false, note: draft.note.trim() ? draft.note : provenance }, "case");
+  }
+  const listNames = (names: string[]) =>
+    names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  const defectNames = report.defect_fields.map((f) => FIELD_LABELS[f] ?? f);
+  const legibleSummary = (["si", "bl"] as const)
+    .filter((s) => transcripts[s])
+    .map((s) => `${transcripts[s]!.legible_count} of ${transcripts[s]!.fields.length} on the ${s.toUpperCase()}`)
+    .join(", ");
+  const togglePanel = (which: "picker" | "adopt") => setPanel(panel === which ? null : which);
+  const findingButton = (label: string, onClick: () => void, title: string, primary = false, expanded?: boolean) => (
+    <Button
+      size="sm"
+      variant={primary ? "default" : "outline"}
+      disabled={saving}
+      onClick={onClick}
+      title={title}
+      aria-expanded={expanded}
+    >
+      {label}
+    </Button>
+  );
+  const finding: { heading: string; line: string; buttons: ReactNode } | null =
+    !review || !comparison
+      ? null
+      : report.status === "MISMATCH"
+        ? {
+            heading: "Sentinel found a mismatch",
+            line: `${listNames(defectNames)} differ${defectNames.length === 1 ? "s" : ""} between the SI and the BL — each value below carries the line it was read from.`,
+            buttons: (
+              <>
+                {findingButton(
+                  "Agree — it's a mismatch",
+                  review.confirm,
+                  "You checked the cards and the documents really differ there: record that you agree with Sentinel",
+                  true,
+                )}
+                {findingButton(
+                  "No mismatch",
+                  noMismatch,
+                  "The flagged values are the same thing written two ways: take them all off the list; Sentinel's reading stays on the record",
+                )}
+                {findingButton("Can't tell", cantTell, "Send the whole case to Needs review: you looked and could not decide")}
+              </>
+            ),
+          }
+        : report.status === "OK"
+          ? {
+              heading: "No mismatch found",
+              line: `All ${report.fields.length} fields agree, each with the line it was read from. Agree to sign it off, or say what Sentinel missed.`,
+              buttons: (
+                <>
+                  {findingButton("Agree — no mismatch", review.confirm, "You looked and nothing is wrong: sign the case off", true)}
+                  {findingButton(
+                    "Mismatch…",
+                    () => togglePanel("picker"),
+                    "Pick the fields that differ; Sentinel's evidence stays beside your call",
+                    false,
+                    panel === "picker",
+                  )}
+                  {findingButton("Can't tell", cantTell, "Send the whole case to Needs review: you looked and could not decide")}
+                </>
+              ),
+            }
+          : report.fields.length > 0
+            ? {
+                heading: "Decide it yourself",
+                line: hasReadOut
+                  ? `The model read the scans for you (${legibleSummary}). Adopt what you have checked against the image and the rules compare the pair — or decide it below.`
+                  : "Look at the documents, then say what you found. Values can be entered on the cards below.",
+                buttons: (
+                  <>
+                    {hasReadOut && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={saving}
+                        aria-expanded={panel === "adopt"}
+                        onClick={() => togglePanel("adopt")}
+                        title="The model's reading of each scan, for you to adopt field by field after checking it against the image; the rules then compare the pair"
+                      >
+                        <Sparkles className="size-4 text-ai" />
+                        Use the scan read-out
+                      </Button>
+                    )}
+                    {findingButton("No mismatch", noMismatch, "You read both documents: the fields Sentinel could not compare are fine")}
+                    {findingButton(
+                      "Mismatch…",
+                      () => togglePanel("picker"),
+                      "Pick the fields that differ; Sentinel's evidence stays beside your call",
+                      false,
+                      panel === "picker",
+                    )}
+                    {findingButton("Still can't tell", cantTell, "Leave it in review: you looked and could not decide either")}
+                  </>
+                ),
+              }
+            : {
+                heading: "Decide it yourself",
+                line: "Nothing could be compared. Attach the re-sent documents, or leave it in review.",
+                buttons: findingButton("Still can't tell", cantTell, "Leave it in review: you looked and could not decide either"),
+              };
+  const rowEnd = !showWorkspace ? (
+    <RowEnd>
+      <ReplyDraftPanel key={replyDraftKey(report)} report={report} />
+    </RowEnd>
+  ) : null;
+  const recheckArea =
+    recheckOpen && offerRecheck && onRecheck ? (
+      <div data-spotlight="recheck">
+        <RecheckPanel report={report} onRecheck={onRecheck} rechecking={rechecking} onClose={() => setRecheckOpen(false)} />
+      </div>
+    ) : null;
+  const belowRow =
+    review && (panel !== null || recheckArea) ? (
+      <div className="flex flex-col gap-3">
+        {panel === "picker" && (
+          <FieldPicker fields={report.fields} initial={standingDefects} busy={saving} onSave={mismatchOn} onCancel={() => setPanel(null)} />
+        )}
+        {panel === "adopt" && (
+          <ScanAdoptPanel rows={readOutRows} model={readOutModel} busy={saving} onSave={adoptReadOut} onCancel={() => setPanel(null)} />
+        )}
+        {recheckArea}
+      </div>
+    ) : null;
 
   return (
     <motion.div
@@ -543,37 +740,37 @@ export function CaseReportView({
         </motion.div>
       )}
 
+      {/* A comparison request gets the review box; anything else has no
+          documents to compare, and says so in one line instead of offering
+          a sign-off with nothing behind it. */}
+      {review && !comparison && (
+        <motion.p className="text-sm text-muted-foreground" variants={fadeUp} data-testid="nothing-to-review">
+          Sorted as {CATEGORY_BADGE_LABELS[report.category]} — not a document check, so there is nothing to review.
+        </motion.p>
+      )}
+
       {/* Right under the "why", not after every field — a reviewer landing
           here should see what to do before they see the evidence, not after
-          scrolling past all of it. Everything a reviewer can do with the
-          whole case is one row here: confirm, "I can't tell", attach the
-          re-sent SI/BL (the area opens under the row) and, on a case that
-          is not escalated, the reply draft at the row's end. The draft used
-          to hang under the box on its own and the re-sent documents were a
-          grey bar of their own; the user read neither as an action. On an
-          escalated case the draft sits in the workspace's "what to do"
-          above -- never in both places. */}
-      {review && (
+          scrolling past all of it. One row holds everything a reviewer can
+          do with the whole case: the findings (Sentinel's own first, so
+          agreeing is one click), the re-sent SI/BL (the area opens under
+          the row) and, on a case that is not escalated, the reply draft at
+          the row's end. On an escalated case the draft sits in the
+          workspace's "what to do" above -- never in both places. */}
+      {review && comparison && finding && (
         <motion.div variants={fadeUp} data-spotlight="review">
-          <ReviewPanel
-            report={report}
-            control={review}
-            inPlace={inPlace}
-            canRecheck={recheckButton !== null}
-            actions={recheckButton}
-            trailing={!showWorkspace ? <ReplyDraftPanel key={replyDraftKey(report)} report={report} /> : undefined}
-          >
-            {recheckOpen && offerRecheck && onRecheck && (
-              <div data-spotlight="recheck">
-                <RecheckPanel
-                  report={report}
-                  onRecheck={onRecheck}
-                  rechecking={rechecking}
-                  onClose={() => setRecheckOpen(false)}
-                />
-              </div>
-            )}
-          </ReviewPanel>
+          {report.review ? (
+            <ReviewSummary report={report} control={review} below={belowRow}>
+              {recheckButton}
+              {rowEnd}
+            </ReviewSummary>
+          ) : (
+            <ReviewBox status={report.status} heading={finding.heading} line={finding.line} saving={saving} below={belowRow}>
+              {finding.buttons}
+              {recheckButton}
+              {rowEnd}
+            </ReviewBox>
+          )}
         </motion.div>
       )}
 
@@ -633,54 +830,35 @@ export function CaseReportView({
           as the other section labels on this page, so the list of cards
           reads as one section with a boundary rather than more of the
           same-sized text (the collapsed variant below has its own line). */}
-      {report.fields.length > 0 && !collapseFields && (
+      {report.fields.length > 0 && (
         <motion.div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" variants={fadeUp}>
           {report.fields.length} fields compared
         </motion.div>
       )}
 
-      {report.fields.length > 0 &&
-        (collapseFields ? (
-          <motion.details className="rounded-lg border bg-card text-sm" variants={fadeUp}>
-            <summary className="cursor-pointer select-none p-3 text-muted-foreground">
-              All {report.fields.length} fields uncomparable — {uncomparableReason}. Show the fields anyway
-            </summary>
-            <div className="flex flex-col gap-2 border-t p-3">
-              {report.fields.map((f) => (
-                <FieldComparisonRow
-                  key={f.field}
-                  comparison={f}
-                  reviewerView={reviewerViewFor(f)}
-                  reviewerNote={report.review?.note}
-                  priorCount={priorDefectCounts?.[f.field] ?? 0}
-                />
-              ))}
-            </div>
-          </motion.details>
-        ) : (
-          <motion.div className="flex flex-col gap-2" variants={stagger(0, 0.05)} data-spotlight="fields">
-            {report.fields.map((f) => {
-              const quiet = isQuiet(f);
-              const open = quiet && Boolean(openQuiet[f.field]);
-              return (
-                <motion.div key={f.field} variants={fadeUp} data-spotlight={f.field === historyField ? "history" : undefined}>
-                  {quiet ? (
-                    <QuietFieldRow
-                      comparison={f}
-                      open={open}
-                      onToggle={() => setOpenQuiet((s) => ({ ...s, [f.field]: !s[f.field] }))}
-                    >
-                      {open && renderCard(f)}
-                    </QuietFieldRow>
-                  ) : (
-                    renderCard(f)
-                  )}
-                </motion.div>
-              );
-            })}
-          </motion.div>
-        ))}
-
+      {report.fields.length > 0 && (
+        <motion.div className="flex flex-col gap-2" variants={stagger(0, 0.05)} data-spotlight="fields">
+          {report.fields.map((f) => {
+            const quiet = isQuiet(f);
+            const open = quiet && Boolean(openQuiet[f.field]);
+            return (
+              <motion.div key={f.field} variants={fadeUp} data-spotlight={f.field === historyField ? "history" : undefined}>
+                {quiet ? (
+                  <QuietFieldRow
+                    comparison={f}
+                    open={open}
+                    onToggle={() => setOpenQuiet((s) => ({ ...s, [f.field]: !s[f.field] }))}
+                  >
+                    {open && renderCard(f)}
+                  </QuietFieldRow>
+                ) : (
+                  renderCard(f)
+                )}
+              </motion.div>
+            );
+          })}
+        </motion.div>
+      )}
     </motion.div>
   );
 }

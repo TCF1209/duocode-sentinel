@@ -116,7 +116,7 @@ export function MetricsPageView({ runId }: { runId: string }) {
             variants={stagger()}
           >
             <Stat label="Reviewed" value={metrics.review.reviewed} />
-            <Stat label="Confirmed as-is" value={metrics.review.confirmed} accent="ok" />
+            <Stat label="Agreed" value={metrics.review.confirmed} accent="ok" />
             <Stat label="Corrected" value={metrics.review.corrected} />
             {/* Cases re-run on documents the sender re-sent -- the other
                 thing a person does to a run after it finished. */}

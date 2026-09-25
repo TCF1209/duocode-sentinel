@@ -90,16 +90,16 @@ in the organisers' own words.
 four numbers beside it — **520 emails · 46 mismatches · 20 sent to a person,
 with the reason · 12.7 s on a free container.** Below, the four steps a
 desk actually takes (the mentor: "the pitch shows the pipeline, not how a
-person uses it"): *run the inbox · open a flagged case · confirm it, correct
-a single field, or re-upload the corrected document · send the drafted
-reply.*
+person uses it"): *run the inbox · open a flagged case · agree with it,
+correct a single field, or re-upload the corrected document · send the
+drafted reply.*
 
 **Say:** "This is the whole inbox, live on Render and Vercel — not a
 sample, the organisers' 520 emails. Every email classified, every document
 pair compared, every case Sentinel can't decide sent to a person with the
 reason attached. Thirteen seconds. And this is how a desk uses it, four
-steps: run the inbox, open a flagged case, confirm it or correct one field
-or re-upload the corrected document, send the drafted reply."
+steps: run the inbox, open a flagged case, agree with it or correct one
+field or re-upload the corrected document, send the drafted reply."
 
 **Scores:** End-to-End Functionality. Do not say the accuracy here — that
 is slide 6's evidence.

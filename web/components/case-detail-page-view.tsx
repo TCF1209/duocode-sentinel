@@ -17,7 +17,6 @@ import {
   withdrawReview,
   type CaseReport,
   type CaseSummary,
-  type ReviewBody,
 } from "@/lib/api";
 import { listUrlFor, markReturningToRun } from "@/lib/list-memory";
 import { STATUS_LABELS } from "@/lib/labels";
@@ -112,9 +111,10 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
 
   // -- the in-place review ------------------------------------------------
   //
-  // Every choice on a field card (and "I can't tell", the note, "what it
-  // should read") is saved the moment it is made: there is no draft waiting
-  // for a Save button, so there is nothing to lose by leaving the page.
+  // Every finding on the case (agree, no mismatch, mismatch on these fields,
+  // can't tell), every choice on a field card, every corrected value and
+  // the note is saved the moment it is made: there is no draft waiting for
+  // a Save button, so there is nothing to lose by leaving the page.
   // `pending` is the change on its way to the server, shown as if saved so
   // the card answers the click at once; the saved review takes over as soon
   // as the fresh report is back. Saves are queued one after another, so two
@@ -192,14 +192,6 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
           persist(() => withdrawReview(runId, emailId), "case", EMPTY_DRAFT, () =>
             toast.success("Review withdrawn — Sentinel's answer stands"),
           );
-        },
-        // The whole-case form on a case with no field cards: its own
-        // Saving… state and error line (review-panel.tsx), so errors are
-        // thrown to it rather than toasted here.
-        submitLegacy: async (body: ReviewBody) => {
-          await reviewCase(runId, emailId, body);
-          toast.success("Review saved");
-          refresh();
         },
       }
     : undefined;

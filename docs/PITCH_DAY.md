@@ -96,9 +96,11 @@ The deck's beats and timings are in `PITCH_DECK.md`. On the product:
 5. A **MISMATCH** case: the two documents on top (*View original*), all
    seven fields in order — the two that disagree as full cards, the five
    that agree as one line each (click one to open it) — and under every
-   value **the line it was read from**. The review box is one row: *Confirm
-   outcome · I can't tell · Attach re-sent SI/BL · Draft reply*. Then fix
-   it where it is: *Edit* on the BL value, type what the shipper confirmed,
+   value **the line it was read from**. The review box asks one thing — do
+   the SI and the BL match? — in one row: *Agree — it's a mismatch · No
+   mismatch · Can't tell · Attach re-sent SI/BL · Draft reply*; agreeing
+   with Sentinel is the one click. Then fix it where it is: *Edit* on the
+   BL value, type what the shipper confirmed,
    Enter — the pair is compared again with the run's own rules, the card
    turns to *Match* with Sentinel's reading kept underneath, the outcome
    above follows; *Undo* puts Sentinel's reading back. *Not a mismatch* is
@@ -106,7 +108,11 @@ The deck's beats and timings are in `PITCH_DECK.md`. On the product:
    to, nothing to submit.
 6. A **NEEDS_REVIEW** case: `email_512` (a scan, needs the model run): "no
    text layer, so it did not decide — but the model read the page for the
-   reviewer" — the transcript card. Or `email_506` (the BL never arrived):
+   reviewer" — the transcript card, and the seven fields as amber rows. Then
+   *Use the scan read-out* → tick the fields you checked against the image
+   → *Adopt* → the rules compare the fourteen values and the case moves on,
+   with "adopted from the scan read-out by the reviewer" on the record. Or
+   `email_506` (the BL never arrived):
    the review box already shows *Re-sent documents* (nothing on file) →
    *No files? Load a sample pair* → *Re-check* → it comes back OK, and the
    old answer stays on the case as v1.

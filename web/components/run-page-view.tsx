@@ -41,17 +41,27 @@ import { toast } from "sonner";
 const CATEGORIES: Category[] = ["BL_COMPARISON", "SI_REQUEST", "INVOICE_QUERY", "GENERAL", "SPAM"];
 const STATUSES: CaseStatus[] = ["OK", "MISMATCH", "NEEDS_REVIEW"];
 
-// The third filter axis, asked for directly: "confirmed together, corrected
-// together, and the ones nobody has looked at together". Not a backend
-// field -- derived from the two the case list already carries (reviewed,
-// outcome_source), exactly as the table's own "confirmed"/"corrected" tags
-// are, so the filter can never disagree with the tag on the row.
-type ReviewFilter = "pending" | "confirmed" | "corrected";
-const REVIEW_FILTERS: ReviewFilter[] = ["pending", "confirmed", "corrected"];
+// The third filter axis, asked for directly: "the ones a person agreed
+// with together, the ones they corrected together, and the ones nobody has
+// looked at together". Not a backend field -- derived from what the case
+// list already carries (reviewed, outcome_source, status), exactly as the
+// table's own tags are, so the filter can never disagree with the tag on
+// the row. The words are the review box's own (case page): a reviewer
+// *agrees* with Sentinel, *corrects* it, or *can't tell*. Only a document
+// check (BL_COMPARISON) is ever reviewed; the other categories have nothing
+// to compare, so they never carry a state here.
+type ReviewFilter = "pending" | "agreed" | "corrected" | "cant_tell";
+const REVIEW_FILTERS: ReviewFilter[] = ["pending", "agreed", "corrected", "cant_tell"];
 const REVIEW_FILTER_LABELS: Record<ReviewFilter, string> = {
   pending: "Not reviewed",
-  confirmed: "Confirmed",
+  agreed: "Agreed",
   corrected: "Corrected",
+  cant_tell: "Can't tell",
+};
+const REVIEW_TAG_TITLE: Record<Exclude<ReviewFilter, "pending">, string> = {
+  agreed: "A reviewer looked and agreed with Sentinel's answer",
+  corrected: "A reviewer changed Sentinel's answer; both are kept on the case",
+  cant_tell: "A reviewer looked and could not decide; the case stays in review",
 };
 type ListOrder = "attention" | "inbox";
 const LIST_ORDERS: ListOrder[] = ["attention", "inbox"];
@@ -70,9 +80,11 @@ const STATUS_DOT: Record<CaseStatus, string> = { OK: "bg-ok", MISMATCH: "bg-dang
 // left-aligned badges as "not lined up"). `text-center` here overrides the
 // `text-left` that TableHead carries by default.
 const TH = "text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground";
+const reviewable = (c: CaseSummary) => c.category === "BL_COMPARISON";
 function reviewStateOf(c: CaseSummary): ReviewFilter {
-  if (c.outcome_source === "review") return "corrected";
-  return c.reviewed ? "confirmed" : "pending";
+  // A reviewer only ever moves a case *to* Needs review by "can't tell".
+  if (c.outcome_source === "review") return c.status === "NEEDS_REVIEW" ? "cant_tell" : "corrected";
+  return c.reviewed ? "agreed" : "pending";
 }
 
 /** The "classify five yourself" exercise (Before Sentinel): the visitor's
@@ -285,10 +297,22 @@ export function RunPageView({ runId }: { runId: string }) {
   // How much of the run a person has actually looked at -- the review
   // queue's own progress, which nothing on this page said before.
   const reviewCounts = useMemo(() => {
-    const counts: Record<ReviewFilter, number> = { pending: 0, confirmed: 0, corrected: 0 };
-    for (const c of allCases) counts[reviewStateOf(c)]++;
+    const counts: Record<ReviewFilter, number> & { checks: number } = {
+      pending: 0,
+      agreed: 0,
+      corrected: 0,
+      cant_tell: 0,
+      checks: 0,
+    };
+    for (const c of allCases) {
+      if (!reviewable(c)) continue;
+      counts.checks++;
+      counts[reviewStateOf(c)]++;
+    }
     return counts;
   }, [allCases]);
+  // A category with nothing to compare has no review state to filter by.
+  const reviewFilterOff = categoryFilter !== null && categoryFilter !== "BL_COMPARISON";
 
   // Not wrapped in useCallback: the React Compiler in this project memoizes
   // call sites automatically, and a manual dependency array here previously
@@ -607,10 +631,14 @@ export function RunPageView({ runId }: { runId: string }) {
                   to. The hover breaks it down the same three ways the Review
                   select below does, so the number and the control can never
                   mean different things. */}
-              <span title={`${reviewCounts.confirmed} confirmed · ${reviewCounts.corrected} corrected · ${reviewCounts.pending} not reviewed yet`}>
+              <span
+                title={`${reviewCounts.agreed} agreed · ${reviewCounts.corrected} corrected · ${reviewCounts.cant_tell} can't tell · ${reviewCounts.pending} not reviewed yet — of the ${reviewCounts.checks} document checks; the other categories have nothing to review`}
+              >
                 Reviewed{" "}
-                <span className="font-medium tabular-nums text-foreground">{reviewCounts.confirmed + reviewCounts.corrected}</span>{" "}
-                / {allCases.length}
+                <span className="font-medium tabular-nums text-foreground">
+                  {reviewCounts.agreed + reviewCounts.corrected + reviewCounts.cant_tell}
+                </span>{" "}
+                / {reviewCounts.checks} checks
               </span>
               {run?.metrics && (
                 <span>
@@ -624,10 +652,12 @@ export function RunPageView({ runId }: { runId: string }) {
             <label className="flex items-center gap-1.5 text-muted-foreground">
               <span className="w-24 shrink-0">Review</span>
               <select
-                value={reviewFilter ?? ""}
+                value={reviewFilterOff ? "" : (reviewFilter ?? "")}
+                disabled={reviewFilterOff}
+                title={reviewFilterOff ? "Only document checks are reviewed; this category has nothing to compare" : undefined}
                 onChange={(e) => setFilters({ review: (e.target.value || null) as ReviewFilter | null })}
                 aria-label="Review state"
-                className="rounded-md border bg-background px-2 py-1 text-sm text-foreground"
+                className="rounded-md border bg-background px-2 py-1 text-sm text-foreground disabled:opacity-50"
               >
                 <option value="">All</option>
                 {REVIEW_FILTERS.map((r) => (
@@ -931,17 +961,16 @@ export function RunPageView({ runId }: { runId: string }) {
                       {/* A row a person overrode must not read like a row we
                           got right. The badge shows the outcome that stands;
                           this shows who it came from, and what we had said. */}
-                      {c.outcome_source === "review" && (
+                      {reviewable(c) && reviewStateOf(c) !== "pending" && (
                         <span
                           className="ml-2 whitespace-nowrap text-xs text-muted-foreground"
-                          title={`Sentinel said ${STATUS_LABELS[c.system_status]}; corrected by a reviewer`}
+                          title={
+                            reviewStateOf(c) === "corrected"
+                              ? `Sentinel said ${STATUS_LABELS[c.system_status]}; ${REVIEW_TAG_TITLE.corrected}`
+                              : REVIEW_TAG_TITLE[reviewStateOf(c) as Exclude<ReviewFilter, "pending">]
+                          }
                         >
-                          Corrected
-                        </span>
-                      )}
-                      {c.outcome_source === "system" && c.reviewed && (
-                        <span className="ml-2 whitespace-nowrap text-xs text-muted-foreground">
-                          Confirmed
+                          {REVIEW_FILTER_LABELS[reviewStateOf(c)]}
                         </span>
                       )}
                       {/* The other way a case moves on after the run: the
@@ -1150,10 +1179,17 @@ function CaseRowCard({
             )}
             <span>{Math.round(c.category_confidence * 100)}%</span>
             <DecidedByBadge decidedBy={c.decided_by} />
-            {c.outcome_source === "review" && (
-              <span title={`Sentinel said ${STATUS_LABELS[c.system_status]}; corrected by a reviewer`}>Corrected</span>
+            {reviewable(c) && reviewStateOf(c) !== "pending" && (
+              <span
+                title={
+                  reviewStateOf(c) === "corrected"
+                    ? `Sentinel said ${STATUS_LABELS[c.system_status]}; ${REVIEW_TAG_TITLE.corrected}`
+                    : REVIEW_TAG_TITLE[reviewStateOf(c) as Exclude<ReviewFilter, "pending">]
+                }
+              >
+                {REVIEW_FILTER_LABELS[reviewStateOf(c)]}
+              </span>
             )}
-            {c.outcome_source === "system" && c.reviewed && <span>Confirmed</span>}
             {c.recheck_count > 0 && (
               <span title="Re-checked on re-sent documents; the previous answer is kept on the case">Re-checked</span>
             )}
