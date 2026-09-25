@@ -2,7 +2,7 @@
 
 > **Superseded on 24 Sep 2026 — final round.** No video this round. Kept for
 > the reasoning and the number-provenance table, with the same three
-> corrections as `VIDEO_NARRATION.md`: **646 tests, 0 failing** (not 574 with
+> corrections as `VIDEO_NARRATION.md`: **732 tests, 0 failing** (not 574 with
 > one pinned to fail — §5.4 is fixed, §5.2 is the open one); **46 MISMATCH /
 > 20 NEEDS_REVIEW** (not 45/21, a Windows line-ending artefact fixed by
 > `.gitattributes`); and scan transcriptions now visible via the run page's

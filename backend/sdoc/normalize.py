@@ -227,6 +227,29 @@ def digits_contaminated(s: str) -> bool:
     return m.end() < len(s) and s[m.end()] in _DIGIT_LOOKALIKES
 
 
+# A container size as printed: a length with a type code ("40HC", "20' GP"),
+# a length with a foot mark ("40'"), or an ISO 6346 size-type code ("22G1").
+_CTR_SIZE = (
+    r"(?:(?:20|40|45)\s*(?:'|’|FT)?\s*(?:GP|HC|HQ|DV|DC|RF|RH|OT|FR|TK|SD|SH|ST|STD|FCL|NOR)\b"
+    r"|(?:20|40|45)\s*(?:'|’)"
+    r"|[24L][0-9A-Z][A-Z]\d\b)"
+)
+_NUM_WORDS = {
+    w: i for i, w in enumerate(
+        "ONE TWO THREE FOUR FIVE SIX SEVEN EIGHT NINE TEN ELEVEN TWELVE".split(), start=1)
+}
+# Each of these must be the WHOLE value. A line that restates or breaks down
+# a count ("2 X 40'HC (SAY TWO X 40'HC ONLY)", "3 CONTAINERS INCL. 1 X 20RF")
+# or carries a box dimension ("1 CONTAINER 40' X 8'6\"") is read exactly as
+# before, by its first number: wider rules were reviewed old-against-new and
+# broke those. Summing mixed equipment ("1x40HC + 2x20GP") was withdrawn for
+# the same reason: a value that names the same boxes twice, or a total and its
+# breakdown, summed to double.
+_CTR_SIZE_FIRST_ONLY = re.compile(rf"^\s*{_CTR_SIZE}\s*[X×*]\s*(\d{{1,3}})\s*$", re.I)
+_CTR_WORD_ONLY = re.compile(
+    rf"^\s*({'|'.join(_NUM_WORDS)})\s*[X×*]\s*{_CTR_SIZE}\s*(?:CONTAINERS?|CNTRS?|CTRS?)?\s*$", re.I)
+
+
 def container_count(value) -> Optional[int]:
     """Containers as an integer.
 
@@ -235,6 +258,12 @@ def container_count(value) -> Optional[int]:
     The count is always the number that comes *before* the container-size
     token, which is why we take the first number and not the largest: in
     "6 x 40'HC" the 40 is the box size, not a quantity.
+
+    Two shapes found on real documents outside the generator
+    (docs/EXTERNAL_VALIDATION.md) are read differently, and only when they are
+    the whole value: the size first ("40HC x 3", where the first number is the
+    box length, so "40HC x 3" and "40HC x 2" both read 40 and a missing box was
+    cleared), and the count as a word ("THREE X 40' HC").
     """
     if value is None:
         return None
@@ -243,6 +272,12 @@ def container_count(value) -> Optional[int]:
     s = first_segment(str(value))
     if is_blank(s) or digits_contaminated(s):
         return None
+    size_first = _CTR_SIZE_FIRST_ONLY.match(s)
+    word = _CTR_WORD_ONLY.match(s)
+    if size_first:
+        return int(size_first.group(1)) or None
+    if word:
+        return _NUM_WORDS[word.group(1).upper()]
     m = _NUM_RE.search(s)
     if not m:
         return None
@@ -279,6 +314,12 @@ def gross_weight_kg(value) -> Optional[float]:
     unit = _WEIGHT_UNIT_RE.search(s)
     if unit and unit.group(1).upper().startswith(("MT", "TON")):
         n *= 1000.0
+    # Pounds are still read as kilograms ("26,455 LBS" is 26,455). Known and
+    # left open (docs/EXTERNAL_VALIDATION.md): three versions of a conversion
+    # were reviewed old-against-new and each broke real shapes, the narrowest
+    # because it converts one document's pounds and not the other's, which
+    # turns the same weight printed two ways into a false defect. A fix needs
+    # the comparison to see both sides' units, not this one value.
     return n if n > 0 else None
 
 

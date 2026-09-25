@@ -27,7 +27,7 @@ add for eight. Read the portal first, then cut.
         Review with "No label for … could be recognised"; toggle on → Mismatch
         on consignee and notify party, badge **model answered**.
   - [ ] `/compare`, the *scanned* sample, toggle on: transcript card.
-  - [ ] `/pitch` slide 3 chip reads **646 tests · 0 failing**; slide 4's
+  - [ ] `/pitch` slide 3 chip reads **732 tests · 0 failing**; slide 4's
         card is about `email_145`.
   - [ ] GitHub: the CI badge on the README is green (first run after the
         push). If it is red, read the log before the pitch — a red badge on
@@ -227,7 +227,7 @@ changes only what survives a restart.
 - **"Our pipeline is 89% AI."** It is not; the model does no work on the
   graded inbox. The 168 → 2 is what happens on wording we invented.
 - **"574 tests"**, **"596 tests"**, **"one test pinned to fail"**, **"45
-  mismatches, 21 refused"** — all stale. It is **646 tests, 0 failing** and
+  mismatches, 21 refused"** — all stale. It is **732 tests, 0 failing** and
   **46 / 20**.
 - **"Thirteen seconds"** is a warm container. A cold one takes 40. Wake it.
 - **"Eleven hours of desk work"** only with *"at a conservative estimate"*

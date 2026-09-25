@@ -149,6 +149,7 @@ Keep this table updated every time the number moves — it is the evidence for
 | 2026-09-19 | (Phase 2 close) | 1.000 | 1.000 | 1.000 | **1.0000** | 100% | robustness fixes: alt separators, wrap repair, short-synonym fuzzy guard |
 | 2026-09-21 | (Phase 3 close) | 1.000 | 1.000 | 1.000 | **1.0000** | 100% | API review propagation + retry; nothing in `backend/sdoc/` changed |
 | 2026-09-21 | (OCR defences) | 1.000 | 1.000 | 1.000 | **1.0000** | 100% | digit guard + confusion veto: the decision path changed, the number did not |
+| 2026-09-25 | (external validation) | 1.000 | 1.000 | 1.000 | **1.0000** | 100% | fixes from real external documents (labels, size-first container counts, PDF column crash); `submission.json` byte-identical, all six datasets and the adversarial harness field-by-field identical (`EXTERNAL_VALIDATION.md`) |
 
 The Phase 3 row is here for completeness rather than news: the reviewer
 correction path and the retry endpoint live in `backend/api/` and the CLI that

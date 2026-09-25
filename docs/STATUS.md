@@ -4,6 +4,65 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-25 (morning) — Claude session · `origin/main` merged into the final-round branch
+
+**Done**
+- `7ba149c` (the external-validation fixes below) merged into
+  `feat/final-round-differentiators`; the only conflicts were this file and
+  the README's test-count lines. On the merged tree: **732 tests, 590 passed
+  / 142 skipped** with no `data/bundle`; `submission.json` over `bundle_data`
+  byte-identical (`1c08cd215b0ba4d3c607a7133212a6f9`), so 46 / 20 stand and
+  no SCORING row beyond the teammate's; `backend/tools/party_continuations.py`
+  still gives 328 of 530 label lines and 114 of 124 pairs, so the 92% wording
+  stands. Every quoted test count (README, PITCH_DECK, PITCH_DAY,
+  ADVERSARIAL, the VIDEO banners, the deck script and `/pitch`) now says 732,
+  and the deck is rebuilt.
+
+**Next**
+- The teammate merges the branch; nothing on it is left uncommitted.
+
+**Careful**
+- The two entries below were written the same night by two sessions on two
+  branches; each quotes the count as it was on its own branch at the time.
+
+---
+
+## 2026-09-25 (early morning) — Claude session · the rules tested on real external data, and fixed only where three reviews agreed
+
+The user asked, before sleeping, whether the rules hold outside the
+generator, and for a complete test if suitable samples existed. Full record:
+`docs/EXTERNAL_VALIDATION.md`, second round.
+
+**Done**
+- Five tests on real data (8 carrier/industry forms, 14 NTSB-docket scans, 16
+  archived BLs/SIs, 2,000 real BL records, 14,326 real emails), every failure
+  re-run by a second agent (84 of 86 reproduced). Case level held: no real
+  document was auto-decided wrongly. Field level did not: real form layouts
+  are mostly unread (0 of 42 fields on the filled carrier forms).
+- Fixed, and pinned by 86 tests in `test_external_validation.py`: size-first
+  and number-word container counts, a set of labels that took the wrong field
+  (reference/declared-value boxes, marks, agent boxes, "Port of Final
+  Delivery", form fragments, "Port of :", "Port of Unlading"), and a PDF
+  reader crash that reported valid files as corrupt.
+- Everything else was reviewed old-against-new in three rounds and withdrawn
+  where it broke a real shape: every weight change, including pounds;
+  summing mixed equipment; a container cap; general REF and UNLOADING rules;
+  "Destination"/"Quantity" ignores; accent folding.
+- Six datasets and the adversarial harness identical field by field;
+  `submission.json` byte-identical; scorer 1.0000; 727 tests (585 passed /
+  142 skipped with no `data/`).
+
+**Next**
+- Pounds (read as kilograms today) is the most serious open item; it needs a
+  comparison that sees both sides' units, not a normaliser change.
+- Reading label-above-value boxed layouts is the largest gap on real forms.
+
+**Careful**
+- Downloaded samples live only in the session scratchpad; none is committed.
+  RealDoc-Bench and IDL documents are internal-testing only.
+
+---
+
 ## 2026-09-25 (night) — Claude session · what a judge meets first: Before/With Sentinel, corrections made on the card, the run page's filter card, and every explanation cut to a line
 
 Written the night before the final, against the user's standing rules
@@ -141,7 +200,8 @@ in first, with one trivial overlap; 504 backend tests pass, 142 skipped
   with a "cut for time" line. The parallel session bumped every quoted test
   count to 645; the value-correction test makes it 646, and every place
   that quotes it (README, PITCH_DECK, PITCH_DAY, ADVERSARIAL,
-  VIDEO_NARRATION, VIDEO_SCRIPT, the deck script, `/pitch`) says 646.
+  VIDEO_NARRATION, VIDEO_SCRIPT, the deck script, `/pitch`) was bumped with
+  it (and again to 732 after the morning merge, see the entry above).
 
 **Next**
 - Teammate's pages (Patterns, How it works) were listed for the same copy

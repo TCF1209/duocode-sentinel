@@ -305,7 +305,14 @@ def _value_column_from_labelled_rows(words: list[dict]) -> float | None:
     # label/value collision can also drop a stray plain word inside the label's
     # own span, so a bin needs more than one row behind it to count.
     threshold = max(2, strongest * 0.6)
-    best = min(b for b, count in bins.items() if count >= threshold)
+    qualifying = [b for b, count in bins.items() if count >= threshold]
+    if not qualifying:
+        # No edge recurs, e.g. a page with a single labelled row. Without this
+        # the min() below raised on an empty sequence, the reader caught it as
+        # a damaged file, and a valid PDF went to the sender as "the file will
+        # not open" (docs/EXTERNAL_VALIDATION.md). Fall back to the histogram.
+        return None
+    best = min(qualifying)
     return min(x for x in starts if int(round(x / COLUMN_TOLERANCE)) == best)
 
 

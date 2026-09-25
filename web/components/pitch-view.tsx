@@ -487,7 +487,7 @@ const INFRA = [
   "FastAPI · 13 routes",
   "Docker on Render",
   "Next.js 16 on Vercel",
-  "646 tests · 0 failing",
+  "732 tests · 0 failing",
 ];
 
 function TechStack() {
