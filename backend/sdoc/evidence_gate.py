@@ -395,9 +395,8 @@ def _no_label_sentence(absent: dict[str, list[str]]) -> str:
         by_where.setdefault(where, []).append(name.replace("_", " "))
     clauses = [f"{', '.join(names)} in {where}" for where, names in by_where.items()]
     return (
-        "No label for " + "; ".join(clauses) + " could be recognised — the wording "
-        "may be one the label table has not seen, so the value was left unread "
-        "rather than guessed at."
+        "No label for " + "; ".join(clauses) + " could be recognised — new wording, "
+        "so the value was left unread, not guessed."
     )
 
 
@@ -447,7 +446,7 @@ def evaluate(
             review_reason="unreadable",
             reason="The evidence gate could not verify this case, so it was not auto-decided.",
             blocked_signals=[f"gate_error:{type(exc).__name__}"],
-            recovery="Check the SI and the draft BL by hand; the automated check did not complete.",
+            recovery="Check the SI and the draft BL by hand.",
         )
 
 
@@ -501,7 +500,7 @@ def _evaluate(
                 review_reason="missing_attachment",
                 reason="The sender expects us to check attached documents, but the email carries none.",
                 blocked_signals=["attachments:0", "intent:expects_attached_documents"],
-                recovery="Reply asking the sender to re-send with both the SI and the draft BL attached.",
+                recovery="Ask the sender to re-send both the SI and the draft BL.",
             )
         # Zero attachments and the intent check found no signal either way.
         # Deliberate default: with no documents there is no defect to report,
@@ -545,7 +544,7 @@ def _evaluate(
                 f"(read as {si_type} and {bl_type}), so comparing them would be meaningless."
             ),
             blocked_signals=[f"pair_problem:{problem}", f"si_doc_type:{si_type}", f"bl_doc_type:{bl_type}"],
-            recovery="Ask the sender for the draft BL itself; the document attached is a different one.",
+            recovery="Ask the sender for the draft BL; the attached document is something else.",
         )
 
     # ---- 5. the document does not state the value -------------------------
@@ -613,12 +612,11 @@ def _evaluate(
                 + ", ".join(f.replace("_", " ") for f in blank_only)
                 + " — a blank value is uncertainty, not a discrepancy."
             )
-            recoveries.append("Ask the sender to confirm the missing field(s) before the BL is released.")
+            recoveries.append("Ask the sender to confirm the missing field(s).")
         if absent:
             sentences.append(_no_label_sentence(absent))
             recoveries.append(
-                "Read the field(s) off the document by hand; if the label wording is new, "
-                "add it to the label table so the next one is read automatically."
+                "Read the field(s) off the document; if the wording is new, add it to the label table."
             )
         return GateDecision(
             status="blank_value",
@@ -647,10 +645,7 @@ def _evaluate(
                 " discrepancy, but the text alone cannot settle which."
             ),
             blocked_signals=[f"ocr_confusable:{f}" for f in fields],
-            recovery=(
-                "Compare the two values against the original pages; if they are"
-                " the same party or port, the draft BL is clean on this field."
-            ),
+            recovery="Compare both values against the pages; if they are the same party or port, this field is clean.",
         )
 
     # ---- 6. can we actually find what we claim to have read? --------------
@@ -684,7 +679,7 @@ def _evaluate(
                 + " in the source document, so the extraction cannot be trusted."
             ),
             blocked_signals=signals,
-            recovery="Open the documents and confirm the flagged field(s) by eye before replying.",
+            recovery="Confirm the flagged field(s) against the documents before replying.",
             untraceable_fields=fields,
             evidence_checked=checked,
             evidence_traced=traced,

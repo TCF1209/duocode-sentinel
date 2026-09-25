@@ -1,12 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import Link from "next/link";
 import { motion, useScroll, useTransform, type MotionValue } from "motion/react";
-import { FileSearch, GitCompareArrows, Inbox, ShipCargo, UserCheck } from "lucide-react";
+import {
+  ArrowRight,
+  Eye,
+  FileSearch,
+  GitCompareArrows,
+  Inbox,
+  Layers,
+  Mail,
+  RefreshCw,
+  ScanLine,
+  ShipCargo,
+  UserCheck,
+  Users,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { listRuns, type Category, type RunStatus } from "@/lib/api";
+import { listCases, listRuns, type CaseSummary, type Category, type RunStatus } from "@/lib/api";
+import { pickShowcases, SAMPLE_SCAN_HREF, showcaseHref, type ShowcaseKey } from "@/lib/showcases";
 import { fadeUp, stagger, TAP, TAP_TRANSITION, useCountUp } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { CATEGORY_LABELS } from "@/lib/labels";
@@ -24,9 +38,8 @@ export default function HomePage() {
             Catch a mismatched shipment before the paperwork ships
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Sentinel reads a shipping team&apos;s inbox, tells document-check requests apart from spam and billing
-            questions, then checks the Shipping Instruction against the draft Bill of Lading across all 7 required
-            fields. Anything it can&apos;t confirm goes to a person with the evidence attached — never a guess.
+            Reads the inbox, checks each Shipping Instruction against its draft Bill of Lading on 7 fields, and sends
+            anything it can&apos;t confirm to a person — with the evidence.
           </p>
         </div>
 
@@ -35,22 +48,22 @@ export default function HomePage() {
             {
               icon: Inbox,
               step: "1. Classify",
-              text: "Sort the inbox — comparison requests, new SI requests, invoice queries, general mail, spam.",
+              text: "Sort the inbox: comparison requests, SI requests, invoice queries, general, spam.",
             },
             {
               icon: FileSearch,
               step: "2. Extract",
-              text: "Pull the 7 shipment fields from the SI and BL attachments, however each one labels them.",
+              text: "Pull the 7 fields from the SI and the BL, whatever the labels say.",
             },
             {
               icon: GitCompareArrows,
               step: "3. Compare",
-              text: "Show which fields agree and flag exactly which ones don't, side by side.",
+              text: "Which fields agree and which don't, side by side.",
             },
             {
               icon: UserCheck,
               step: "4. Escalate",
-              text: "Missing, unreadable, or unsure? Send it to a person with the reason, not a silent guess.",
+              text: "Missing, unreadable or unsure? A person gets it, with the reason.",
             },
           ]}
         />
@@ -60,23 +73,21 @@ export default function HomePage() {
         <div>
           <h2 className="font-heading text-xl font-semibold tracking-tight">What it&apos;s caught so far</h2>
           <p className="text-sm text-muted-foreground">
-            Real numbers from the most recent run over the graded inbox — nothing here is made up.
+            From the latest run over the graded inbox.
           </p>
         </div>
         <LiveStats />
       </motion.div>
 
-      <motion.div
-        className="flex flex-col items-start gap-4 border-t pt-6 sm:flex-row sm:items-center sm:justify-between"
-        variants={fadeUp}
-      >
+      <motion.div className="flex flex-col gap-4 border-t pt-6" variants={fadeUp}>
         <div>
-          <h2 className="font-heading text-xl font-semibold tracking-tight">See it work</h2>
+          <h2 className="font-heading text-xl font-semibold tracking-tight">See it live</h2>
           <p className="text-sm text-muted-foreground">
-            Run the pipeline over the graded inbox, or drop in your own SI and BL.
+            Each tile opens a real case from the latest run.
           </p>
         </div>
-        <div className="flex gap-3">
+        <SeeItLive />
+        <div className="flex flex-wrap gap-3">
           <motion.div whileTap={TAP} transition={TAP_TRANSITION} className="inline-block">
             <Link href="/runs">
               <Button>Go to Runs</Button>
@@ -84,12 +95,169 @@ export default function HomePage() {
           </motion.div>
           <motion.div whileTap={TAP} transition={TAP_TRANSITION} className="inline-block">
             <Link href="/compare">
-              <Button variant="outline">Try the upload demo</Button>
+              <Button variant="outline">Compare two documents</Button>
             </Link>
           </motion.div>
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+/**
+ * The mentor's largest point (24 Sep): the features that set this apart --
+ * correction by re-upload, scans read out, shipper history, the original a
+ * click away, a drafted reply, patterns -- all live deep inside a case page,
+ * where a judge exploring alone never finds them. These tiles bring them to
+ * the landing page, and each one links not just to a case but to the panel
+ * on it (`?spotlight=`, case-report-view.tsx), chosen from the latest
+ * finished run by what the case *is* -- never a hard-coded email id.
+ */
+interface Showcase {
+  key: string;
+  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
+  title: string;
+  text: string;
+  /** Which pick to link to (lib/showcases.ts), and the panel to land on.
+   *  `patterns` links to the run page's own card instead. */
+  pick: ShowcaseKey | "patterns";
+  spotlight?: string;
+}
+
+const SHOWCASES: Showcase[] = [
+  {
+    key: "recheck",
+    icon: RefreshCw,
+    title: "Correct by re-upload",
+    text: "Re-send the BL; the check runs again.",
+    pick: "recheck",
+    spotlight: "recheck",
+  },
+  {
+    key: "scan",
+    icon: ScanLine,
+    title: "Scans read out for the reviewer",
+    text: "Image-only PDF, read out for the reviewer.",
+    pick: "scan",
+    spotlight: "documents",
+  },
+  {
+    key: "history",
+    icon: Users,
+    title: "Shipper history on the field",
+    text: "Same shipper, same field, again.",
+    pick: "history",
+    spotlight: "history",
+  },
+  {
+    key: "original",
+    icon: Eye,
+    title: "The original, one click away",
+    text: "Every value links to its line in the file.",
+    pick: "mismatch",
+    spotlight: "documents",
+  },
+  {
+    key: "reply",
+    icon: Mail,
+    title: "A reply drafted from the outcome",
+    text: "Subject and body written; a person sends it.",
+    pick: "mismatch",
+    spotlight: "reply",
+  },
+  {
+    key: "patterns",
+    icon: Layers,
+    title: "Patterns across the inbox",
+    text: "One shipper, one field, seven emails.",
+    pick: "patterns",
+  },
+];
+
+function SeeItLive() {
+  const [runId, setRunId] = useState<string | null | undefined>(undefined);
+  const [cases, setCases] = useState<CaseSummary[] | null>(null);
+
+  useEffect(() => {
+    listRuns()
+      .then((runs) => setRunId(runs.find((r) => r.status === "done")?.run_id ?? null))
+      .catch(() => setRunId(null));
+  }, []);
+  useEffect(() => {
+    if (!runId) return;
+    listCases(runId, {})
+      .then((r) => setCases(r.cases))
+      .catch(() => setCases([]));
+  }, [runId]);
+
+  const picks = useMemo(() => pickShowcases(cases ?? []), [cases]);
+
+  if (runId === undefined || (runId && cases === null)) {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {SHOWCASES.map((s) => (
+          <Skeleton key={s.key} className="h-28 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {SHOWCASES.map((s) => {
+        const Icon = s.icon;
+        let href: string | null = null;
+        let cta = "Open a real case";
+        // Said on the tile when it cannot go where its text promises.
+        let note: string | null = null;
+        if (s.pick === "scan" && !picks.scanReadOut) {
+          // No scan in this run was read out -- the API's own startup run
+          // makes no model call, by design -- so a scan here would open on
+          // "could not be read" and nothing more. The Compare page's scanned
+          // pair, with the model on, shows what this tile promises, live.
+          href = SAMPLE_SCAN_HREF;
+          cta = "Read a sample scan out";
+          note = "This run ran without the model.";
+        } else if (runId) {
+          if (s.pick === "patterns") {
+            href = `/runs/${runId}?open=patterns`;
+            cta = "Open the run";
+          } else {
+            const emailId = picks[s.pick];
+            if (emailId) href = showcaseHref(runId, emailId, s.spotlight);
+          }
+        }
+        const body = (
+          <>
+            <span className="flex items-center gap-2.5">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary/30 bg-primary/10">
+                <Icon className="size-4 text-primary" strokeWidth={1.75} />
+              </span>
+              <span className="text-sm font-semibold">{s.title}</span>
+            </span>
+            <span className="text-xs text-muted-foreground">{s.text}</span>
+            {note && <span className="text-xs text-warn">{note}</span>}
+            <span className="mt-auto flex items-center gap-1 pt-1 text-xs font-medium text-primary">
+              {href ? cta : "No such case in the latest run"}
+              {href && <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />}
+            </span>
+          </>
+        );
+        const className = cn(
+          "group flex flex-col gap-2 rounded-xl border bg-card p-4 text-left transition-all",
+          href ? "hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md" : "opacity-70",
+        );
+        return href ? (
+          <Link key={s.key} href={href} className={className}>
+            {body}
+          </Link>
+        ) : (
+          <div key={s.key} className={className}>
+            {body}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

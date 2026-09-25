@@ -53,3 +53,28 @@ class ReviewRequest(BaseModel):
     defect_fields: Optional[list[str]] = None
     note: Optional[str] = None
     reviewer: Optional[str] = None
+    # The choices behind `status` / `defect_fields`, one per field the
+    # reviewer touched: "cleared" (Sentinel's mismatch taken off the list),
+    # "flagged" (a field Sentinel passed or could not compare, added to it),
+    # "fine" (an uncomparable field the reviewer has read both sides of and
+    # is satisfied with). `status` and `defect_fields` stay the outcome the
+    # submission reports -- these only let the case page show a saved review
+    # exactly as it was made, choice by choice, so it can be changed one
+    # choice at a time. Optional: a review without them is a whole-case
+    # decision, as every review was before they existed.
+    decisions: Optional[dict[str, str]] = Field(
+        default=None, description="Per field: cleared | flagged | fine"
+    )
+    # "I can't tell": the whole case goes to NEEDS_REVIEW whatever the
+    # per-field choices say.
+    cant_tell: bool = False
+    # Per field, the value the reviewer says a side reads ("the shipper
+    # confirmed the BL consignee is EAST BRIGHT FZ-LLC"): {"consignee":
+    # {"bl": "EAST BRIGHT FZ-LLC"}}. The corrected pair is compared again by
+    # the pipeline's own comparison (review_outcome.py) and the outcome
+    # follows; the run's own reading is kept beside it. When `decisions` or
+    # `corrections` is sent, `status` / `defect_fields` are derived from
+    # them and need not be given.
+    corrections: Optional[dict[str, dict[str, str]]] = Field(
+        default=None, description='Per field: {"si": text} and/or {"bl": text}'
+    )

@@ -3,8 +3,8 @@
 > **Superseded on 24 Sep 2026 — final round.** No video is submitted this
 > round; this script survives as the source of the pitch's running order and
 > the reasoning behind each beat. Three things in it are stale and must not
-> be said aloud: **"574 tests… one pinned to fail"** — the suite is **596
-> tests, 0 failing**; the pinned §5.4 defect was fixed on 24 Sep and the open
+> be said aloud: **"574 tests… one pinned to fail"** — the suite is **732
+> tests, 0 failing** (25 Sep); the pinned §5.4 defect was fixed on 24 Sep and the open
 > one is §5.2 (`email_145`). **"45 mismatches, 21 refused"** — the inbox is
 > **46 MISMATCH / 20 NEEDS_REVIEW**; 45/21 was an artefact of a Windows
 > checkout rewriting one PDF's line endings (`STATUS.md` 2026-09-24, fixed

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ChevronDown, ChevronRight, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -63,17 +63,54 @@ function groupIntoPatterns(cases: CaseSummary[]): Pattern[] {
  *  different and more valuable statement than twelve separate reports —
  *  docs/ROADMAP.md's own backlog line for this. Reads the case list already
  *  fetched for the table below; no extra request. */
-export function PatternAlerts({ runId, cases }: { runId: string; cases: CaseSummary[] }) {
+export function PatternAlerts({
+  runId,
+  cases,
+  openRequested = false,
+  onOpened,
+}: {
+  runId: string;
+  cases: CaseSummary[];
+  /** True when the page was opened *at* this box (/runs/{id}?open=patterns
+   *  -- the home page's "Patterns across the inbox" tile): it starts open
+   *  and scrolls itself into view once it exists. A query parameter rather
+   *  than a hash: the router hands a parameter to the page's first render,
+   *  whereas the hash was already gone by the time this component first
+   *  rendered (checked live). The run page strips the parameter once it has
+   *  been read, so flipping Before/With or coming back from a case does not
+   *  open and scroll again. */
+  openRequested?: boolean;
+  /** Called once the request has been read into this box's state, so the
+   *  caller can drop it from the URL. */
+  onOpened?: () => void;
+}) {
   const patterns = useMemo(() => groupIntoPatterns(cases), [cases]);
+  useEffect(() => {
+    if (openRequested) onOpened?.();
+  }, [openRequested, onOpened]);
   // Collapsed by default, so the case table below is what a reviewer lands
   // on; the heading keeps the count, so a collapsed box still says there is
   // something here, and one click opens it.
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(!openRequested);
+  // The box is built from a client-side fetch, so it is not there when the
+  // page first paints: the scroll waits for the first render that has it.
+  const wanted = useRef(openRequested);
+  useEffect(() => {
+    if (!wanted.current || patterns.length === 0) return;
+    wanted.current = false;
+    const show = setTimeout(
+      () => document.getElementById("patterns")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      250,
+    );
+    return () => clearTimeout(show);
+  }, [patterns.length]);
   if (patterns.length === 0) return null;
 
   return (
     <motion.div variants={fadeUp}>
-      <Card className="border-warn/30">
+      {/* `id` so the home page's "See it live" tile can land here directly
+          (/runs/{id}#patterns); scroll-mt clears the sticky nav. */}
+      <Card id="patterns" className="scroll-mt-24 border-warn/30">
         <CardHeader>
           <CardTitle className="text-sm font-medium">
             <button
@@ -180,7 +217,7 @@ function ContactedBadge({ at }: { at: number }) {
   }, []);
   return (
     <span
-      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[11px] text-primary"
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-xs text-primary"
       title="Recorded when a summary email was opened for this pattern in your mail client -- Sentinel hands off to it and has no way to confirm the message was actually sent."
     >
       <Mail className="size-3" />

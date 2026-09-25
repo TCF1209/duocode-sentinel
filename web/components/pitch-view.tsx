@@ -487,7 +487,7 @@ const INFRA = [
   "FastAPI · 13 routes",
   "Docker on Render",
   "Next.js 16 on Vercel",
-  "596 tests · 0 failing",
+  "732 tests · 0 failing",
 ];
 
 function TechStack() {
@@ -655,9 +655,9 @@ function Proof() {
             reported as a match: one masked discrepancy in 3,008 perturbed documents.
           </p>
           <p className="mt-auto border-t border-warn/30 pt-2 text-xs text-muted-foreground">
-            A defect we hide is worse than one we miss. The obvious guard would flag 92% of
-            genuine party fields, so this one stays open and written down (ADVERSARIAL.md
-            §5.2) rather than quietly patched. The defect we had pinned to fail on purpose was
+            A defect we hide is worse than one we miss. The obvious guard would flag 114 of 124
+            SI/BL pairs (92%), so this one stays open and written down (ADVERSARIAL.md §5.2)
+            rather than quietly patched. The defect we had pinned to fail on purpose was
             fixed on 24 September — this is the one that is left.
           </p>
         </motion.div>

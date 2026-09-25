@@ -1,7 +1,11 @@
 import { Badge } from "@/components/ui/badge";
 import type { CaseStatus, Category, DecidedBy, RunStatus, Verdict } from "@/lib/api";
-import { STATUS_LABELS } from "@/lib/labels";
+import { CATEGORY_BADGE_LABELS, STATUS_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+
+// Every badge reads in sentence case, like every other label in the app:
+// "Match", "Rules", "Running…". The backend's own codes (MATCH, llm,
+// running) never reach the screen -- one rule, applied here once.
 
 const STATUS_STYLE: Record<CaseStatus, string> = {
   OK: "bg-ok-bg text-ok",
@@ -44,20 +48,26 @@ const VERDICT_STYLE: Record<Verdict, string> = {
   UNCOMPARABLE: "bg-warn-bg text-warn",
 };
 
+const VERDICT_LABEL: Record<Verdict, string> = {
+  MATCH: "Match",
+  MISMATCH: "Mismatch",
+  UNCOMPARABLE: "Uncomparable",
+};
+
 export function VerdictBadge({ verdict }: { verdict: Verdict }) {
-  return <Badge className={cn("border-0 font-medium", VERDICT_STYLE[verdict])}>{verdict}</Badge>;
+  return <Badge className={cn("border-0 font-medium", VERDICT_STYLE[verdict])}>{VERDICT_LABEL[verdict]}</Badge>;
 }
 
 export function DecidedByBadge({ decidedBy }: { decidedBy: DecidedBy }) {
   return (
     <Badge className={cn("border-0 font-medium", decidedBy === "llm" ? "bg-ai-bg text-ai" : "bg-muted text-muted-foreground")}>
-      {decidedBy === "llm" ? "LLM" : "rule"}
+      {decidedBy === "llm" ? "Model" : "Rules"}
     </Badge>
   );
 }
 
 export function CategoryBadge({ category }: { category: Category }) {
-  return <Badge variant="secondary">{category}</Badge>;
+  return <Badge variant="secondary">{CATEGORY_BADGE_LABELS[category]}</Badge>;
 }
 
 const RUN_STATUS_STYLE: Record<RunStatus["status"], string> = {
@@ -67,9 +77,9 @@ const RUN_STATUS_STYLE: Record<RunStatus["status"], string> = {
 };
 
 const RUN_STATUS_LABEL: Record<RunStatus["status"], string> = {
-  running: "running…",
-  failed: "failed",
-  done: "done",
+  running: "Running…",
+  failed: "Failed",
+  done: "Done",
 };
 
 export function RunStatusPill({ status }: { status: RunStatus["status"] }) {

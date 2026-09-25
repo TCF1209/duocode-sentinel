@@ -138,6 +138,13 @@
      side by side, not assumed from the numbers alone — light mode needs a
      noticeably higher percentage to be visible at all, not a lower one. */
   --cursor-glow: 14%;
+  /* .attention-beam (below): on a light card the beam's bright end must be
+     the *dark* brass, since anything lighter than the card is invisible on
+     it; the tail is a tint. Dark mode inverts this. Both set here so a
+     change to one theme cannot be forgotten in the other. */
+  --beam-tip: #8f5a20;
+  --beam-tail: color-mix(in srgb, #8f5a20 45%, transparent);
+  --beam-glow: color-mix(in srgb, #8f5a20 22%, transparent);
 }
 
 .dark {
@@ -187,6 +194,9 @@
   --sidebar-ring: #e0ac5e;
   --bg-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120'%3E%3Cpath d='M0 20 Q30 5 60 20 T120 20 T180 20 T240 20' fill='none' stroke='%23ede7d6' stroke-width='1' opacity='0.055'/%3E%3Cpath d='M0 60 Q30 45 60 60 T120 60 T180 60 T240 60' fill='none' stroke='%23ede7d6' stroke-width='1' opacity='0.04'/%3E%3Cpath d='M-20 98 Q10 83 40 98 T100 98 T160 98 T220 98' fill='none' stroke='%23ede7d6' stroke-width='1' opacity='0.03'/%3E%3C/svg%3E");
   --cursor-glow: 8%;
+  --beam-tip: #fff4dc;
+  --beam-tail: color-mix(in srgb, #e0ac5e 55%, transparent);
+  --beam-glow: color-mix(in srgb, #e0ac5e 20%, transparent);
 }
 
 @layer base {
@@ -205,5 +215,74 @@
        call site — 16px -> 18px is a real, consistent bump, not a rounding
        error you'd need a ruler to see. */
     font-size: 18px;
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * .attention-beam — a light travelling round an element's edge, for the one
+ * thing on a screen a first-time visitor must not miss: the first sample
+ * pair on Compare, the panel a home-page tile promised. Chosen over a soft
+ * pulse (went unnoticed) and a hard blink (noticed, and ugly): motion at
+ * the edge is what the eye goes to, and a beam is motion without strobing.
+ * The edge itself stays lit in brass while the beam runs. It runs until the
+ * visitor acts, never on a timer: the components remove the class on the
+ * first click, key, wheel or touch. The beam is a conic gradient on a
+ * pseudo-element, masked to a 3px ring; `@property` lets the gradient's
+ * start angle animate (Chromium/Safari 16.4+/Firefox 128+ — elsewhere the
+ * ring simply holds still). Reduced-motion keeps the lit edge, no beam.
+ * Unlayered on purpose so it wins over the element's own shadow/border
+ * utilities while it is on.
+ * --------------------------------------------------------------------- */
+@property --beam-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes attention-beam-spin {
+  to {
+    --beam-angle: 360deg;
+  }
+}
+.attention-beam {
+  position: relative;
+  /* The element's own 1px border carries the lit edge; the beam ring
+     outside it is 2px. Any more read as a thick frame (seen and said). */
+  border-color: var(--primary);
+  box-shadow: 0 0 12px 0 var(--beam-glow);
+}
+.attention-beam::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  /* --beam-tip / --beam-tail / --beam-glow are set per theme in :root and
+     .dark above: a bright end that reads on a dark card is invisible on a
+     light one, and vice versa. */
+  background: conic-gradient(
+    from var(--beam-angle),
+    transparent 0deg,
+    transparent 270deg,
+    var(--beam-tail) 322deg,
+    var(--beam-tip) 352deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: attention-beam-spin 2.4s linear infinite;
+  /* Set per element (a negative delay starts the beam part-way round) so
+     several beams on one screen are not in lockstep. */
+  animation-delay: var(--beam-delay, 0s);
+}
+@media (prefers-reduced-motion: reduce) {
+  .attention-beam::after {
+    animation: none;
   }
 }

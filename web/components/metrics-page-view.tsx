@@ -16,6 +16,22 @@ import { CATEGORY_LABELS, REVIEW_REASON_LABELS, STATUS_LABELS } from "@/lib/labe
 
 const CHART_MS = 420;
 
+// Recharts' tooltip ships its own white box with a grey border and black
+// text, which was the one element on this page that ignored the theme --
+// a white card popping up over a dark chart. Styled from the same tokens
+// as every other surface, so it follows light and dark like the rest.
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    background: "var(--card)",
+    border: "1px solid var(--border)",
+    borderRadius: 8,
+    color: "var(--foreground)",
+    fontSize: 12,
+  },
+  labelStyle: { color: "var(--muted-foreground)" },
+  itemStyle: { color: "var(--foreground)" },
+} as const;
+
 export function MetricsPageView({ runId }: { runId: string }) {
   const [run, setRun] = useState<RunStatus | null>(null);
   const [metrics, setMetrics] = useState<PipelineMetrics | null>(null);
@@ -61,18 +77,22 @@ export function MetricsPageView({ runId }: { runId: string }) {
         </span>
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-heading text-xl font-semibold">Metrics</h1>
+            <h1 className="font-heading text-2xl font-semibold tracking-tight">Metrics</h1>
             {run && <RunStatusPill status={run.status} />}
           </div>
           <p className="font-mono text-sm text-muted-foreground">{runId}</p>
         </div>
       </motion.div>
 
+      {/* Two full rows rather than one grid with a hole in it: the run's
+          own four numbers, then the documents. */}
       <motion.div className="grid grid-cols-2 gap-3 sm:grid-cols-4" variants={stagger()}>
         <Stat label="Emails" value={metrics.emails} />
-        <Stat label="Mean ms / email" value={metrics.mean_ms_per_email} decimals={2} />
+        <Stat label="Mean ms per email" value={metrics.mean_ms_per_email} decimals={2} />
         <Stat label="Resolved by rules" value={metrics.rule_share * 100} format={(v) => `${Math.round(v)}%`} accent="ok" />
         <Stat label="Model calls" value={metrics.llm_calls} accent={metrics.llm_calls > 0 ? "ai" : undefined} />
+      </motion.div>
+      <motion.div className={cn("grid grid-cols-2 gap-3", metrics.llm?.available ? "sm:grid-cols-3" : "sm:grid-cols-2")} variants={stagger()}>
         <Stat label="Documents read" value={metrics.documents_read} />
         <Stat
           label="Unreadable"
@@ -129,7 +149,10 @@ export function MetricsPageView({ runId }: { runId: string }) {
                     height={60}
                   />
                   <YAxis allowDecimals={false} />
-                  <Tooltip labelFormatter={(label) => CATEGORY_LABELS[String(label) as Category] ?? String(label)} />
+                  <Tooltip
+                    {...TOOLTIP_STYLE}
+                    labelFormatter={(label) => CATEGORY_LABELS[String(label) as Category] ?? String(label)}
+                  />
                   <Bar
                     dataKey="value"
                     name="Emails"
@@ -168,7 +191,10 @@ export function MetricsPageView({ runId }: { runId: string }) {
                       />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value, name) => [value, STATUS_LABELS[String(name) as CaseStatus] ?? name]} />
+                  <Tooltip
+                    {...TOOLTIP_STYLE}
+                    formatter={(value, name) => [value, STATUS_LABELS[String(name) as CaseStatus] ?? name]}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
@@ -194,6 +220,7 @@ export function MetricsPageView({ runId }: { runId: string }) {
                       tickFormatter={(key: string) => REVIEW_REASON_LABELS[key as ReviewReason] ?? key}
                     />
                     <Tooltip
+                      {...TOOLTIP_STYLE}
                       labelFormatter={(label) => REVIEW_REASON_LABELS[String(label) as ReviewReason] ?? String(label)}
                     />
                     <Bar
@@ -264,10 +291,9 @@ function ThroughputProjection({ metrics, costUsd }: { metrics: PipelineMetrics; 
           <MiniStat label="Worst case — every email unfamiliar" value={`$${projectedWorstCase.toFixed(2)}`} accent="warn" />
         </div>
         <p className="text-xs text-muted-foreground">
-          Processing time scales this run&apos;s own measured {metrics.mean_ms_per_email.toFixed(2)} ms/email — nothing
-          assumed. &quot;Today&apos;s mix&quot; scales this run&apos;s own measured cost per email. The worst case uses
-          $0.0013/document, the rate measured when every field carries wording the rules have never seen
-          (<code className="text-[0.7rem]">docs/ADVERSARIAL.md</code> §8) — a ceiling, not a forecast.
+          Time: this run&apos;s measured {metrics.mean_ms_per_email.toFixed(2)} ms per email. Cost: this run&apos;s
+          measured rate; worst case ${WORST_CASE_USD_PER_DOCUMENT} per document with every field unfamiliar — a
+          ceiling.
         </p>
       </CardContent>
     </Card>
@@ -278,7 +304,7 @@ function MiniStat({ label, value, accent }: { label: string; value: string; acce
   return (
     <div className="rounded-lg border bg-card p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={cn("font-heading text-lg font-semibold tabular-nums", accent && ACCENT_STYLE[accent])}>{value}</div>
+      <div className={cn("font-heading text-xl font-semibold tabular-nums", accent && ACCENT_STYLE[accent])}>{value}</div>
     </div>
   );
 }
@@ -308,7 +334,7 @@ function Stat({
       <Card>
         <CardContent className="p-4">
           <div className="text-xs text-muted-foreground">{label}</div>
-          <div className={cn("font-heading text-xl font-semibold tabular-nums", accent && ACCENT_STYLE[accent])}>
+          <div className={cn("font-heading text-2xl font-semibold tabular-nums", accent && ACCENT_STYLE[accent])}>
             {format ? format(display) : display}
           </div>
         </CardContent>

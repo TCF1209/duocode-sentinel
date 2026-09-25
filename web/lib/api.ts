@@ -50,6 +50,13 @@ export interface DocumentReport {
   notes: string[];
 }
 
+/** A reviewer's choice on one field, relative to what Sentinel said about
+ *  it: a mismatch Sentinel flagged that the reviewer takes off the list
+ *  ("cleared"), a field Sentinel passed or could not compare that the
+ *  reviewer flags ("flagged"), or an uncomparable field the reviewer has
+ *  looked at and is satisfied with ("fine"). */
+export type FieldDecision = "flagged" | "cleared" | "fine";
+
 export interface ReviewRecord {
   decision: "confirm" | "correct";
   status: CaseStatus;
@@ -57,6 +64,44 @@ export interface ReviewRecord {
   note: string | null;
   reviewer: string | null;
   reviewed_at: number;
+  /** The per-field choices and corrected values `status` / `defect_fields`
+   *  were built from, so the case page can show a saved review as it was
+   *  made and change it one choice at a time. Empty (not absent) on a
+   *  whole-case review; absent only on a record from before they existed. */
+  decisions?: Record<string, FieldDecision>;
+  cant_tell?: boolean;
+  corrections?: Record<string, FieldCorrection>;
+  /** Per corrected field, what the corrected pair got from the same
+   *  comparison the run used (backend/api/review_outcome.py). */
+  field_verdicts?: Record<string, FieldVerdictReport>;
+}
+
+/** The reviewer's value for one or both sides of a field. */
+export interface FieldCorrection {
+  si?: string;
+  bl?: string;
+}
+
+export interface FieldVerdictReport {
+  verdict: Verdict;
+  reason: string | null;
+  /** The verdict once the reviewer's one-click choice is applied on top. */
+  stands: Verdict;
+  si: { raw: string | null; normalised: string | null; corrected: boolean };
+  bl: { raw: string | null; normalised: string | null; corrected: boolean };
+}
+
+export interface ReviewBody {
+  decision: "confirm" | "correct";
+  /** The whole-case form sends these; the in-place review sends the
+   *  choices and corrections below and the backend derives them. */
+  status?: CaseStatus;
+  defect_fields?: string[];
+  note?: string;
+  reviewer?: string;
+  decisions?: Record<string, FieldDecision>;
+  cant_tell?: boolean;
+  corrections?: Record<string, FieldCorrection>;
 }
 
 export interface CaseReport {
@@ -95,6 +140,8 @@ export interface CaseReport {
    *  -- the overwhelming majority -- and both are absent on /compare. */
   recheck?: RecheckInfo | null;
   history?: CaseVersion[];
+  /** The email as it arrived (see CaseSummary.subject). Absent on /compare. */
+  inbox?: { subject: string; attachments: string[] };
 }
 
 export interface EffectiveOutcome {
@@ -143,6 +190,11 @@ export interface CaseSummary {
   email_id: string;
   /** The inbox record's own "from" address. See CaseReport.sender. */
   sender: string;
+  /** The email as it arrived -- subject line and attachment file names --
+   *  for the "Before Sentinel" view. Not pipeline outputs; the API keeps
+   *  them beside the case (store.py's inbox_of). */
+  subject: string;
+  attachments: string[];
   category: Category;
   category_confidence: number;
   /** The effective status — a corrected case leaves the queue it was in. */
@@ -163,6 +215,13 @@ export interface CaseSummary {
   /** How many times this case was re-checked on re-sent documents; 0 for
    *  almost every row. See CaseReport.recheck. */
   recheck_count: number;
+  /** A document is an image-only scan -- not the same as `review_reason`
+   *  "unreadable", which a corrupt file also gets. Optional: an API from
+   *  before these two fields leaves them out. */
+  scanned?: boolean;
+  /** A vision model read one of those scans out for the reviewer. Never true
+   *  in a run made without the model, such as the API's own startup run. */
+  scan_transcribed?: boolean;
 }
 
 export interface RunStatus {
@@ -276,14 +335,18 @@ export function attachmentUrl(caseId: string, side: DocSide, version?: number): 
   return version === undefined ? base : `${base}?version=${version}`;
 }
 
-export function reviewCase(
-  runId: string,
-  emailId: string,
-  body: { decision: "confirm" | "correct"; status?: CaseStatus; defect_fields?: string[]; note?: string; reviewer?: string },
-) {
+export function reviewCase(runId: string, emailId: string, body: ReviewBody) {
   return request<ReviewRecord>(`/cases/${encodeURIComponent(runId)}:${encodeURIComponent(emailId)}/review`, {
     method: "POST",
     body: JSON.stringify(body),
+  });
+}
+
+/** Take a review back: the case is unreviewed again and Sentinel's own answer
+ *  stands. Returns the fresh case report. 404 when there is no review. */
+export function withdrawReview(runId: string, emailId: string) {
+  return request<CaseReport>(`/cases/${encodeURIComponent(runId)}:${encodeURIComponent(emailId)}/review`, {
+    method: "DELETE",
   });
 }
 

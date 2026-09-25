@@ -61,6 +61,14 @@ class Store:
         # set by the pipeline for the case list and re-checks -- two homes
         # for one value; reconciling them is noted in docs/STATUS.md.)
         self._senders: dict[str, dict[str, str]] = {}
+        # The inbox record's own subject line and attachment names, per
+        # case -- what a person saw before Sentinel touched the email. The
+        # dashboard's "Before Sentinel" view (docs/PITCH_DAY.md, the mentor
+        # session of 24 Sep) shows the inbox as it arrived, and nothing in
+        # CaseResult carries these: they are not pipeline outputs and not
+        # part of the submission, so they live here in the API layer like
+        # the sender does.
+        self._inbox: dict[str, dict[str, dict]] = {}
         self._counter = itertools.count(1)
 
     def new_run_id(self) -> str:
@@ -82,13 +90,27 @@ class Store:
         with self._lock:
             return sorted(self._runs.values(), key=lambda r: r.created_at, reverse=True)
 
-    def add_case(self, run_id: str, result: CaseResult, *, sender: str = "") -> None:
+    def add_case(
+        self, run_id: str, result: CaseResult, *, sender: str = "",
+        subject: str = "", attachments: Optional[list[str]] = None,
+    ) -> None:
         with self._lock:
             self._cases[run_id][result.email_id] = result
             self._order[run_id].append(result.email_id)
             self._runs[run_id].processed += 1
             if sender:
                 self._senders.setdefault(run_id, {})[result.email_id] = sender
+            self._inbox.setdefault(run_id, {})[result.email_id] = {
+                "subject": subject,
+                "attachments": list(attachments or []),
+            }
+
+    def inbox_of(self, run_id: str, email_id: str) -> dict:
+        """The email as it arrived: subject and attachment names. Empty
+        strings/lists for a case this store never saw an inbox record for."""
+        with self._lock:
+            rec = self._inbox.get(run_id, {}).get(email_id)
+        return {"subject": rec["subject"], "attachments": list(rec["attachments"])} if rec else {"subject": "", "attachments": []}
 
     def sender_of(self, run_id: str, email_id: str) -> str:
         """Empty string when unknown -- a run started before this existed, or
@@ -142,6 +164,9 @@ class Store:
     def set_review(
         self, run_id: str, email_id: str, *, decision: str, status: str,
         defect_fields: list[str], note: Optional[str], reviewer: Optional[str],
+        decisions: Optional[dict[str, str]] = None, cant_tell: bool = False,
+        corrections: Optional[dict[str, dict[str, str]]] = None,
+        field_verdicts: Optional[dict[str, dict]] = None,
     ) -> dict:
         review = {
             "decision": decision,
@@ -150,6 +175,15 @@ class Store:
             "note": note,
             "reviewer": reviewer,
             "reviewed_at": time.time(),
+            # The per-field choices and corrected values the outcome above
+            # was built from (models.py's ReviewRequest), kept verbatim so
+            # the case page can show the review as it was made, and the
+            # per-field verdicts the corrected pairs got (review_outcome.py).
+            # All empty for a whole-case review.
+            "decisions": dict(decisions or {}),
+            "cant_tell": bool(cant_tell),
+            "corrections": {f: dict(sides) for f, sides in (corrections or {}).items() if sides},
+            "field_verdicts": dict(field_verdicts or {}),
         }
         with self._lock:
             self._reviews.setdefault(run_id, {})[email_id] = review
@@ -158,6 +192,16 @@ class Store:
     def get_review(self, run_id: str, email_id: str) -> Optional[dict]:
         with self._lock:
             return self._reviews.get(run_id, {}).get(email_id)
+
+    def clear_review(self, run_id: str, email_id: str) -> bool:
+        """Withdraw a review: the case is unreviewed again and Sentinel's own
+        answer stands. The review is dropped, not kept as history -- it was
+        a person's decision *about the current answer*, and they have taken
+        it back; a re-check (below) is the one thing that supersedes a review
+        and keeps it, because there the answer itself changed under it.
+        Returns False when there was nothing to withdraw."""
+        with self._lock:
+            return self._reviews.get(run_id, {}).pop(email_id, None) is not None
 
     # -- what the case is NOW -------------------------------------------
     #

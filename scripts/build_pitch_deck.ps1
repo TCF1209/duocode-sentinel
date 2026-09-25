@@ -234,7 +234,7 @@ $cards = @(
   @("Not memorised", "1.0000 on four datasets, three from seeds we never developed against - 225 planted defects caught with the exact field set, 80/80 escalations correct."),
   @("Attacked ourselves", "16 kinds of damage, 3,008 perturbed documents, 20,496 field reads, no answer key. Thirteen modes at zero movement; silent wrong values 982 -> 0."),
   @("A real carrier's form", "CMA CGM's public SI template, from outside the generator: four fields held, one bug found and fixed the same day."),
-  @("Engineering", "596 tests, 0 failing; CI on every push; a container that runs as a non-root user with no secret baked in; every value carries its evidence.")
+  @("Engineering", "732 tests, 0 failing; CI on every push; a container that runs as a non-root user with no secret baked in; every value carries its evidence.")
 )
 $cw = 272; $ch = 150; $x = $M; $y = 100
 for ($i = 0; $i -lt 4; $i++) {
@@ -246,7 +246,7 @@ for ($i = 0; $i -lt 4; $i++) {
 $hx = $M + 2 * ($cw + 14) + 4; $hw = $W - $M - $hx
 Add-Rect $s $hx 100 $hw 314 $C.warn 0.08 $null | Out-Null
 Add-Bold $s "What we haven't fixed" ($hx + 14) 112 ($hw - 28) 24 15 $C.amberdk | Out-Null
-Add-Body $s "email_145: a wrapped party name cut short to exactly what the other document says leaves the repair nothing to repair, and one real mismatch in 3,008 perturbed documents is reported as a match.`r`rThe obvious guard would flag 92% of genuine party fields - worse than the gap - so it stays open and written down (ADVERSARIAL.md 5.2)." ($hx + 14) 142 ($hw - 28) 200 11.5 $C.ink | Out-Null
+Add-Body $s "email_145: a wrapped party name cut short to exactly what the other document says leaves the repair nothing to repair, and one real mismatch in 3,008 perturbed documents is reported as a match.`r`rThe obvious guard would flag 114 of 124 SI/BL pairs (92%) - worse than the gap - so it stays open and written down (ADVERSARIAL.md 5.2)." ($hx + 14) 142 ($hw - 28) 200 11.5 $C.ink | Out-Null
 Add-Bold $s "A defect we hide is worse than one we miss." ($hx + 14) 352 ($hw - 28) 50 12 $C.amberdk | Out-Null
 Add-Text $s "A perfect score on the dataset you were handed proves you didn't memorise it. It doesn't prove the reader works - so we went looking for the failures ourselves." $M 432 ($W - 2 * $M) 30 11.5 $C.muted 0 $BODY 1 1 | Out-Null
 Add-Tag $s "Criterion 4 · Engineering quality & robustness" $false | Out-Null
@@ -257,8 +257,8 @@ $s = New-Slide $pres $C.navy
 Add-Title $s "Live demo" $true | Out-Null
 Add-Text $s "90 seconds, on the deployed URLs" $M 84 500 24 14 $C.amber 0 $BODY 1 1 | Out-Null
 $steps = @(
-  "Start a run with the model tier on - the organisers' full inbox, 520 emails",
-  "Patterns worth a second look - one shipper, one field, six times",
+  "Start a run with the model tier on - then Before / With Sentinel: the inbox as it arrived, and what it made of it",
+  "Patterns worth a second look - one shipper, one field, seven times",
   "A mismatch case - under every value, the line it was read from",
   "A scanned case - the page read out for the reviewer; the case still in review, decided per field",
   "Compare, unfamiliar labels: model off, then on - 'model answered'"

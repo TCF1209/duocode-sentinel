@@ -85,7 +85,12 @@ def _execute(
         pipeline = Pipeline(PipelineConfig(data_root=data_root, llm=client))
         for email in emails:
             result = pipeline.process(email)          # Pipeline.process never raises
-            store.add_case(run_id, result, sender=email.sender)
+            store.add_case(
+                run_id, result, sender=email.sender, subject=email.subject,
+                # File names only: the inbox lists paths under the data root,
+                # and a person reading their mail sees "email_004_BL.txt".
+                attachments=[Path(a).name for a in email.attachments],
+            )
         metrics = pipeline.stats.to_dict()
         metrics["llm"] = client.stats() if client else {"available": False}
         store.finish_run(run_id, metrics=metrics)

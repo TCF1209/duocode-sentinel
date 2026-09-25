@@ -4,6 +4,74 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-25 (morning, later) — Claude session · the case page as the user wanted it: all seven fields on the page, one row of actions, "Edit"
+
+The user, awake, looked at the case page and asked whether it was user
+friendly: the five agreeing fields were hidden behind a "show them" line,
+the re-sent documents were a grey bar with a small "Open ›", "Correct"
+beside a value read as a verdict, and the review box was two sentences with
+the reply button hanging under it. Four options were put to them and the
+recommended one taken each time.
+
+**Done**
+- **All seven fields, in the documents' order** (`case-report-view.tsx`,
+  `QuietFieldRow` in `field-comparison-row.tsx`): a field that differs, or
+  that the reviewer touched, is the full card; a field that agrees is one
+  line -- name, the value both documents carry (both shown when they differ
+  to the eye), the Match badge -- and opens into its card on a click. The
+  "N fields agree — show them" fold is gone.
+- **One row of actions in the review box** (`review-panel.tsx`): *Confirm
+  outcome · I can't tell · Attach re-sent SI/BL*, and on a case that is not
+  escalated the reply draft at the row's end (its open panel drops onto a
+  full line under the buttons). One sentence above the row, naming those
+  buttons. The re-sent documents area (`recheck-panel.tsx`, now controlled
+  by the page) opens under the row; it starts open on `?spotlight=recheck`
+  and on a case with nothing on file, as before, so the sample pair is
+  still on screen for `email_506` without a click. The grey bar is gone.
+- **"Correct" is "Edit"** on every value box; "Enter value" stays for a
+  side Sentinel could not read. PITCH_DAY steps 5 and 6 follow the new
+  screen.
+- Verified on `email_004` (mismatch), `email_001` (no mismatch: seven
+  rows), `email_506` (nothing on file: area open with the sample button),
+  `email_512` (scan: reply in the workspace, not in the row),
+  `?spotlight=recheck`; light and dark, 1280 and 375 px; tsc / eslint /
+  `next build` clean.
+
+**Next**
+- Nothing on this; the teammate merges.
+
+**Careful**
+- The reply draft's trigger is a button and its open panel a div; the row
+  tells them apart with a `:has(>div)` variant on the wrapper rather than
+  by touching the teammate's component.
+- `data-spotlight="reply"` is on that wrapper for a non-escalated case and
+  in the workspace's "what to do" for an escalated one -- never both.
+
+---
+
+## 2026-09-25 (morning) — Claude session · `origin/main` merged into the final-round branch
+
+**Done**
+- `7ba149c` (the external-validation fixes below) merged into
+  `feat/final-round-differentiators`; the only conflicts were this file and
+  the README's test-count lines. On the merged tree: **732 tests, 590 passed
+  / 142 skipped** with no `data/bundle`; `submission.json` over `bundle_data`
+  byte-identical (`1c08cd215b0ba4d3c607a7133212a6f9`), so 46 / 20 stand and
+  no SCORING row beyond the teammate's; `backend/tools/party_continuations.py`
+  still gives 328 of 530 label lines and 114 of 124 pairs, so the 92% wording
+  stands. Every quoted test count (README, PITCH_DECK, PITCH_DAY,
+  ADVERSARIAL, the VIDEO banners, the deck script and `/pitch`) now says 732,
+  and the deck is rebuilt.
+
+**Next**
+- The teammate merges the branch; nothing on it is left uncommitted.
+
+**Careful**
+- The two entries below were written the same night by two sessions on two
+  branches; each quotes the count as it was on its own branch at the time.
+
+---
+
 ## 2026-09-25 (early morning) — Claude session · the rules tested on real external data, and fixed only where three reviews agreed
 
 The user asked, before sleeping, whether the rules hold outside the
@@ -37,6 +105,170 @@ generator, and for a complete test if suitable samples existed. Full record:
 **Careful**
 - Downloaded samples live only in the session scratchpad; none is committed.
   RealDoc-Bench and IDL documents are internal-testing only.
+
+---
+
+## 2026-09-25 (night) — Claude session · what a judge meets first: Before/With Sentinel, corrections made on the card, the run page's filter card, and every explanation cut to a line
+
+Written the night before the final, against the user's standing rules
+(explain → discuss → confirm → then modify; both themes closed-loop; the
+light theme is what the stage will use). All of it is on
+`feat/final-round-differentiators`, uncommitted at the time of writing: the
+user says when to commit. `origin/main` (the teammate's reply drafts + AI
+wording, their five review fixes, the collapsible patterns box) was merged
+in first, with one trivial overlap; 504 backend tests pass, 142 skipped
+(646 collected); tsc / lint / `next build` clean.
+
+**Done**
+- **Before Sentinel / With Sentinel** (`web/lib/view-mode.ts`,
+  `components/view-mode-switch.tsx`, `before-case-view.tsx`; run and case
+  pages). The mentor's intro point, on screen: the same inbox as it arrived
+  (subject, sender, attachments; no filters, no verdicts) with the team's
+  own labelled estimate of the desk work, and the case page as the two files
+  plus a blank seven-field table. "Classify five yourself" times the
+  visitor's own five calls; flipping back shows their pace projected over
+  all 520 ("All 520 at that pace: ≈ 11 min. Plus 220 pair checks at 4 min
+  each: + 14.7 h (estimate)") beside Sentinel's 1.3 s and how many of the
+  five it agreed with. Remembered per run in sessionStorage so opening a
+  case mid-demo does not lose it; "Start over" clears it. Kept in
+  sessionStorage, never the URL.
+- **Tidy | Raw** on the Before case view (`web/lib/tidy-document.ts`): the
+  SI/BL text file re-set into a label column and a value column, the same
+  lines in order, nothing extracted or corrected; Raw is the file as it
+  arrived; a scan shows the page and says there is nothing to tidy. The
+  pitch line it exists for: "you classified on tidy documents — can you be
+  sure the shipper's are?" Two columns from `md` up, stacked below (a long
+  label starved the value column at 375 px).
+- **Corrections made on the field card, saved as they are made**
+  (`review-panel.tsx`, `field-comparison-row.tsx`,
+  `case-detail-page-view.tsx`; backend `models.py`, `store.py`, `main.py`).
+  The sticky bar is gone — the user did not want a bar following them.
+  Each choice on a card is saved on the click, with "Saving… / Saved"
+  beside the control; the note saves on Enter or blur. The review record
+  now carries the per-field choices (`decisions`, `cant_tell`, and, from
+  later the same night, `corrections` -- see "Values corrected on the card
+  itself" below) so a saved review reads back exactly as it was made;
+  `status` / `defect_fields` are unchanged in meaning and stay the scorer's
+  words. New `DELETE /cases/{id}/review` withdraws a review:
+  taking back the last choice, "Undo review", or "Needs review — undo" put
+  the case back to unreviewed rather than leaving a review that equals
+  Sentinel's answer. Saves are queued so two quick clicks cannot land out of
+  order. 3 new API tests.
+- **The run page's filter card** (`run-page-view.tsx`). The stat strip and
+  the filter bar were the same facts twice — one with numbers, one with
+  buttons — and the category chips said `BL_COMPARISON`. Now one card:
+  "Sorted into" (the five categories with counts — step 1, Classify, which
+  the page never showed once a run had ended; the mentor could not find the
+  classification), "Outcome" (the three statuses with dots and counts,
+  Reviewed n / N and the rules share beside them), then Review and Order as
+  two selects and "Showing n of N". Counts are always the whole run's, from
+  the effective status, so they move after a correction.
+- **Every explanation cut to a line**, page by page, after the user's audit
+  request: Home hero and tiles, Compare subtitle and post-result blurbs,
+  Runs subtitle and model-tier note, the run progress panel, the review
+  panel (one line each, a second version for the no-cards case), Re-sent
+  documents, the scan card, the metrics footnote, the Before view. The
+  needs-review workspace said the same thing four times (reason sentence,
+  blank-field list, suggested action, the pipeline's own note): now one
+  reason line, one "Unread on the SI: …" line, one action line, and the
+  pipeline's notes and classifier signals fold into a single disclosure.
+  The gate's recovery sentences and the no-label note were shortened in
+  `backend/sdoc/evidence_gate.py` (not in the submission shape; the two test
+  substrings kept).
+- **One typography rule set, applied everywhere** (user's ask after the
+  mentor's "fonts" remarks): monospace only for identifiers (the case page
+  title joins the run page's); every badge in sentence case from one map
+  (`Comparison`, `Match`, `Rules`, `Model`, `Done`, `Model off` -- no
+  backend code reaches the screen; `CATEGORY_BADGE_LABELS` in
+  `lib/labels.ts`); one small-caps style for every section label and every
+  table header (run table, Before table); page titles all `text-2xl`
+  (Metrics was `xl`); a space before every unit (`1.8 ms`, `697 B`).
+- **The case page, tidied** (user's screenshot): "Retry this case" no longer
+  sits beside Re-check in the needs-review workspace -- the same thing said
+  twice; a retry is offered in the header only on a case the pipeline
+  failed on. The two document cards ("View original") now lead every case,
+  not the needs-review page at the top and the mismatch page in a footer
+  line. Re-sent documents is its own block under "what to do" rather than
+  a box inside a box.
+- **The patterns box opens on arrival from the home tile**
+  (`/runs/{id}?open=patterns`, consumed once read): a query parameter, not
+  a hash -- the hash was gone by the time the client-fetched box first
+  rendered.
+- Parallel session (the teammate's checkout partner, same night): the "See
+  it live" scan tile picks a real scan (`list_cases` gains `scanned` /
+  `scan_transcribed`) or falls back to `/compare?sample=scanned`; the
+  re-check panel offers a sample pair on a case with no files
+  (`public/samples/ordinary-corrected_BL.txt`); one API test added.
+- Also tonight, from the same session: the home page's "See it live" tiles
+  and `?spotlight=` landings; shipper-history badge on a mismatched field's
+  card; "Worth opening" strip; the Compare page's light beam rule and no
+  auto-run on a sample click; recharts tooltips follow the theme; the inbox
+  subject and attachment names on the case list and report
+  (`store._inbox`).
+
+- **Values corrected on the card itself** (the user's design, after seeing
+  the one-click version: "when the shipper tells us the right BL value, I
+  change it on the Consignee card and press Save"). Each SI/BL value box
+  has *Correct*: type what the side should read, Enter. The review now
+  carries `corrections` per field and side; the backend compares the
+  corrected pair again with the run's own comparison
+  (`backend/api/review_outcome.py` → `sdoc.compare.compare_field`, same
+  canonicalisation, same OCR veto) and derives status / defect fields
+  itself -- the browser no longer computes an outcome. Sentinel's reading
+  stays under the corrected value ("was …", *Undo*) and in
+  `CaseResult.comparisons`; `field_verdicts` on the review says what the
+  corrected pair got. "What it should read" and the Confirm / Flag / It's
+  a mismatch pills are gone; *Not a mismatch* (same party, no edit) and
+  *Flag as mismatch* / *It's fine* stay as one small control per card. One
+  new API test; `submission.json` over `bundle_data` re-run and
+  byte-identical (`1c08cd215b0ba4d3c607a7133212a6f9`), so no SCORING row.
+- **Two things start folded** (user's ask): *Re-sent documents* is one line
+  until opened (open on arrival from the home tile), and the field cards
+  that agree fold under "N fields agree — show them", so a mismatch case
+  opens on the fields that differ. A field the reviewer touches stays open.
+- **Alignment and size pass** (user's ask, after a 1280 px audit of every
+  page): the filter card's four labels share one fixed column so every
+  row's controls start on one line; the Runs cards keep the status pill on
+  the id's line; the Confidence column is right-aligned; the metrics page
+  has two full rows instead of a grid with a hole and its numbers are
+  `2xl`; every 11 px tag is now `xs` (13.5 px) -- the smallest text on the
+  site. 646 tests (504 passed / 142 skipped) after tonight.
+- **Deck and demo script brought up to the product**: the three captures in
+  `docs/img/pitch/` re-taken in the light theme (the stage theme) at
+  1440×900 from a model-tier run, via headless Edge driven over CDP with an
+  emulated `prefers-color-scheme` (the old headless `--screenshot` path
+  could not choose the theme); `Sentinel-final-pitch.pptx` / `.pdf`
+  rebuilt; slide 7's step list gains the Before / With beat and says "seven
+  times", not six. `docs/PITCH_DAY.md`'s demo order is now eight steps
+  (Before / With with the five calls, the filter card, patterns from
+  collapsed, correcting on the card, the sample re-check on `email_506`)
+  with a "cut for time" line. The parallel session bumped every quoted test
+  count to 645; the value-correction test makes it 646, and every place
+  that quotes it (README, PITCH_DECK, PITCH_DAY, ADVERSARIAL,
+  VIDEO_NARRATION, VIDEO_SCRIPT, the deck script, `/pitch`) was bumped with
+  it (and again to 732 after the morning merge, see the entry above).
+
+**Next**
+- Teammate's pages (Patterns, How it works) were listed for the same copy
+  and typography cuts but not touched; naming of the two "Patterns"
+  features still to agree.
+- "92% of genuine party fields" (ADVERSARIAL §5.2, deck slide 6, /pitch,
+  PITCH_DECK, PITCH_DAY) -- **corrected by the parallel session, on the
+  user's decision, to "114 of 124 SI/BL pairs (92%)"**: per label line it is
+  328 of 530 (62%); the 24 Sep "485 of 530" was a miscount.
+  `backend/tools/party_continuations.py` reproduces both numbers.
+
+**Careful**
+- The `subject` now lives in two places: `CaseResult.subject` (teammate,
+  for the reply draft) and `store._inbox` (this session, for the Before
+  view). Same value, two homes — like `sender` before it.
+- A review made before per-field choices existed reads back with the
+  choices derived from its `defect_fields` (`draftFromReview`); only an
+  in-memory store, so none survive a restart anyway.
+- The browser pane's ref-based clicks sometimes landed on a neighbouring
+  control during verification; every flow above was re-verified by driving
+  the real handlers and reading the backend log, and no product defect was
+  behind it.
 
 ---
 

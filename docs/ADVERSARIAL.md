@@ -2,8 +2,8 @@
 
 > Regenerated 2026-09-19 against the working tree of that day, and re-run on
 > 2026-09-24 after the fixes in §4.3, §4.4 and §5.4 landed: every count in §2
-> and §3 reproduces byte for byte. The suite is now **596 tests, 0 failed,
-> 0 xfailed**. Two strict `xfail`s have lived in it, and both did what a
+> and §3 reproduces byte for byte. The suite is now (25 Sep) **732 tests,
+> 0 failed, 0 xfailed**. Two strict `xfail`s have lived in it, and both did what a
 > strict xfail is for: the one that recorded the address-line hole in §4.3
 > went red when that fix landed, and the one that pinned §5.4 did the same on
 > 24 September — the fix was confirmed by the failure, and the marker came
@@ -576,18 +576,36 @@ that depends on a truncated value — escalate, do not guess.
 as stated would cost far more than it buys.** The only signal available for
 "this value might have been truncated at a wrap" is the same signal that
 already exists for the ordinary case a value is *not* truncated: does a
-line with no label of its own follow it. Measured directly against
-`bundle_data/` — every `Shipper`/`Consignee`/`Notify` label line, and
-whether the next line looks like a labelless continuation — **485 of 530
-(92%)** do. That is not a rare shape to guard against; it is what a party
-field looks like on this dataset's forms almost every time, because a name
-is almost always followed by its address block. A reader that flagged
-"possibly truncated" on that signal would flag 92% of real party fields,
-and a comparison stage that refused to auto-match a flagged value would
-send the overwhelming majority of genuinely correct matches to
-`NEEDS_REVIEW` instead — trading one masked discrepancy in 188 for a false
-escalation on nearly every comparison email, unmeasurable against the real
-score on this machine because `data/_grader/` is not on it.
+line with no label of its own follow it. That is not a rare shape to guard
+against; it is what a party field looks like on this dataset's forms,
+because a name is almost always followed by its address block. Measured
+against `bundle_data/` with `backend/tools/party_continuations.py`, which
+applies the reader's own continuation rule:
+
+| | followed by a line the reader attaches |
+|---|---:|
+| `Shipper` label lines (`.txt`) | 182 of 189 (96%) |
+| `Consignee` label lines | 146 of 154 (95%) |
+| `Notify` label lines | 0 of 187 |
+| all party label lines | 328 of 530 (62%) |
+| **SI/BL pairs with such a party value, every format** | **114 of 124 (92%)** |
+
+A notify party is never followed by an address here — the next line is
+always the port of loading — which is what holds the per-line figure down.
+The ten pairs not counted are seven spreadsheets (a cell does not wrap) and
+three scans nothing could read. A comparison stage that refused to
+auto-match a flagged value would escalate 114 of the 124 pairs — trading one
+masked discrepancy in 188 for a false escalation on nearly every comparison,
+unmeasurable against the real score on this machine because `data/_grader/`
+is not on it.
+
+*Corrected 2026-09-25.* This paragraph first said **485 of 530 (92%)** of
+the party label lines, and the pitch has quoted "92% of genuine party
+fields" since. That count was wrong: no reading of "a labelless next line"
+gives 485 of those 530 lines, and the reader's own rule gives 328 (62%). The
+92% holds per pair, which is the unit the argument needs, since a guard
+escalates pairs, not lines. The conclusion is unchanged; the figure under it
+is not, and the pitch now says "114 of 124 SI/BL pairs".
 
 So the mitigation needs a sharper signal than "is there a continuation" —
 something closer to "would completing the value from that continuation
