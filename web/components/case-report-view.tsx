@@ -630,7 +630,7 @@ export function CaseReportView({
                         Use scan transcription
                       </Button>
                     )}
-                    {findingButton("Mark no discrepancy", noMismatch, "Verified against both documents: the unverified fields are consistent")}
+                    {findingButton("Mark no discrepancy", noMismatch, "Checked against both documents: the fields Sentinel could not compare are consistent")}
                     {findingButton(
                       "Flag fields",
                       () => togglePanel("picker"),

@@ -214,7 +214,7 @@ export function formatReason(reason: string) {
 }
 
 // For the badge's hover when a person overrode Sentinel on this field.
-const VERDICT_WORD: Record<Verdict, string> = { MATCH: "Consistent", MISMATCH: "Discrepancy", UNCOMPARABLE: "Unverified" };
+const VERDICT_WORD: Record<Verdict, string> = { MATCH: "Consistent", MISMATCH: "Discrepancy", UNCOMPARABLE: "Not compared" };
 
 /**
  * One field as a card: the name, one badge for what stands, both values

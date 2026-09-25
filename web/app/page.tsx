@@ -65,7 +65,7 @@ export default function HomePage() {
             {
               icon: UserCheck,
               step: "4. Escalate",
-              text: "Missing, unreadable or unverified? Escalated to a reviewer, with the reason.",
+              text: "Missing, unreadable or unclear? Escalated to a reviewer, with the reason.",
             },
           ]}
         />
