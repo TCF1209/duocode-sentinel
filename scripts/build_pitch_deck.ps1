@@ -1,10 +1,16 @@
 ﻿# Builds docs/Sentinel-final-pitch.pptx (and .pdf) from the content of
 # docs/PITCH_DECK.md by driving PowerPoint itself over COM -- no package
 # downloads, and the render a judge sees is the render PowerPoint makes.
-# Needs PowerPoint installed. Run from anywhere:
+# Needs PowerPoint installed, and the .pptx closed. Run from anywhere:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build_pitch_deck.ps1
 # Slide images for a visual check land in %TEMP%\sentinel-deck-png.
 # When a number changes, change PITCH_DECK.md first, then this file, then rebuild.
+#
+# 10-minute pitch, live demo inside it (25 Sep). Seven presented slides, then
+# nine "demo backup" slides that are hidden in the slide show (skipped on
+# stage) but included in the PDF, so a judge reading the submission sees
+# every demo beat. Colours and serif headings follow the dashboard
+# (web/app/globals.css) so the switch between deck and browser is seamless.
 $ErrorActionPreference = "Stop"
 $REPO  = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $SHOTS = "$REPO\docs\img\pitch"
@@ -13,66 +19,59 @@ $OUT_PDF  = "$REPO\docs\Sentinel-final-pitch.pdf"
 $PNG_DIR  = Join-Path $env:TEMP "sentinel-deck-png"
 
 function RGB($r, $g, $b) { return [int]($r + $g * 256 + $b * 65536) }
+# The dashboard's own tokens (globals.css, light theme; dark slides use the dark theme's).
 $C = @{
-  navy   = (RGB 26 32 48);    white = (RGB 255 255 255); ink    = (RGB 31 36 48)
-  muted  = (RGB 107 114 128); amber = (RGB 217 164 65);  slate  = (RGB 59 74 107)
-  panel  = (RGB 243 244 246); dpanel = (RGB 36 43 61);   warn   = (RGB 255 244 224)
-  purple = (RGB 124 92 191);  line  = (RGB 209 213 219); dtext  = (RGB 226 229 236)
-  amberdk = (RGB 156 108 24); green = (RGB 22 128 84)
+  bg     = (RGB 250 247 239); ink    = (RGB 24 35 53);    brown  = (RGB 143 90 32)
+  muted  = (RGB 241 236 223); mfg    = (RGB 91 101 119);  line   = (RGB 227 218 195)
+  card   = (RGB 255 255 255); ok     = (RGB 30 122 76);   okbg   = (RGB 225 239 227)
+  warn   = (RGB 169 99 27);   warnbg = (RGB 245 231 206); danger = (RGB 172 51 39)
+  dbg    = (RGB 18 24 31);    dfg    = (RGB 237 231 214); dcard  = (RGB 27 34 44)
+  dgold  = (RGB 224 172 94);  dmfg   = (RGB 168 179 194); ai     = (RGB 107 79 160)
+  aibg   = (RGB 238 233 246); white  = (RGB 255 255 255)
 }
-$HEAD = "Cambria"; $BODY = "Calibri"; $MSO_TRUE = -1; $MSO_FALSE = 0
+$HEAD = "Georgia"; $BODY = "Calibri"; $MSO_TRUE = -1
 $W = 960; $H = 540; $M = 48
 
 function New-Slide($pres, $bg) {
   $s = $pres.Slides.Add($pres.Slides.Count + 1, 12)
   $s.FollowMasterBackground = 0
   $s.Background.Fill.Solid()
-  $s.Background.Fill.ForeColor.RGB = $bg
+  $s.Background.Fill.ForeColor.RGB = [int]$bg
   return $s
 }
-function Add-Text($s, $t, $x, $y, $w, $h, $size, $color, $bold, $font, $align, $anchor) {
+function Add-Text($s, $txt, $x, $y, $w, $h, $size, $color, $bold, $font, $align, $anchor) {
   $tb = $s.Shapes.AddTextbox(1, [double]$x, [double]$y, [double]$w, [double]$h)
   $tf = $tb.TextFrame
   $tf.WordWrap = -1; $tf.AutoSize = 0
   $tf.MarginLeft = 0; $tf.MarginRight = 0; $tf.MarginTop = 0; $tf.MarginBottom = 0
   $tf.VerticalAnchor = [int]$anchor
   $tr = $tf.TextRange
-  $tr.Text = $t
-  try { $tr.Font.Size = [double]$size } catch { throw ("Font.Size failed for text [" + $t + "] size=[" + $size + "] type=" + $size.GetType().FullName) }
-  try { $tr.Font.Name = $font } catch { throw ("Font.Name failed for text [" + $t + "] font=[" + $font + "] type=" + $font.GetType().FullName) }
-  try { $tr.Font.Bold = [int]$bold } catch { throw ("Font.Bold failed for text [" + $t + "] bold=[" + $bold + "] type=" + $bold.GetType().FullName) }
+  $tr.Text = $txt
+  $tr.Font.Size = [double]$size
+  $tr.Font.Name = [string]$font
+  $tr.Font.Bold = [int]$bold
   $tr.Font.Color.RGB = [int]$color
   $tr.ParagraphFormat.Alignment = [int]$align
   return $tb
 }
-function Add-Body($s, $t, $x, $y, $w, $h, $size, $color) { return (Add-Text $s $t $x $y $w $h $size $color 0 $BODY 1 1) }
-function Add-Bold($s, $t, $x, $y, $w, $h, $size, $color) { return (Add-Text $s $t $x $y $w $h $size $color $MSO_TRUE $BODY 1 1) }
-function Add-Bullets($s, $items, $x, $y, $w, $h, $size, $color, $gap) {
-  $tb = Add-Body $s ($items -join "`r") $x $y $w $h $size $color
-  $pf = $tb.TextFrame.TextRange.ParagraphFormat
-  $pf.Bullet.Visible = -1; $pf.Bullet.Character = 8226; $pf.Bullet.Font.Color.RGB = $C.amber
-  $pf.LineRuleAfter = 0; $pf.SpaceAfter = [double]$gap
-  $tb.TextFrame.Ruler.Levels(1).FirstMargin = 0; $tb.TextFrame.Ruler.Levels(1).LeftMargin = 14
-  return $tb
-}
+function Add-Body($s, $txt, $x, $y, $w, $h, $size, $color) { return (Add-Text $s $txt $x $y $w $h $size $color 0 $BODY 1 1) }
+function Add-Bold($s, $txt, $x, $y, $w, $h, $size, $color) { return (Add-Text $s $txt $x $y $w $h $size $color $MSO_TRUE $BODY 1 1) }
 function Add-Rect($s, $x, $y, $w, $h, $fill, $radius, $lineColor) {
   $shape = 1; if ($radius -gt 0) { $shape = 5 }
   $sh = $s.Shapes.AddShape([int]$shape, [double]$x, [double]$y, [double]$w, [double]$h)
   $sh.Fill.Solid(); $sh.Fill.ForeColor.RGB = [int]$fill
-  if ($null -eq $lineColor) { $sh.Line.Visible = 0 } else { $sh.Line.ForeColor.RGB = $lineColor; $sh.Line.Weight = 0.75 }
-  if ($radius -gt 0) { $sh.Adjustments.Item(1) = $radius }
+  if ($null -eq $lineColor) { $sh.Line.Visible = 0 } else { $sh.Line.ForeColor.RGB = [int]$lineColor; $sh.Line.Weight = [double]0.75 }
+  if ($radius -gt 0) { $sh.Adjustments.Item(1) = [double]$radius }
   $sh.Shadow.Visible = 0
   return $sh
 }
 function Add-Circle($s, $x, $y, $d, $fill, $label, $labelColor) {
   $sh = $s.Shapes.AddShape(9, [double]$x, [double]$y, [double]$d, [double]$d)
   $sh.Fill.Solid(); $sh.Fill.ForeColor.RGB = [int]$fill; $sh.Line.Visible = 0; $sh.Shadow.Visible = 0
-  if ($label) {
-    $tr = $sh.TextFrame.TextRange; $tr.Text = $label; $tr.Font.Size = [double]($d * 0.45); $tr.Font.Bold = [int]-1
-    $tr.Font.Name = $BODY; $tr.Font.Color.RGB = [int]$labelColor; $tr.ParagraphFormat.Alignment = 2
-    $sh.TextFrame.MarginLeft = 0; $sh.TextFrame.MarginRight = 0; $sh.TextFrame.MarginTop = 0; $sh.TextFrame.MarginBottom = 0
-    $sh.TextFrame.VerticalAnchor = 3
-  }
+  $tr = $sh.TextFrame.TextRange; $tr.Text = [string]$label; $tr.Font.Size = [double]($d * 0.45); $tr.Font.Bold = [int]-1
+  $tr.Font.Name = $BODY; $tr.Font.Color.RGB = [int]$labelColor; $tr.ParagraphFormat.Alignment = 2
+  $sh.TextFrame.MarginLeft = 0; $sh.TextFrame.MarginRight = 0; $sh.TextFrame.MarginTop = 0; $sh.TextFrame.MarginBottom = 0
+  $sh.TextFrame.VerticalAnchor = 3
   return $sh
 }
 function Add-Arrow($s, $x1, $y1, $x2, $y2, $color, $weight) {
@@ -81,24 +80,33 @@ function Add-Arrow($s, $x1, $y1, $x2, $y2, $color, $weight) {
   return $ln
 }
 function Add-Pic($s, $path, $x, $y, $w, $maxH) {
+  if (-not (Test-Path $path)) { throw "missing capture: $path" }
   $img = [System.Drawing.Image]::FromFile($path)
   $ratio = [double]$img.Height / $img.Width
   $img.Dispose()
-  $h = [double]$w * $ratio
-  if ($maxH -and $h -gt $maxH) { $h = [double]$maxH; $w = $h / $ratio }
-  $p = $s.Shapes.AddPicture($path, 0, -1, [double]$x, [double]$y, [double]$w, [double]$h)
-  $p.Line.Visible = -1; $p.Line.ForeColor.RGB = $C.line; $p.Line.Weight = 0.75
+  $pw = [double]$w; $ph = $pw * $ratio
+  if ($maxH -and $ph -gt $maxH) { $ph = [double]$maxH; $pw = $ph / $ratio }
+  $p = $s.Shapes.AddPicture($path, 0, -1, [double]$x, [double]$y, [double]$pw, [double]$ph)
+  $p.Line.Visible = -1; $p.Line.ForeColor.RGB = [int]$C.line; $p.Line.Weight = [double]0.75
   return $p
 }
-function Add-Title($s, $t, $dark) {
-  $col = $C.ink; if ($dark) { $col = $C.white }
-  return (Add-Text $s $t $M 36 ($W - 2 * $M) 50 32 $col $MSO_TRUE $HEAD 1 3)
+function Add-Title($s, $txt, $dark) {
+  $col = $C.ink; if ($dark) { $col = $C.dfg }
+  return (Add-Text $s $txt $M 30 ($W - 2 * $M) 46 30 $col $MSO_TRUE $HEAD 1 3)
 }
-function Add-Tag($s, $t, $dark) {
-  $col = $C.muted; if ($dark) { $col = $C.dtext }
-  return (Add-Text $s $t.ToUpper() $M ($H - 34) ($W - 2 * $M) 16 9 $col 0 $BODY 3 1)
+function Add-Kicker($s, $txt, $dark) {
+  $col = $C.brown; if ($dark) { $col = $C.dgold }
+  return (Add-Text $s $txt.ToUpper() $M 16 ($W - 2 * $M) 14 9.5 $col $MSO_TRUE $BODY 1 1)
 }
-function Set-Notes($s, $t) { $s.NotesPage.Shapes[2].TextFrame.TextRange.Text = $t }
+# The rubric criterion this slide is evidence for, bottom left, so a judge
+# filling the score sheet can file it; the speaker never says it aloud.
+function Add-Tag($s, $txt, $dark) {
+  $col = $C.mfg; if ($dark) { $col = $C.dmfg }
+  $t = Add-Text $s $txt.ToUpper() $M ($H - 28) ($W - 2 * $M) 14 9 $col $MSO_TRUE $BODY 1 1
+  return $t
+}
+function Set-Notes($s, $txt) { $s.NotesPage.Shapes[2].TextFrame.TextRange.Text = $txt }
+function Hide-Slide($s) { $s.SlideShowTransition.Hidden = -1 }
 
 Add-Type -AssemblyName System.Drawing
 $app = New-Object -ComObject PowerPoint.Application
@@ -106,255 +114,258 @@ $pres = $app.Presentations.Add(0)
 $pres.PageSetup.SlideSize = 15
 $pres.PageSetup.SlideWidth = 960; $pres.PageSetup.SlideHeight = 540   # 13.333 x 7.5 in
 
-# ---------------------------------------------------------------- 1 · title
-$s = New-Slide $pres $C.navy
-Add-Text $s "Sentinel" $M 150 600 80 60 $C.amber $MSO_TRUE $HEAD 1 1 | Out-Null
-Add-Text $s "Every answer comes with its evidence." $M 230 700 44 28 $C.white 0 $HEAD 1 1 | Out-Null
-Add-Text $s "A document checker that is confidently wrong is worse than no checker at all - because nobody goes back and looks." $M 290 620 60 16 $C.dtext 0 $BODY 1 1 | Out-Null
-$tb = Add-Text $s "DuoCode  ·  Tang Chye Fong  ·  Lim Yee Teng  ·  Asia Pacific University" $M ($H - 96) 640 22 13 $C.dtext 0 $BODY 1 1
-Add-Text $s "duocode-sentinel.vercel.app  ·  github.com/TCF1209/duocode-sentinel" $M ($H - 70) 640 22 12 $C.amber 0 $BODY 1 1 | Out-Null
-Add-Text $s "Averis x Monash Hackathon 2026 · Final Round" ($W - $M - 320) ($H - 70) 320 22 12 $C.dtext 0 $BODY 3 1 | Out-Null
-Set-Notes $s "We're DuoCode. Sentinel is built on one rule: it never reports anything it cannot prove. Everything in the next five minutes is evidence for that sentence. (0:00-0:15)"
+# ============================================================ 1 · title (A)
+$s = New-Slide $pres $C.bg
+Add-Kicker $s "Averis x Monash Hackathon 2026 · Final round" $false | Out-Null
+Add-Text $s "Sentinel" $M 118 440 76 58 $C.ink $MSO_TRUE $HEAD 1 1 | Out-Null
+Add-Text $s "Every answer comes with its evidence." $M 196 430 72 25 $C.brown 0 $HEAD 1 1 | Out-Null
+Add-Body $s "A document checker that is confidently wrong is worse than none: nobody goes back to look. Sentinel never reports a discrepancy it cannot prove." $M 282 420 64 14.5 $C.mfg | Out-Null
+Add-Rect $s $M 372 60 3 $C.brown 0 $null | Out-Null
+Add-Bold $s "DuoCode" $M 388 420 20 14 $C.ink | Out-Null
+Add-Body $s "Lim Yee Teng  ·  Tang Chye Fong  ·  Asia Pacific University" $M 408 430 20 13 $C.ink | Out-Null
+Add-Body $s "duocode-sentinel.vercel.app`rgithub.com/TCF1209/duocode-sentinel" $M 440 430 40 12.5 $C.brown | Out-Null
+Add-Pic $s "$SHOTS\run_page.png" 510 96 402 400 | Out-Null
+Add-Body $s "The organisers' 520-email inbox, run live on the deployed site." 510 356 402 18 10.5 $C.mfg | Out-Null
+Set-Notes $s "SPEAKER A (Yee Teng) · 0:00-0:15`r`rGood morning. We're DuoCode - I'm Yee Teng, this is Chye Fong. A checker that is confidently wrong is worse than none: nobody goes back to look. So Sentinel has one rule - it never reports a discrepancy it cannot prove."
 
-# -------------------------------------------------------------- 2 · problem
-$s = New-Slide $pres $C.white
-Add-Title $s "The problem - and the fourth case" $false | Out-Null
+# ============================================================ 2 · why we built it (A)
+$s = New-Slide $pres $C.bg
+Add-Kicker $s "Why we built it" $false | Out-Null
+Add-Title $s "Four things the desk needs - the fourth matters most" $false | Out-Null
 $caps = @(
-  @("Classify", "Tell message types apart: comparison requests, new SI requests, invoice queries, general mail, spam."),
-  @("Extract", "For comparison requests, read the SI and BL attachments and pull the matching shipment fields."),
-  @("Compare", "Surface any mismatched fields, showing the SI and BL values side by side."),
-  @("Ask for help", "When it can't finish on its own, escalate to a person with full context instead of guessing or failing silently.")
+  @("01", "Classify", "Tell message types apart: comparison requests, new SI requests, invoice queries, general mail, spam."),
+  @("02", "Extract", "For comparison requests, read the SI and BL attachments and pull the matching shipment fields."),
+  @("03", "Compare", "Surface any mismatched fields, showing the SI and BL values side by side."),
+  @("04", "Ask for help", "When it can't finish on its own, escalate to a person with full context instead of guessing or failing silently.")
 )
-$bw = 204; $gapx = 16; $x = $M; $y = 104
+$bw = 204; $gapx = 16; $x = $M; $y = 100
 for ($i = 0; $i -lt 4; $i++) {
-  Add-Rect $s $x $y $bw 150 $C.panel 0.08 $null | Out-Null
-  Add-Circle $s ($x + 14) ($y + 14) 30 $C.amber ("0" + ($i + 1)) $C.ink | Out-Null
-  Add-Bold $s $caps[$i][0] ($x + 52) ($y + 18) ($bw - 64) 24 16 $C.ink | Out-Null
-  Add-Body $s $caps[$i][1] ($x + 14) ($y + 54) ($bw - 28) 90 12 $C.ink | Out-Null
+  $fill = $C.card; $lc = $C.line; if ($i -eq 3) { $fill = $C.warnbg; $lc = $C.warn }
+  Add-Rect $s $x $y $bw 158 $fill 0.06 $lc | Out-Null
+  Add-Circle $s ($x + 14) ($y + 14) 30 $C.brown $caps[$i][0] $C.white | Out-Null
+  Add-Text $s $caps[$i][1] ($x + 54) ($y + 17) ($bw - 64) 26 16 $C.ink $MSO_TRUE $HEAD 1 1 | Out-Null
+  Add-Body $s $caps[$i][2] ($x + 14) ($y + 56) ($bw - 28) 96 12 $C.ink | Out-Null
   $x += $bw + $gapx
 }
-Add-Text $s "Why we built it: today a documentation clerk does this manually - about 4 minutes per SI/BL pair and 20 seconds to triage each email (a conservative estimate, not a measurement) - and a missed field becomes a correction, a delay, rework." $M 266 ($W - 2 * $M) 34 11.5 $C.ink 0 $BODY 1 1 | Out-Null
-$pains = @(
-  @("Finding the right emails takes time", "A document request that is overlooked never reaches the checking step."),
-  @("Manual comparison is easy to get wrong", "Names, ports, quantities and weight across two documents; a missed discrepancy is a correction, a delay, rework."),
-  @("The same fact looks different", "One document says 'Port of Loading', the other 'Load Port' - the system has to know they are the same field.")
-)
-$cw = 277; $x = $M; $y = 306
-for ($i = 0; $i -lt 3; $i++) {
-  Add-Bold $s $pains[$i][0] $x $y $cw 40 14 $C.slate | Out-Null
-  Add-Body $s $pains[$i][1] $x ($y + 42) $cw 70 12 $C.ink | Out-Null
-  $x += $cw + 16
-}
-Add-Rect $s $M 436 ($W - 2 * $M) 44 $C.warn 0.15 $null | Out-Null
-Add-Text $s "The fourth case: sometimes the check cannot be done at all - an unreadable scan, a blank field, the wrong document. That has to be escalated to a reviewer with the reason attached, not guessed at. Sentinel does all four." ($M + 16) 443 ($W - 2 * $M - 32) 32 12 $C.ink 0 $BODY 1 3 | Out-Null
-Add-Tag $s "Criterion 5 · Solution effectiveness & user value" $false | Out-Null
-Set-Notes $s "Why we built it: a shipping desk gets five kinds of mail in one inbox, and for every document check a person compares the Shipping Instruction against the draft Bill of Lading - seven fields, manually. At a conservative estimate that is about four minutes a pair and twenty seconds to triage each email; this inbox alone is a day and a half of desk work. Miss one field and it's a correction, a delay, rework. And there's a fourth case the statement names: sometimes the check can't be done - an unreadable scan, a blank field, the wrong document. That has to be escalated to a reviewer with the reason, not guessed at. Sentinel does all four. (0:15-0:40)"
-
-# ------------------------------------------------------ 3 · what it does
-$s = New-Slide $pres $C.white
-Add-Title $s "What it does, end to end" $false | Out-Null
-Add-Pic $s "$SHOTS\run_page.png" $M 100 540 | Out-Null
-$stats = @(@("520", "emails, classified and routed"), @("46", "discrepancies, with the fields that differ"), @("20", "escalated - with the reason and what to do"), @("12.7 s", "for the whole inbox, on a free-tier container"))
-$x = 620; $y = 100
+Add-Body $s "The problem statement's four capabilities, in its own words." $M 264 ($W - 2 * $M) 16 10 $C.mfg | Out-Null
+$stats = @(@("~4 min", "to check one SI/BL pair manually - seven fields, two documents"), @("~20 s", "to triage one email in a shared inbox of five kinds of mail"), @("1 field", "missed becomes a correction, a delay, rework"))
+$x = $M
 foreach ($st in $stats) {
-  Add-Text $s $st[0] $x $y 300 46 40 $C.amber $MSO_TRUE $HEAD 1 1 | Out-Null
-  Add-Body $s $st[1] $x ($y + 46) 292 30 12 $C.ink | Out-Null
-  $y += 92
+  Add-Text $s $st[0] $x 290 270 44 32 $C.brown $MSO_TRUE $HEAD 1 1 | Out-Null
+  Add-Body $s $st[1] $x 334 262 40 12.5 $C.ink | Out-Null
+  $x += 294
 }
-Add-Text $s "How a desk uses it:   1  Run the inbox   ·   2  Open a flagged case   ·   3  Confirm or override it - correct a single value or attach the amended SI/BL   ·   4  Send the drafted reply" $M 450 ($W - 2 * $M) 30 11.5 $C.ink 0 $BODY 1 1 | Out-Null
-Add-Tag $s "Criterion 1 · End-to-end functionality" $false | Out-Null
-Set-Notes $s "This is the whole inbox, live on Render and Vercel - not a sample, the organisers' 520 emails. Every email classified, every document pair compared, every case Sentinel can't decide escalated with the reason attached. Thirteen seconds. And this is how a desk uses it, four steps: run the inbox, open a flagged case, confirm or override it - correct a single value or attach the amended SI/BL - then send the drafted reply. Do not say the accuracy here - that is slide 6. (0:40-1:05)"
+Add-Body $s "Our own estimate, not a measurement." $M 376 400 16 10 $C.mfg | Out-Null
+Add-Rect $s $M 404 ($W - 2 * $M) 70 $C.warnbg 0.12 $null | Out-Null
+Add-Text $s "The fourth case" ($M + 18) 414 300 20 13 $C.warn $MSO_TRUE $BODY 1 1 | Out-Null
+Add-Body $s "Sometimes the check cannot be done: a scan with no text layer, a blank field, the wrong document. That goes to a person with the reason and the next step. It is never guessed." ($M + 18) 434 ($W - 2 * $M - 36) 36 13 $C.ink | Out-Null
+Add-Tag $s "Rubric 5 · Solution effectiveness & user value · 10" $false | Out-Null
+Set-Notes $s "SPEAKER A (Yee Teng) · 0:15-0:50`r`rWhy we built it. A shipping desk gets five kinds of email in one inbox. For every document check, a clerk compares the Shipping Instruction with the draft Bill of Lading - seven fields, manually. Our own estimate: about four minutes a pair. Miss one field and it becomes a correction, a delay, rework. And sometimes the check can't be done - a scan with no text, a blank field, the wrong document. That has to go to a person with the reason, not be guessed. Chye Fong.`r`r(Do NOT say eleven hours here - it is said once, live, on the Before Sentinel view.)"
 
-# ------------------------------------------------------ 4 · how it decides
-$s = New-Slide $pres $C.white
-Add-Title $s "How it decides" $false | Out-Null
-$stages = @("Classify", "Intake", "Extract", "Compare", "GATE", "Decide")
-$sw = 122; $sh = 54; $sg = 22; $x = $M + 8; $y = 118
+# ============================================================ 3 · how it decides (B)
+$s = New-Slide $pres $C.bg
+Add-Kicker $s "How it decides" $false | Out-Null
+Add-Title $s "Six stages, one direction - and a gate that can say no" $false | Out-Null
+$stages = @("Classify", "Intake", "Extract", "Compare", "Evidence gate", "Decide")
+$sw = 124; $sh = 46; $sg = 20; $x0 = $M + 4; $y = 118
 for ($i = 0; $i -lt 6; $i++) {
-  $fill = $C.panel; $col = $C.ink; if ($i -eq 4) { $fill = $C.amber }
-  $r = Add-Rect $s $x $y $sw $sh $fill 0.18 $null
-  $tr = $r.TextFrame.TextRange; $tr.Text = $stages[$i]; $tr.Font.Name = $HEAD; $tr.Font.Size = 15; $tr.Font.Bold = -1
-  $tr.Font.Color.RGB = $col; $tr.ParagraphFormat.Alignment = 2; $r.TextFrame.VerticalAnchor = 3
-  if ($i -lt 5) { Add-Arrow $s ($x + $sw + 3) ($y + $sh / 2) ($x + $sw + $sg - 3) ($y + $sh / 2) $C.slate 1.5 | Out-Null }
-  $x += $sw + $sg
+  $x = $x0 + $i * ($sw + $sg)
+  $fill = $C.card; $col = $C.ink; $lc = $C.line
+  if ($i -eq 4) { $fill = $C.brown; $col = $C.white; $lc = $null }
+  $r = Add-Rect $s $x $y $sw $sh $fill 0.2 $lc
+  $tr = $r.TextFrame.TextRange; $tr.Text = ("" + ($i + 1) + "  " + $stages[$i]); $tr.Font.Name = $HEAD; $tr.Font.Size = [double]13.5; $tr.Font.Bold = [int]-1
+  $tr.Font.Color.RGB = [int]$col; $tr.ParagraphFormat.Alignment = 2; $r.TextFrame.VerticalAnchor = 3
+  if ($i -lt 5) { Add-Arrow $s ($x + $sw + 2) ($y + $sh / 2) ($x + $sw + $sg - 2) ($y + $sh / 2) $C.mfg 1.5 | Out-Null }
 }
-# the veto: from the gate back over the comparison
-$gx = $M + 8 + 4 * ($sw + $sg); $cx = $M + 8 + 3 * ($sw + $sg)
-$veto = $s.Shapes.AddLine(($gx + $sw / 2), $y - 6, ($cx + $sw / 2), $y - 6)
-$veto.Line.ForeColor.RGB = $C.amberdk; $veto.Line.Weight = 1.5; $veto.Line.EndArrowheadStyle = 2; $veto.Line.DashStyle = 4
-Add-Text $s "can veto the comparison" ($cx + 10) ($y - 30) 260 18 10 $C.amberdk 0 $BODY 2 1 | Out-Null
-Add-Text $s "Six stages, one direction. The gate runs after the comparison: a value we cannot find again in the document it was read from is never reported as a discrepancy - it is escalated to a reviewer, with both readings attached." $M 190 ($W - 2 * $M) 36 12 $C.ink 0 $BODY 1 1 | Out-Null
+$gx = $x0 + 4 * ($sw + $sg); $cx = $x0 + 3 * ($sw + $sg)
+$veto = $s.Shapes.AddLine([double]($gx + $sw / 2), [double]($y - 8), [double]($cx + $sw / 2), [double]($y - 8))
+$veto.Line.ForeColor.RGB = [int]$C.warn; $veto.Line.Weight = [double]1.5; $veto.Line.EndArrowheadStyle = 2; $veto.Line.DashStyle = 4
+Add-Text $s "can overrule the comparison" ($cx + $sw / 2) ($y - 26) ($gx - $cx) 14 10 $C.warn $MSO_TRUE $BODY 2 1 | Out-Null
+Add-Body $s "No discrepancy · Discrepancy · Escalated + reason" ($x0 + 5 * ($sw + $sg) - 30) ($y + $sh + 4) ($sw + 40) 28 9.5 $C.mfg | Out-Null
+$ai = Add-Rect $s $x0 ($y + $sh + 10) (3 * $sw + 2 * $sg) 40 $C.aibg 0.2 $null
+Add-Text $s "Model tier (gpt-5-mini, structured output) - only where the rules can't read: an unclear email · a label never seen · a scanned page. Every answer must be found again in the document." ($x0 + 10) ($y + $sh + 14) (3 * $sw + 2 * $sg - 20) 34 10 $C.ai 0 $BODY 1 3 | Out-Null
 $dec = @(
-  @("Labels by meaning, values exactly", "Never a similarity score. A threshold loose enough to forgive a scan artefact also merges two real companies - and this data has them."),
-  @("Rules first, model second", "Every stage tries a deterministic answer before a model, and records which one answered (decided_by). The model is asked only where the rules admit they cannot read."),
-  @("One stateless pipeline library", "No web framework or database in backend/sdoc. The CLI, the API and the tests run the same code, so the thing scored is the thing demonstrated.")
+  @("Values exactly, never by similarity", "APRIL FINE PAPER TRADING and APRIL FINE PAPER TRADING (MIDDLE EAST) FZE are two different companies in this data. Labels are matched by meaning; values, exactly.", "Our cost: sometimes a person checks a pair that was fine. The alternative's cost: a wrong Bill of Lading, cleared silently."),
+  @("Rules first, model second", "The model is asked only where the rules admit they cannot read, and every case records which one answered.", "Cost: with the model tier off, a label we have never seen is escalated, not read."),
+  @("One stateless library", "No web server or database inside the pipeline. The API, the command line and the tests run the same code, so what is scored is what you see.", "Cost: no database yet - reviews live in memory until the one-file change.")
 )
-$cw = 277; $x = $M; $y = 244
+$cw = 277; $x = $M; $y2 = 236
 for ($i = 0; $i -lt 3; $i++) {
-  Add-Rect $s $x $y $cw 160 $C.panel 0.08 $null | Out-Null
-  Add-Bold $s $dec[$i][0] ($x + 14) ($y + 14) ($cw - 28) 40 14 $C.slate | Out-Null
-  Add-Body $s $dec[$i][1] ($x + 14) ($y + 56) ($cw - 28) 100 11.5 $C.ink | Out-Null
-  $x += $cw + 16
+  Add-Rect $s $x $y2 $cw 160 $C.card 0.05 $C.line | Out-Null
+  Add-Text $s $dec[$i][0] ($x + 14) ($y2 + 12) ($cw - 28) 22 13.5 $C.ink $MSO_TRUE $HEAD 1 1 | Out-Null
+  Add-Body $s $dec[$i][1] ($x + 14) ($y2 + 38) ($cw - 28) 70 11.5 $C.ink | Out-Null
+  Add-Body $s $dec[$i][2] ($x + 14) ($y2 + 108) ($cw - 28) 48 10.5 $C.warn | Out-Null
+  $x += $cw + 14
 }
-Add-Text $s "Scaling, as built: state sits behind one class in one file (store.py) - Postgres is a one-file change · one worker on purpose · throughput is more copies of a stateless library · cost does not scale with volume on this inbox · per-desk rules slot into the existing stage boundaries." $M 418 ($W - 2 * $M) 40 11 $C.muted 0 $BODY 1 1 | Out-Null
-Add-Tag $s "Criterion 2 · Architecture & scalability" $false | Out-Null
-Set-Notes $s "Six stages, one direction. Two choices carry the design. Values are compared exactly after canonicalising, never by similarity - a threshold loose enough to forgive a scan artefact also merges two real companies, and the data has those. And the gate after the comparison can overrule it: a value we cannot find again in the document it was read from is never reported as a discrepancy - it is escalated to a reviewer. The pipeline is a stateless library with no web or database in it, which is also the scaling story: throughput is more copies of it; the state sits behind one class in one file. (1:05-1:40)"
+Add-Rect $s $M 408 ($W - 2 * $M) 72 $C.muted 0.1 $null | Out-Null
+Add-Bold $s "Deployed and scaling, as built" ($M + 16) 416 400 18 11.5 $C.brown | Out-Null
+Add-Body $s "Vercel (Next.js dashboard)  ->  Render (FastAPI + the pipeline, one Docker container, non-root user)  ->  OpenAI.   Under 3 ms per email on one laptop core. All state sits behind one class (store.py): a database is a one-file change, then throughput is more copies of the same container." ($M + 16) 436 ($W - 2 * $M - 32) 40 11 $C.ink | Out-Null
+Add-Tag $s "Rubric 2 · Architecture & scalability · 15" $false | Out-Null
+Set-Notes $s "SPEAKER B (Chye Fong) · 0:50-1:50`r`rSix stages, one direction. The unusual one is the gate: it runs after the comparison and can overrule it. If a value can't be found again in its own document, we don't report a discrepancy - we escalate. Three decisions, each with a cost. One: values are compared exactly, never by similarity - this data has APRIL FINE PAPER TRADING, and the same name with MIDDLE EAST: two different companies. Our cost: sometimes a person checks a pair that was fine. The alternative's cost: a wrong Bill of Lading, cleared silently. Two: rules first, the model only where rules can't read - and every case records which one answered. Three: one stateless library - the API, the command line and the tests run the same code. So scaling is more copies; state sits behind one class, and a database is a one-file change. Let's watch it run."
 
-# ------------------------------------------------------ 5 · where the AI is
-$s = New-Slide $pres $C.white
-Add-Title $s "Where the AI is - and why it is aimed" $false | Out-Null
-$rows = @(
-  @("C", "Classify", "an email the rules cannot separate", "asked only when the rule score is ambiguous; a closed five-way answer, never free text"),
-  @("R", "Read", "a field label the table has never seen", "asked only about fields no rule resolved; every value must be found again in the document before it is accepted"),
-  @("S", "See", "a scanned page with no text layer", "transcribed for the reviewer, never fed into a comparison - the case stays escalated")
+# ============================================================ 4 · demo map (B -> A)
+$s = New-Slide $pres $C.dbg
+Add-Kicker $s "Live demo · 6 minutes · on the deployed site" $true | Out-Null
+Add-Title $s "What to watch for" $true | Out-Null
+$cols = @(
+  @("Chye Fong  ·  how it works", @(
+    @("1", "The whole inbox - 520 emails, model tier on, live on the cloud", "End-to-end · Technology"),
+    @("2", "Before Sentinel / With Sentinel - the inbox as a clerk gets it", "Effectiveness"),
+    @("3", "One case through the six stages - the line under every value", "Architecture"),
+    @("4", "Compare: model off, then on - it escalates, then it reads", "Technology · Robustness"))),
+  @("Yee Teng  ·  how a reviewer uses it", @(
+    @("5", "Patterns across the inbox -> this shipper's history on the field", "Differentiation"),
+    @("6", "Edit a value -> compared again -> reply drafted from the decision", "User experience"),
+    @("7", "A scan: the transcription is evidence, never a verdict", "Technology · Robustness"),
+    @("8", "Amended documents arrive -> the same check runs again", "End-to-end")))
 )
-$y = 104
-foreach ($r in $rows) {
-  Add-Circle $s $M $y 34 $C.purple $r[0] $C.white | Out-Null
-  Add-Bold $s ($r[1] + " - " + $r[2]) ($M + 48) ($y - 2) 470 22 14 $C.ink | Out-Null
-  Add-Body $s $r[3] ($M + 48) ($y + 22) 470 44 11.5 $C.muted | Out-Null
-  $y += 82
+$x = $M
+foreach ($col in $cols) {
+  Add-Rect $s $x 96 424 360 $C.dcard 0.04 $null | Out-Null
+  Add-Text $s $col[0] ($x + 18) 110 390 20 14 $C.dgold $MSO_TRUE $BODY 1 1 | Out-Null
+  $y = 146
+  foreach ($it in $col[1]) {
+    Add-Circle $s ($x + 18) $y 26 $C.dgold $it[0] $C.dbg | Out-Null
+    Add-Body $s $it[1] ($x + 56) ($y - 1) 352 36 13 $C.dfg | Out-Null
+    Add-Body $s $it[2] ($x + 56) ($y + 36) 352 16 10 $C.dmfg | Out-Null
+    $y += 76
+  }
+  $x += 424 + 16
 }
-Add-Text $s "gpt-5-mini, structured output. One rule for all three: nothing the model returns is accepted until it is found again in the document." $M 352 520 40 12 $C.ink 0 $BODY 1 1 | Out-Null
-Add-Rect $s 600 104 312 226 $C.panel 0.08 $null | Out-Null
-Add-Text $s "168" 612 122 130 70 56 $C.muted $MSO_TRUE $HEAD 3 1 | Out-Null
-Add-Text $s "→" 748 130 30 50 30 $C.muted 0 $BODY 2 1 | Out-Null
-Add-Text $s "2" 786 122 110 70 56 $C.amber $MSO_TRUE $HEAD 1 1 | Out-Null
-Add-Body $s "cases escalated on wording we invented - rules alone vs rules + model, 188 documents" 616 200 280 40 11.5 $C.ink | Out-Null
-Add-Bold $s "False discrepancies: 0 both ways. Recall bought by guessing would have shown up there; it didn't." 616 250 280 60 11.5 $C.slate | Out-Null
-Add-Rect $s $M 404 ($W - 2 * $M) 54 $C.warn 0.15 $null | Out-Null
-Add-Text $s "`$0.0013 per document at the published rates · cached · `$2 ceiling per run.   On this inbox: 0 classifier calls, 0 extractor calls, 6 scans transcribed for the reviewer - every decision is a rule's, and that is measured, not assumed." ($M + 16) 410 ($W - 2 * $M - 32) 42 11.5 $C.ink 0 $BODY 1 3 | Out-Null
-Add-Tag $s "Criterion 3 · Technology integration" $false | Out-Null
-Set-Notes $s "Never say 'we use less AI'. Say: the AI is reserved for the cases the rules cannot handle - and the system performs just as well. A judge in the first round said we use AI less than most teams. True, and measured. On this inbox the rules answer all 520 and the scoring is all-or-nothing per email, so a model that is almost always right costs places. The model goes only where the rules admit they can't read: an ambiguous email, a label we've never seen, a scanned page. On documents with wording we invented, rules alone escalate 168 of 188 cases; with the model, two - and false discrepancies stay at zero, because nothing the model says is accepted until we find it again in the source. You'll see both in the demo: a scan transcribed for the reviewer, and four unknown labels read on request. (1:40-2:20)"
+Add-Body $s "If the venue network fails: the same inbox runs on the laptop with no network at all - only the model beats change. Screenshots of every beat follow the closing slide." $M 468 ($W - 2 * $M) 30 11 $C.dmfg | Out-Null
+Set-Notes $s "SPEAKER B (Chye Fong) drives the laptop for the whole demo. Full click-by-click script: docs/PITCH_DAY.md, 'The ten minutes'.`r`r1:50-2:40 (B) Run the inbox, model tier TICKED. 2:40-3:00 (B) Before / With Sentinel. 3:00-3:50 (B) email_004 through the stages, open '1 note from Sentinel'. 3:50-4:50 (B) Compare, 'Labels we have never seen', off then on - say 168 -> 2 here.`r`r4:50-7:55 (A speaks, B clicks) Patterns -> email_031 -> history, View original, Edit BL gross weight, Draft reply; email_512 scan transcription; email_506 re-check; one sentence on common alternatives.`r`rCheckpoints: run page done by 2:40 · handover to A by 4:55 · re-check done by 7:45."
 
-# ------------------------------------------------------ 6 · how we know
-$s = New-Slide $pres $C.white
+# ============================================================ 5 · how we know it holds (B)
+$s = New-Slide $pres $C.bg
+Add-Kicker $s "What a demo can't show" $false | Out-Null
 Add-Title $s "How we know it holds" $false | Out-Null
 $cards = @(
-  @("Not memorised", "1.0000 on four datasets, three from seeds we never developed against - 225 planted discrepancies caught with the exact field set, 80/80 escalations correct."),
-  @("Attacked ourselves", "16 kinds of damage, 3,008 perturbed documents, 20,496 field reads, no answer key. Thirteen modes at zero movement; silent wrong values 982 -> 0."),
-  @("A real carrier's form", "CMA CGM's public SI template, from outside the generator: four fields held, one bug found and fixed the same day."),
-  @("Engineering", "757 tests, 0 failing; CI on every push; a container that runs as a non-root user with no secret baked in; every value carries its evidence.")
+  @("Not memorised", "1.0000 on the organisers' scorer - and on three more datasets from seeds we never developed against. 225 planted discrepancies, each caught with the exact field set; 80 of 80 escalations correct."),
+  @("Attacked ourselves", "16 kinds of damage, 3,008 perturbed documents, 20,496 field reads, no answer key. 13 kinds change nothing; 0 invented discrepancies in any. Under OCR damage, silently wrong values: 982 -> 0."),
+  @("Outside the organisers' data", "Real carrier forms, real scans, archived bills of lading, 14,326 real emails. It cannot read most real form layouts yet - and made 0 wrong automatic decisions: every one went to a person."),
+  @("Engineering", "763 tests, 0 failing; CI on every push to main. Runs with no key and no network. A `$2 model cap per run - when it is spent, hard cases escalate. The container runs as a non-root user with no secret inside.")
 )
-$cw = 272; $ch = 150; $x = $M; $y = 100
+$cw = 272; $ch = 158
 for ($i = 0; $i -lt 4; $i++) {
-  $cx = $M + ($i % 2) * ($cw + 14); $cy = 100 + [math]::Floor($i / 2) * ($ch + 14)
-  Add-Rect $s $cx $cy $cw $ch $C.panel 0.08 $null | Out-Null
-  Add-Bold $s $cards[$i][0] ($cx + 14) ($cy + 12) ($cw - 28) 24 15 $C.slate | Out-Null
-  Add-Body $s $cards[$i][1] ($cx + 14) ($cy + 40) ($cw - 28) 104 11.5 $C.ink | Out-Null
+  $cx = $M + ($i % 2) * ($cw + 14); $cy = 96 + [math]::Floor($i / 2) * ($ch + 14)
+  Add-Rect $s $cx $cy $cw $ch $C.card 0.05 $C.line | Out-Null
+  Add-Text $s $cards[$i][0] ($cx + 14) ($cy + 12) ($cw - 28) 22 14 $C.ink $MSO_TRUE $HEAD 1 1 | Out-Null
+  Add-Body $s $cards[$i][1] ($cx + 14) ($cy + 40) ($cw - 28) 112 11.5 $C.ink | Out-Null
 }
-$hx = $M + 2 * ($cw + 14) + 4; $hw = $W - $M - $hx
-Add-Rect $s $hx 100 $hw 314 $C.warn 0.08 $null | Out-Null
-Add-Bold $s "What we haven't fixed" ($hx + 14) 112 ($hw - 28) 24 15 $C.amberdk | Out-Null
-Add-Body $s "email_145: a wrapped party name cut short to exactly what the other document says leaves the repair nothing to repair, and one real discrepancy in 3,008 perturbed documents is reported as consistent.`r`rThe obvious guard would flag 114 of 124 SI/BL pairs (92%) - worse than the gap - so it stays open and written down (ADVERSARIAL.md 5.2)." ($hx + 14) 142 ($hw - 28) 200 11.5 $C.ink | Out-Null
-Add-Bold $s "A defect we hide is worse than one we miss." ($hx + 14) 352 ($hw - 28) 50 12 $C.amberdk | Out-Null
-Add-Text $s "A perfect score on the dataset you were handed proves you didn't memorise it. It doesn't prove the reader works - so we went looking for the failures ourselves." $M 432 ($W - 2 * $M) 30 11.5 $C.muted 0 $BODY 1 1 | Out-Null
-Add-Tag $s "Criterion 4 · Engineering quality & robustness" $false | Out-Null
-Set-Notes $s "A perfect score on the dataset you were handed proves you didn't memorise it. It doesn't prove the reader works. So we attacked our own reader - three thousand perturbed documents, sixteen kinds of damage, no answer key. Thirteen of sixteen don't move. OCR noise used to produce 982 silently wrong values; it produces zero now, because a damaged number is refused instead of parsed short. Then we fed it a real carrier's template from outside the generator, and it found a bug we fixed the same day. And the one we haven't fixed is on the slide, because a defect we hide is worse than one we miss. (2:20-2:55)"
+$hx = $M + 2 * ($cw + 14) + 2; $hw = $W - $M - $hx
+Add-Rect $s $hx 96 $hw 330 $C.warnbg 0.05 $null | Out-Null
+Add-Text $s "What we haven't fixed" ($hx + 14) 108 ($hw - 28) 22 14 $C.warn $MSO_TRUE $HEAD 1 1 | Out-Null
+Add-Body $s "email_145: a wrapped party name cut to exactly what the other document says. One real discrepancy in 3,008 perturbed documents is reported as consistent.`r`rThe obvious guard would flag 114 of 124 SI/BL pairs (92%) - worse than the gap. So it stays open, and written down." ($hx + 14) 138 ($hw - 28) 210 11.5 $C.ink | Out-Null
+Add-Text $s "A defect we hide is worse than one we miss." ($hx + 14) 262 ($hw - 28) 44 12 $C.warn $MSO_TRUE $HEAD 1 1 | Out-Null
+Add-Body $s "Also written down: most real form layouts are not read yet; no database, accounts or mailbox connector yet." ($hx + 14) 330 ($hw - 28) 80 10.5 $C.mfg | Out-Null
+Add-Body $s "A perfect score on the data you were handed proves you didn't memorise it - not that the reader works. So we went looking for the failures ourselves." $M 448 ($W - 2 * $M) 34 11.5 $C.mfg | Out-Null
+Add-Tag $s "Rubric 4 · Engineering quality & robustness · 15" $false | Out-Null
+Set-Notes $s "SPEAKER B (Chye Fong) · 7:55-8:50`r`rWhat a demo can't show: how we know it holds. 1.0000 on the organisers' scorer - and on three more datasets from seeds we never developed against. But a perfect score on the data you were handed doesn't prove the reader works. So we damaged our own documents: sixteen kinds of damage, 3,008 documents, no answer key. Thirteen change nothing; under OCR damage, silently wrong values went from 982 to zero. Then real documents from outside that data - carrier forms, scans, fourteen thousand emails. It can't read most real layouts yet, and it made zero wrong automatic decisions: what it couldn't read went to a person. 763 tests on every push to main. And the one we haven't fixed is on the slide - a defect we hide is worse than one we miss. Yee Teng."
 
-# ------------------------------------------------------ 7 · live demo divider
-$s = New-Slide $pres $C.navy
-Add-Title $s "Live demo" $true | Out-Null
-Add-Text $s "90 seconds, on the deployed URLs" $M 84 500 24 14 $C.amber 0 $BODY 1 1 | Out-Null
-$steps = @(
-  "Start a run with the model tier on - then Before / With Sentinel: the inbox as it arrived, and what it made of it",
-  "Patterns worth a second look - one shipper, one field, seven times",
-  "A discrepancy case - under every value, the line it was read from",
-  "A scanned case - the page transcribed for the reviewer; the case still escalated, decided per field",
-  "Compare, unfamiliar labels: model off, then on - 'model answered'"
-)
-$y = 124
-for ($i = 0; $i -lt 5; $i++) {
-  Add-Circle $s $M $y 28 $C.amber ([string]($i + 1)) $C.ink | Out-Null
-  Add-Text $s $steps[$i] ($M + 40) ($y + 2) 400 48 13 $C.white 0 $BODY 1 1 | Out-Null
-  $y += 62
-}
-Add-Pic $s "$SHOTS\scan_case.png" 520 110 392 | Out-Null
-Add-Text $s "Fallback if the venue network fails: the same inbox on the laptop, 1.5 s, no network - only the model beat changes." $M 448 460 40 11 $C.dtext 0 $BODY 1 1 | Out-Null
-Set-Notes $s "At the discrepancy case: 'Under every value - the line it was read from. A reviewer never has to open the source document to trust this.' At the scan: 'No text layer, so Sentinel did not decide. But the model transcribed the page for the reviewer - seven fields, and it marks the illegible ones rather than guessing. The case stays escalated; the reviewer decides, per field.' At Compare, off: 'wording our table has never seen - the honest answer is that it cannot read them, so it is escalated, and it says which labels.' On: 'the model reads them, every value re-located in the document before it's accepted, and it surfaces the real discrepancy - badge says model answered.' (2:55-4:25)"
-
-# ------------------------------------------------------ 8 · reviewer UX
-$s = New-Slide $pres $C.white
-Add-Title $s "What makes it different" $false | Out-Null
-$feat = @(
-  @("Re-check on amendment", "The sender amends the SI or BL? Attach the amended document on the case and the same check runs again. The previous result stays on record."),
-  @("Scans transcribed for the reviewer", "An image-only PDF is still escalated - but with the seven fields already transcribed by the model, marked as evidence, not a verdict."),
-  @("Shipper history on the field", "Correcting a field shows how often this shipper had a discrepancy on that same field before. A count, not a guess."),
-  @("The original, one click away", "Every value carries its line, and the source document opens beside it."),
-  @("A reply drafted from the reviewer decision", "Subject and body ready, built from what the reviewer decided - not the Sentinel result it overrode. A person still presses send.")
-)
-$y = 96
-for ($i = 0; $i -lt 5; $i++) {
-  Add-Circle $s $M $y 26 $C.amber ([string]($i + 1)) $C.ink | Out-Null
-  Add-Bold $s $feat[$i][0] ($M + 36) ($y - 2) 440 22 13.5 $C.ink | Out-Null
-  Add-Body $s $feat[$i][1] ($M + 36) ($y + 20) 440 44 11 $C.muted | Out-Null
-  $y += 68
-}
-Add-Pic $s "$SHOTS\scan_case_crop.png" 540 96 372 236 | Out-Null
-Add-Body $s "The scan transcription, as the reviewer sees it: seven fields, the model's confidence, and the sentence that none of it entered the comparison." 540 340 372 44 10.5 $C.muted | Out-Null
-Add-Rect $s $M 440 ($W - 2 * $M) 40 $C.warn 0.15 $null | Out-Null
-Add-Text $s "Every flag carries the line it came from. Every escalation carries the reason and what to do about it. Most teams at this stage meet the brief; these are the things a reviewer actually uses." ($M + 16) 446 ($W - 2 * $M - 32) 28 11.5 $C.ink 0 $BODY 1 3 | Out-Null
-Add-Tag $s "Criterion 6 · User experience & differentiation" $false | Out-Null
-Set-Notes $s "At the top-ten stage everyone meets the brief, so this is the slide to slow down on - thirty seconds. Five things the others mostly don't have: the sender amends a document and you attach the amended one on the case, the check runs again and the previous result stays on record; a scan is still escalated but already transcribed by the model; correcting a field shows this shipper's history on that field; the original document is one click away from every value; and the reply is drafted from what the reviewer decided, not the stale answer. (4:10-4:40)"
-
-# ------------------------------------------------------ 9 · impact & next
-$s = New-Slide $pres $C.white
-Add-Title $s "Impact, and what comes next" $false | Out-Null
-Add-Rect $s $M 96 500 96 $C.panel 0.08 $null | Out-Null
-Add-Text $s "11 hours" ($M + 16) 108 190 60 36 $C.muted $MSO_TRUE $HEAD 1 3 | Out-Null
-Add-Text $s "→" ($M + 210) 116 40 44 24 $C.muted 0 $BODY 2 3 | Out-Null
-Add-Text $s "13 seconds" ($M + 254) 104 236 66 40 $C.amber $MSO_TRUE $HEAD 1 3 | Out-Null
-Add-Body $s "520 emails, 124 document pairs. Eleven hours is a conservative estimate (20 s an email, 4 min a pair), not a measurement; thirteen seconds is measured. Every decision on that inbox was a rule's." ($M + 16) 158 470 32 10.5 $C.muted | Out-Null
-Add-Bold $s "First deployment: one desk, not a region" $M 208 500 22 14 $C.slate | Out-Null
-Add-Body $s "The inbox already carries four desk codes (AFEMY 35, AIE 30, AFRT 29, AFPTME 22 emails). Sentinel sits beside the desk's existing check until the measures below have held for a full cycle of its carriers." $M 232 500 48 11.5 $C.ink | Out-Null
-$tblShape = $s.Shapes.AddTable(4, 3, $M, 290, 500, 150)
+# ============================================================ 6 · impact (A)
+$s = New-Slide $pres $C.bg
+Add-Kicker $s "Impact" $false | Out-Null
+Add-Title $s "One desk first - and three numbers to hold" $false | Out-Null
+Add-Body $s "The inbox already carries four desk codes: AFEMY 35 · AIE 30 · AFRT 29 · AFPTME 22 emails. Sentinel runs beside one desk's existing check until these hold for a full cycle of its carriers:" $M 90 530 44 12.5 $C.ink | Out-Null
+$tblShape = $s.Shapes.AddTable(4, 3, [double]$M, [double]144, [double]530, [double]150)
 $tbl = $tblShape.Table
-$tbl.ApplyStyle("{5940675A-B579-460E-94D1-54222C63F5DA}", 0)
 $cells = @(
-  @("Measure", "Today (graded inbox)", "The pilot watches"),
-  @("Escalation rate", "20 of 220 requests (9.1%), all correct", "precision at 1.0 as unfamiliar templates grow"),
-  @("False discrepancies", "0 of 46 discrepancies; 0 across 16 perturbation modes", "the weekly number"),
+  @("Measure", "Today, on this inbox", "The pilot watches"),
+  @("Escalation rate", "20 of 220 requests (9.1%), every one correct", "that it stays correct as new templates arrive"),
+  @("False discrepancies", "0 of 46", "the weekly number"),
   @("Reviewer minutes per escalation", "not measured yet", "the pilot's first new measurement")
 )
 for ($ri = 1; $ri -le 4; $ri++) { for ($ci = 1; $ci -le 3; $ci++) {
-  $tr = $tbl.Cell($ri, $ci).Shape.TextFrame.TextRange
-  $tr.Text = $cells[$ri - 1][$ci - 1]; $tr.Font.Size = [double]10.5; $tr.Font.Name = $BODY; $tr.Font.Color.RGB = [int]$C.ink
   $cellShape = $tbl.Cell($ri, $ci).Shape
-  if ($ri -eq 1) { $tr.Font.Bold = [int]-1; $tr.Font.Color.RGB = [int]$C.white; $cellShape.Fill.Solid(); $cellShape.Fill.ForeColor.RGB = [int]$C.slate } else { $cellShape.Fill.Solid(); $cellShape.Fill.ForeColor.RGB = [int]$C.white }
+  $tr = $cellShape.TextFrame.TextRange
+  $tr.Text = $cells[$ri - 1][$ci - 1]; $tr.Font.Size = [double]11; $tr.Font.Name = $BODY; $tr.Font.Color.RGB = [int]$C.ink; $tr.Font.Bold = [int]0
+  $cellShape.Fill.Solid()
+  if ($ri -eq 1) { $tr.Font.Bold = [int]-1; $tr.Font.Color.RGB = [int]$C.white; $cellShape.Fill.ForeColor.RGB = [int]$C.brown }
+  else { $cellShape.Fill.ForeColor.RGB = [int]$C.card }
 } }
-$tbl.Columns.Item(1).Width = 150; $tbl.Columns.Item(2).Width = 190; $tbl.Columns.Item(3).Width = 160
-Add-Rect $s 580 96 332 344 $C.panel 0.08 $null | Out-Null
-Add-Bold $s "Next, in order" 596 110 300 24 15 $C.slate | Out-Null
+$tbl.Columns.Item(1).Width = [double]165; $tbl.Columns.Item(2).Width = [double]195; $tbl.Columns.Item(3).Width = [double]170
+Add-Body $s "Cost: on this inbox the rules decide every email, so a run costs nothing. Where the model is needed: `$0.0013 per document (measured), with a `$2 cap per run." $M 312 530 36 12 $C.ink | Out-Null
+Add-Rect $s $M 364 530 70 $C.okbg 0.1 $null | Out-Null
+Add-Bold $s "Built since round one" ($M + 14) 372 500 18 12 $C.ok | Out-Null
+Add-Body $s "Pattern alerts across the inbox, and throughput and cost at volume - two of the five items on our round-one roadmap, now live." ($M + 14) 392 500 38 12 $C.ink | Out-Null
+Add-Rect $s 602 90 310 344 $C.card 0.05 $C.line | Out-Null
+Add-Text $s "Next, in order" 618 104 280 22 15 $C.ink $MSO_TRUE $HEAD 1 1 | Out-Null
 $next = @(
-  @("1", "Per-desk rules", "a label table and an escalation policy per desk, selected by the code the inbox already carries"),
+  @("1", "Per-desk rules", "a label table and an escalation policy per desk, picked by the desk code the inbox already carries"),
   @("2", "Corrections feed the label table", "every confirmed correction is a labelled example of wording we could not read - the one place this system should learn"),
-  @("3", "The database", "one file; the demo does not need it yet, a pilot will")
+  @("3", "The database, then accounts", "one file for the store; accounts and a mailbox connector after it")
 )
-$y = 146
+$y = 142
 foreach ($n in $next) {
-  Add-Circle $s 596 $y 26 $C.amber $n[0] $C.ink | Out-Null
-  Add-Bold $s $n[1] 632 ($y - 1) 268 22 13 $C.ink | Out-Null
-  Add-Body $s $n[2] 632 ($y + 20) 268 62 11 $C.muted | Out-Null
-  $y += 92
+  Add-Circle $s 618 $y 26 $C.brown $n[0] $C.white | Out-Null
+  Add-Bold $s $n[1] 654 ($y - 1) 246 20 13 $C.ink | Out-Null
+  Add-Body $s $n[2] 654 ($y + 20) 246 70 11 $C.mfg | Out-Null
+  $y += 96
 }
-Add-Text $s "Cheap because the model is aimed, not because it is absent." $M 452 500 22 12 $C.amberdk $MSO_TRUE $BODY 1 1 | Out-Null
-Add-Tag $s "Criterion 7 · Impact & future potential" $false | Out-Null
-Set-Notes $s "520 emails and 124 document pairs is, at a conservative estimate, about eleven hours of desk work. Sentinel does it in thirteen seconds and every decision on that inbox was a rule, so it costs nothing to run - cheap because the model is aimed, not because it's absent. The first deployment is one desk, with three numbers we'd watch; two of them we can already show you and the third is what the pilot is for. Say 'at a conservative estimate' aloud, always. (4:40-4:58)"
+Add-Tag $s "Rubric 7 · Impact & future potential · 10" $false | Out-Null
+Set-Notes $s "SPEAKER A (Yee Teng) · 8:50-9:45`r`rImpact. The first user is one documentation desk - the inbox already carries four desk codes. Sentinel runs beside that desk's existing check until three numbers hold: the escalation rate - nine percent today, every one correct; false discrepancies - zero of forty-six; and reviewer minutes per escalation - which the pilot is there to measure. Cost: on this inbox the rules decide every email, so a run costs nothing; where the model is needed it's about a tenth of a cent per document, with a two-dollar cap per run. Next, in order: per-desk rules; confirmed reviewer corrections feed the label table - the one place this system should learn; then the database. And two items from our round-one roadmap - pattern alerts and cost at volume - are already built."
 
-# ------------------------------------------------------ 10 · close
-$s = New-Slide $pres $C.navy
-Add-Text $s "Every answer comes with its evidence." $M 200 ($W - 2 * $M) 60 36 $C.white $MSO_TRUE $HEAD 2 3 | Out-Null
-Add-Text $s "Sentinel, by DuoCode" $M 268 ($W - 2 * $M) 30 18 $C.amber 0 $HEAD 2 1 | Out-Null
-Add-Text $s "github.com/TCF1209/duocode-sentinel  ·  duocode-sentinel.vercel.app" $M 310 ($W - 2 * $M) 24 13 $C.dtext 0 $BODY 2 1 | Out-Null
-Set-Notes $s "Sentinel, by DuoCode. Every answer comes with its evidence. Thank you. (4:58-5:00)"
+# ============================================================ 7 · close (A)
+$s = New-Slide $pres $C.dbg
+Add-Text $s "Every answer comes with its evidence." $M 118 ($W - 2 * $M) 56 36 $C.dfg $MSO_TRUE $HEAD 2 3 | Out-Null
+Add-Text $s "Sentinel, by DuoCode" $M 182 ($W - 2 * $M) 28 18 $C.dgold 0 $HEAD 2 1 | Out-Null
+# Wording checked against the other finalists' public code on 25 Sep: none of
+# these three claims "only us" - each is simply true of Sentinel as worded.
+$keep = @(
+  @("Every value found again in its document", "rule-read or model-read, before any verdict is reported"),
+  @("Attacked by its own authors", "3,008 damaged documents, no answer key - the failures published, one still open"),
+  @("Tested outside the organisers' data", "real forms, real scans, real emails - what it couldn't read went to a person")
+)
+$x = $M + 10
+foreach ($k in $keep) {
+  Add-Rect $s $x 250 272 104 $C.dcard 0.06 $null | Out-Null
+  Add-Text $s $k[0] ($x + 14) 262 244 40 13.5 $C.dgold $MSO_TRUE $HEAD 1 1 | Out-Null
+  Add-Body $s $k[1] ($x + 14) 304 244 44 11.5 $C.dfg | Out-Null
+  $x += 272 + 14
+}
+Add-Text $s "duocode-sentinel.vercel.app  ·  github.com/TCF1209/duocode-sentinel" $M 390 ($W - 2 * $M) 22 13 $C.dmfg 0 $BODY 2 1 | Out-Null
+Add-Text $s "Thank you - questions welcome." $M 430 ($W - 2 * $M) 24 15 $C.dfg 0 $HEAD 2 1 | Out-Null
+Set-Notes $s "SPEAKER A (Yee Teng) · 9:45-10:00`r`rSentinel, by DuoCode. The whole inbox, live on the cloud; the model where rules can't read; a person in charge of anything it can't prove. Every answer comes with its evidence. Thank you."
 
-# ------------------------------------------------------ save + render
+# ============================================================ backup · the demo in screenshots (hidden on stage, in the PDF)
+$backup = @(
+  @("1 · The whole inbox, one run", "520 emails sorted into five kinds of mail; 46 discrepancies and 20 escalations, each with its reason; 6 model calls, all scanned pages.", @("run_page.png")),
+  @("2 · Before Sentinel", "The same inbox as a clerk receives it: 124 SI/BL pairs among 520 emails, about 11.2 hours at our own estimate.", @("run_before.png")),
+  @("3 · One case through the stages", "Both documents identified; under every value, the document, the line and the label as printed ('To the Order of' read as Consignee); the gate's note: every compared value (14/14) was located in its source document.", @("case_004_gate.png")),
+  @("4 · Compare: model off, then on", "Left: unfamiliar labels, rules only - escalated, with the fields it could not read. Right: the model reads them, each value re-found in the document - 'Model answered'.", @("compare_off.png", "compare_on.png")),
+  @("5 · Patterns across the inbox", "The six largest of 21 patterns; the top one is seven cases from one shipper with a discrepancy on gross weight.", @("run_patterns.png")),
+  @("6 · Shipper history, and a value corrected in place", "Left: same shipper, same field - other cases in this run. Right: the BL weight edited by the reviewer, compared again by the same rules, the extracted value kept struck through.", @("case_031_history.png", "case_031_edit.png")),
+  @("7 · The reply follows the reviewer's decision", "After the correction it asks only about the container count. The facts are locked; only the greeting and closing may be reworded by the model.", @("reply_draft.png")),
+  @("8 · A scan: transcription is evidence, not a verdict", "No text layer, so Sentinel did not decide. The model's transcription is shown for the reviewer to check against the image; here it misread 'AL GURG' as 'ALGURG' on the BL - which is exactly why a person ticks what was verified.", @("scan_512.png", "scan_512_accept.png")),
+  @("9 · Amended documents, the same check again", "An email whose attachments were dropped: the amended pair is attached on the case, the check runs again, and the earlier result stays on record as version 1.", @("recheck_506.png"))
+)
+foreach ($b in $backup) {
+  $s = New-Slide $pres $C.bg
+  Add-Kicker $s "Demo backup - shown only if the live demo cannot run" $false | Out-Null
+  Add-Text $s $b[0] $M 32 ($W - 2 * $M) 30 22 $C.ink $MSO_TRUE $HEAD 1 3 | Out-Null
+  Add-Body $s $b[1] $M 68 ($W - 2 * $M) 34 12 $C.mfg | Out-Null
+  $imgs = $b[2]
+  if ($imgs.Count -eq 1) { Add-Pic $s ("$SHOTS\" + $imgs[0]) 144 110 672 410 | Out-Null }
+  else {
+    Add-Pic $s ("$SHOTS\" + $imgs[0]) $M 118 426 400 | Out-Null
+    Add-Pic $s ("$SHOTS\" + $imgs[1]) ($M + 438) 118 426 400 | Out-Null
+  }
+  Hide-Slide $s
+  Set-Notes $s "Hidden in the slide show. Use only if both the deployed site and the laptop fallback fail: right-click > See all slides, or type the slide number and Enter."
+}
+
+# ============================================================ save + render
 if (Test-Path $OUT_PPTX) { Remove-Item $OUT_PPTX -Force }
 if (Test-Path $OUT_PDF)  { Remove-Item $OUT_PDF -Force }
 if (Test-Path $PNG_DIR)  { Remove-Item $PNG_DIR -Recurse -Force }
 $pres.SaveAs($OUT_PPTX)
 $pres.Export($PNG_DIR, "PNG", 1920, 1080)
+# The PDF keeps the backup slides: unhide them for the PDF only, then close
+# without saving, so the .pptx on disk still skips them in the slide show.
+# (ExportAsFixedFormat's PrintHiddenSlides cannot be passed from PowerShell.)
+foreach ($sl in $pres.Slides) { $sl.SlideShowTransition.Hidden = 0 }
 $pres.SaveAs($OUT_PDF, 32)
+$pres.Saved = -1
 $pres.Close(); $app.Quit()
 [System.Runtime.InteropServices.Marshal]::ReleaseComObject($app) | Out-Null
 Write-Output ("slides: " + (Get-ChildItem $PNG_DIR | Measure-Object).Count)

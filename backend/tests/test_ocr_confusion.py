@@ -136,6 +136,34 @@ def test_a_confusable_party_is_escalated_not_reported():
     assert c.reason == "ocr_confusable"
 
 
+@pytest.mark.parametrize("field, si, bl", [
+    # The damaged glyph sits inside a word canonicalisation drops on the clean
+    # side only ("PORT", "CO"), so the canonical keys differ in length and only
+    # the printed-text test can see that nothing but one glyph differs.
+    ("port_of_loading", "PORT KLANG (WESTPORT), MALAYSIA (MYPKG)",
+     "P0RT KLANG (WESTPORT), MALAYSIA (MYPKG)"),
+    ("consignee", "MOORIM SP CO., LTD", "MOORIM SP C0., LTD"),
+    ("shipper", "APRIL FAR EAST (M) SDN BHD", "APRIL FAR EAST (M) 5DN BHD"),
+])
+def test_a_glyph_damaged_inside_a_dropped_word_is_escalated(field, si, bl):
+    c = _compare(field, si, bl)
+    assert c.verdict == UNCOMPARABLE
+    assert c.reason == "ocr_confusable"
+
+
+@pytest.mark.parametrize("field, si, bl", [
+    # A confusable glyph beside a real difference is still a real difference.
+    ("port_of_discharge", "P0RT SAID, EGYPT", "PORT KLANG, MALAYSIA"),
+    ("consignee", "MOORIM SP C0., LTD", "MOORIM PAPER CO., LTD"),
+    # Same entity, different amount of text around it: not the same length,
+    # so the printed-text test cannot fire and the canonical verdict stands.
+    ("consignee", "APRIL FINE PAPER TRADING",
+     "APRIL FINE PAPER TRADING (MIDDLE EAST) FZE"),
+])
+def test_the_printed_text_test_does_not_explain_away_a_real_difference(field, si, bl):
+    assert _compare(field, si, bl).verdict == MISMATCH
+
+
 def test_the_veto_never_clears_a_bad_bl():
     """The point of the whole design: it escalates, it does not absolve."""
     c = _compare("consignee", "MOORIM SP CO., LTD", "M0ORIM SP CO., LTD")

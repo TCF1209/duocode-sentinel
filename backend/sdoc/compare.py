@@ -412,6 +412,26 @@ def ocr_confusable(a: str, b: str) -> bool:
     return bool(differing) and all(_same_confusion_class(x, y) for x, y in differing)
 
 
+def _ocr_surface(raw: object) -> str:
+    """The printed text itself, upper-cased with whitespace collapsed.
+
+    The canonical key is not enough on its own. Canonicalisation drops words
+    it recognises -- "PORT" before a port name, "CO"/"LTD" in a company name --
+    so a glyph damaged *inside* one of those words survives on one side only:
+    `normalize.port("P0RT KLANG")` keeps "P0RT KLANG" while
+    `normalize.port("PORT KLANG")` is "KLANG", the keys differ in length, and
+    the canonical test above cannot fire. Found on 25 Sep by reading the veto
+    against the claim made for it; "P0RT KLANG" vs "PORT KLANG" and
+    "C0., LTD" vs "CO., LTD" were reported as discrepancies.
+
+    The same test on the printed text catches those, and it is at least as
+    strict: the two texts must be the same length and differ nowhere except
+    in confusable glyphs, so any real difference anywhere in the value --
+    another word, another address line -- keeps the verdict a MISMATCH.
+    """
+    return " ".join(str(raw).upper().split()) if raw is not None else ""
+
+
 # --------------------------------------------------------------------------
 # Public API
 # --------------------------------------------------------------------------
@@ -431,7 +451,10 @@ def compare_field(field: str, si_value: FieldValue, bl_value: FieldValue) -> Fie
                                si=si_out, bl=bl_out, reason=reason)
 
     same = _RULES[field].equal(_source(si_value), _source(bl_value))
-    if not same and field in _OCR_CHECKED and ocr_confusable(si_key or "", bl_key or ""):
+    if not same and field in _OCR_CHECKED and (
+        ocr_confusable(si_key or "", bl_key or "")
+        or ocr_confusable(_ocr_surface(_source(si_value)), _ocr_surface(_source(bl_value)))
+    ):
         # Same value, different glyphs. Hand it to a human with both readings
         # rather than calling it a discrepancy or calling it clean.
         return FieldComparison(field=field, verdict=UNCOMPARABLE,
