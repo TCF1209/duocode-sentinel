@@ -33,6 +33,7 @@ if str(BACKEND) not in sys.path:
 
 from sdoc.pipeline import build_client  # noqa: E402
 from sdoc.readers import scan  # noqa: E402
+from sdoc import normalize  # noqa: E402
 
 from .direct_compare import MAX_BYTES, compare_uploads  # noqa: E402
 from .patterns import summarise as summarise_patterns  # noqa: E402
@@ -48,6 +49,19 @@ from .review_outcome import FIELD_DECISIONS, SIDES, derive as derive_review  # n
 from .store import store  # noqa: E402
 
 DEFAULT_DATA_ROOT = Path(os.environ.get("SENTINEL_DATA_ROOT", str(BACKEND.parent / "data" / "bundle")))
+
+# The two numeric fields' own comparison (sdoc.normalize) reads only the
+# first number in a string and is deliberately lenient about what surrounds
+# it, because real documents print it messily. A reviewer typing a
+# correction has no such excuse -- see normalize.py's "Reviewer-input
+# validation" section for why review_case below checks corrections to these
+# two fields against the *_well_formed functions instead of just accepting
+# them, and what happens (a case reading "Consistent" over unread text) when
+# nothing does.
+NUMERIC_FIELD_VALIDATORS = {
+    "container_count": normalize.container_count_well_formed,
+    "gross_weight_kg": normalize.gross_weight_well_formed,
+}
 _cors_env = os.environ.get("SENTINEL_CORS_ORIGINS", "*")
 CORS_ORIGINS = [o.strip() for o in _cors_env.split(",") if o.strip()]
 
@@ -473,6 +487,20 @@ def review_case(case_id: str, body: ReviewRequest) -> dict:
         kept = {s: v.strip() for s, v in sides.items() if isinstance(v, str) and v.strip()}
         if kept:
             corrections[field_name] = kept
+
+    # A correction to container_count / gross_weight_kg must be a value the
+    # field's own parser actually means to read, not just a string a number
+    # happens to be inside -- see NUMERIC_FIELD_VALIDATORS above. Checked
+    # here, before derive_review ever runs, so a case can never end up
+    # reporting "Consistent" over a corrected value nobody validated.
+    malformed = sorted(
+        f"{field_name}.{side}: {value!r}"
+        for field_name, sides in corrections.items()
+        for side, value in sides.items()
+        if field_name in NUMERIC_FIELD_VALIDATORS and not NUMERIC_FIELD_VALIDATORS[field_name](value)
+    )
+    if malformed:
+        raise HTTPException(status_code=422, detail=f"not a recognised value: {', '.join(malformed)}")
 
     # In place, the outcome is derived here from what the reviewer did --
     # the corrected pairs compared again by the pipeline's own comparison

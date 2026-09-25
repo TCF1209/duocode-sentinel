@@ -636,6 +636,45 @@ class TestReviewInPlace:
         assert detail["status"] == "MISMATCH"
         assert [f for f in detail["fields"] if f["field"] == "consignee"][0]["bl"]["raw"] == "DIFFERENT IMPORT COMPANY LTD"
 
+    def test_numeric_correction_must_be_a_value_the_field_actually_parses(
+        self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """container_count() and gross_weight_kg() only ever look at the
+        first number in a string (sdoc/normalize.py's own module docstring on
+        this). Found live on the pitch10 demo, 25 Sep: a reviewer's BL
+        correction of "6 x 40' FUCK" against an SI of "6 x 40'HC" was
+        accepted and read MATCH, because nothing checked what came after the
+        6. This is that gap, closed: the same correction must now be
+        refused outright, not silently accepted and shown as "Consistent"."""
+        run_id = _finished_run(client, synthetic_inbox, monkeypatch)
+        case = f"{run_id}:email_002"           # container_count is "2" on both sides
+
+        garbage = client.post(
+            f"/cases/{case}/review",
+            json={"decision": "correct", "corrections": {"container_count": {"bl": "2 x 40' FUCK"}}},
+        )
+        assert garbage.status_code == 422, garbage.text
+        assert "container_count.bl" in garbage.json()["detail"]
+        # Nothing was recorded.
+        assert client.get(f"/cases/{case}").json()["review"] is None
+
+        garbage_weight = client.post(
+            f"/cases/{case}/review",
+            json={"decision": "correct", "corrections": {"gross_weight_kg": {"bl": "15,000FUCK"}}},
+        )
+        assert garbage_weight.status_code == 422, garbage_weight.text
+        assert "gross_weight_kg.bl" in garbage_weight.json()["detail"]
+
+        # A real, well-formed correction still goes through exactly as before
+        # (email_002's planted defect is in consignee, not this field, so
+        # container_count on its own reads MATCH regardless of overall status).
+        fine = client.post(
+            f"/cases/{case}/review",
+            json={"decision": "correct", "corrections": {"container_count": {"bl": "2 x 40'HC"}}},
+        )
+        assert fine.status_code == 200, fine.text
+        assert fine.json()["field_verdicts"]["container_count"]["verdict"] == "MATCH"
+
     def test_choices_must_name_real_fields_and_real_choices(
         self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

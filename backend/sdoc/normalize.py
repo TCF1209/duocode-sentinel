@@ -324,6 +324,61 @@ def gross_weight_kg(value) -> Optional[float]:
 
 
 # --------------------------------------------------------------------------
+# Reviewer-input validation
+#
+# container_count() and gross_weight_kg() above are deliberately lenient:
+# each takes the FIRST number in the string and lets everything around it --
+# a container-type code, a scanner smudge -- go by unexamined, because real
+# documents genuinely print "6 x 4O'HC" and this module's job is reading a
+# fact off a messy page (digits_contaminated's own docstring: checked against
+# 643 real values, zero legitimate ones rejected). A reviewer typing a
+# correction into the case page's Edit box (api/review_outcome.py) has no
+# such excuse -- nothing OCR'd it, they wrote it. Left as lenient as the
+# extraction path, "6 x 40' <anything>" and "6 x 40'HC" read as the identical
+# value 6, and a case shows "Consistent" over a correction that never said
+# what it claims to (found live on the pitch10 demo server, 25 Sep: a typed
+# BL correction of "6 x 40' FUCK" against an SI of "6 x 40'HC" read MATCH).
+# These two functions are the review path's own, stricter gate: they accept
+# only the shapes the two functions above are documented to parse, as a
+# WHOLE value, and reject anything with unread text left over. The
+# extraction functions above are unchanged and still used exactly as before
+# for what a document says.
+# --------------------------------------------------------------------------
+_CTR_COUNT_FIRST = re.compile(
+    rf"^\s*\d{{1,3}}(?:\.\d+)?\s*[X×*]\s*{_CTR_SIZE}\s*(?:CONTAINERS?|CNTRS?|CTRS?)?\s*$", re.I)
+_CTR_COUNT_BARE = re.compile(r"^\s*(?:TOTAL\s+)?\d{1,3}(?:\.\d+)?\s*(?:CONTAINERS?|CNTRS?|CTRS?)?\s*$", re.I)
+_WEIGHT_WHOLE = re.compile(
+    r"^\s*[\d,\s]*\d(?:\.\d+)?\s*(?:KGS?|KILOS?|KILOGRAMS?|MTS?|TONS?|TONNES?|LBS?)?\s*$", re.I)
+
+
+def container_count_well_formed(raw: str) -> bool:
+    """Is `raw` one of the shapes container_count()'s docstring promises to
+    parse, taken as the whole value -- not just a string a number happens to
+    be sitting inside? Blank is well-formed: a reviewer clearing a field to
+    "unreadable" is not what this guards against, only unread trailing text
+    on an otherwise-typed value.
+    """
+    s = first_segment(str(raw)).strip()
+    if is_blank(s):
+        return True
+    return bool(
+        _CTR_COUNT_BARE.match(s)
+        or _CTR_COUNT_FIRST.match(s)
+        or _CTR_SIZE_FIRST_ONLY.match(s)
+        or _CTR_WORD_ONLY.match(s)
+    )
+
+
+def gross_weight_well_formed(raw: str) -> bool:
+    """Is `raw` a number with, at most, one of the units gross_weight_kg()
+    recognises -- see container_count_well_formed."""
+    s = first_segment(str(raw)).strip()
+    if is_blank(s):
+        return True
+    return bool(_WEIGHT_WHOLE.match(s))
+
+
+# --------------------------------------------------------------------------
 # Field-level dispatch
 # --------------------------------------------------------------------------
 def normalise_field(field: str, value) -> tuple[Optional[str], Optional[float]]:

@@ -307,6 +307,36 @@ def test_gross_weight_units_are_reconciled():
     assert _verdict("gross_weight_kg", "216,950", 216950) == MATCH
 
 
+def test_container_count_well_formed_accepts_every_documented_shape():
+    for value in (
+        "6", "  6  ", "6.0",
+        "6 x 40'HC", "6X40HC", "6 x 40' HC", "6 x 40'GP",
+        "40HC x 3", "40' x 3",                 # size first
+        "THREE X 40' HC",                      # count as a word
+        "TOTAL 6 CONTAINERS", "6 CONTAINERS",
+        "", "N/A", "???",                      # blank is well-formed
+    ):
+        assert normalize.container_count_well_formed(value), value
+
+
+def test_container_count_well_formed_rejects_unread_trailing_text():
+    """The bug found live on the pitch10 demo, 25 Sep: a reviewer's BL
+    correction of "6 x 40' FUCK" against an SI of "6 x 40'HC" read MATCH,
+    because container_count() only ever looks at the leading "6"."""
+    for value in ("6 x 40' FUCK", "6 x 40'HC and also a spare", "6 containers of nonsense", "six point five"):
+        assert not normalize.container_count_well_formed(value), value
+
+
+def test_gross_weight_well_formed_accepts_every_documented_shape():
+    for value in ("131,058 KG", "131058", "216 950 kgs", "138 MT", "26,455 LBS", "", "N/A"):
+        assert normalize.gross_weight_well_formed(value), value
+
+
+def test_gross_weight_well_formed_rejects_unread_trailing_text():
+    for value in ("128,544FUCK", "128,544 KG please confirm", "128544 kg of nonsense"):
+        assert not normalize.gross_weight_well_formed(value), value
+
+
 @pytest.mark.parametrize("si_kg, bl_kg", [
     (118270, 117770),      # -500 kg, the smallest planted weight defect
     (200000, 200500),      # +500 kg on a big shipment: 0.25%
