@@ -417,7 +417,7 @@ function pairText(f: FieldComparisonReport): string {
 }
 
 /**
- * "Flag fields…" on a case Sentinel passed or could not check: which fields
+ * "Flag fields" on a case Sentinel passed or could not check: which fields
  * differ, as one checkbox per field with both readings beside it. Saving
  * flags the chosen fields (and takes any of Sentinel's own off the list
  * that were not chosen); the backend derives the outcome from those

@@ -92,7 +92,7 @@ recommended option was taken each time.
   MISMATCH / NEEDS_REVIEW / MATCH / UNCOMPARABLE, the reason codes and the
   required "No mismatch detected." are unchanged.
 - **Reviewer actions** (case page): *Confirm discrepancy* / *Confirm no
-  discrepancy* (primary), *Flag fields…*, *Mark no discrepancy*,
+  discrepancy* (primary), *Flag fields*, *Mark no discrepancy*,
   *Escalate* (*Keep escalated* on an escalated case), *Attach amended
   SI/BL*, *Use scan transcription*. **Review states** (run filter, row
   tags, metrics): Not reviewed / Confirmed / Overridden / Unresolved. The

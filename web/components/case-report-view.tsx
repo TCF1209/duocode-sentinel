@@ -573,7 +573,7 @@ export function CaseReportView({
                   true,
                 )}
                 {findingButton(
-                  "Flag fields…",
+                  "Flag fields",
                   () => togglePanel("picker"),
                   "Select the discrepant fields; Sentinel's flags are pre-selected",
                   false,
@@ -601,7 +601,7 @@ export function CaseReportView({
                     true,
                   )}
                   {findingButton(
-                    "Flag fields…",
+                    "Flag fields",
                     () => togglePanel("picker"),
                     "Select the discrepant fields; Sentinel's evidence stays beside the reviewer decision",
                     false,
@@ -632,7 +632,7 @@ export function CaseReportView({
                     )}
                     {findingButton("Mark no discrepancy", noMismatch, "Verified against both documents: the unverified fields are consistent")}
                     {findingButton(
-                      "Flag fields…",
+                      "Flag fields",
                       () => togglePanel("picker"),
                       "Select the discrepant fields; Sentinel's evidence stays beside the reviewer decision",
                       false,

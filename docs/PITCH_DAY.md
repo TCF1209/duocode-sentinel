@@ -100,7 +100,7 @@ The deck's beats and timings are in `PITCH_DECK.md`. On the product:
    consistent ones as one line each (click one to open it) — and under every
    value **the line it was read from**. The review box asks one thing — is
    there a discrepancy between the SI and the BL? — in one row: *Confirm
-   discrepancy · Flag fields… · Mark no discrepancy · Escalate · Attach
+   discrepancy · Flag fields · Mark no discrepancy · Escalate · Attach
    amended SI/BL · Draft reply to counterparty*; confirming the Sentinel result is the one
    click. Then fix it where it is: *Edit* on the BL value, type what the
    shipper confirmed,
@@ -108,7 +108,7 @@ The deck's beats and timings are in `PITCH_DECK.md`. On the product:
    turns to *Consistent* with the extracted value kept underneath, struck
    through, the outcome above follows; *Revert* puts the extracted value
    back. *Mark no discrepancy* in the box is the one-click version when the
-   two are the same party, and *Flag fields…* adjusts which fields differ.
+   two are the same party, and *Flag fields* adjusts which fields differ.
    The *Review record* then reads as three rows: Sentinel result · Reviewer
    decision · Changes. Nothing to scroll to, nothing to submit.
 6. An **Escalated** case: `email_512` (a scan, needs the model run): "no
