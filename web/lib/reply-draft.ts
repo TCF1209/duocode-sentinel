@@ -322,8 +322,8 @@ function reviewParts(report: CaseReport, reviewReason: string | null): DraftPart
         greeting: GREETING,
         context:
           broken.length === 1
-            ? "We could not open one of the attachments, so the check is on hold."
-            : "We could not open some of the attachments, so the check is on hold.",
+            ? "We could not open one of the attachments, so we could not complete the check."
+            : "We could not open some of the attachments, so we could not complete the check.",
         facts: [
           ...broken.map(
             ({ side, doc }) =>
@@ -475,7 +475,7 @@ export function buildReplyDraft(report: CaseReport, reference = report.email_id)
     // These two ask the recipient for nothing, so the subject must not either.
     fallbackSubject = ["scanned_copies", "review_generic"].includes(parts.situation)
       ? "SI/BL check: manual review in progress"
-      : "SI/BL check on hold: action required";
+      : "SI/BL check: action required";
   } else {
     fallbackSubject = "discrepancy found between SI and draft BL";
     parts = {

@@ -51,7 +51,7 @@ const VERDICT_STYLE: Record<Verdict, string> = {
 const VERDICT_LABEL: Record<Verdict, string> = {
   MATCH: "Consistent",
   MISMATCH: "Discrepancy",
-  UNCOMPARABLE: "Unverified",
+  UNCOMPARABLE: "Not compared",
 };
 
 export function VerdictBadge({ verdict }: { verdict: Verdict }) {
