@@ -163,7 +163,7 @@ function PatternRow({ runId, pattern }: { runId: string; pattern: Pattern }) {
       >
         <span className="text-sm">
           <span className="font-medium">{pattern.emailIds.length} cases</span> from{" "}
-          <span className="font-medium">{pattern.shipper}</span> mismatch on{" "}
+          <span className="font-medium">{pattern.shipper}</span> with a discrepancy on{" "}
           <span className="font-medium text-warn">{fieldLabel}</span>
         </span>
         <span className="flex shrink-0 items-center gap-2">

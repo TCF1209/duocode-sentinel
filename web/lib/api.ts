@@ -253,7 +253,7 @@ export interface PipelineMetrics {
    *  confirming a case afterwards must not retro-improve the pipeline's own
    *  numbers. Present on GET /metrics for a run; absent in the bare pipeline
    *  metrics shape. */
-  review?: { reviewed: number; confirmed: number; corrected: number };
+  review?: { reviewed: number; confirmed: number; corrected: number; unresolved?: number };
   /** Cases re-checked on re-sent documents, and how many re-checks in all --
    *  the other thing a person can do to a run after it finished. */
   recheck?: { cases: number; rechecks: number };

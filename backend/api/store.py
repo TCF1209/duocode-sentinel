@@ -265,14 +265,24 @@ class Store:
         }
 
     def review_summary(self, run_id: str) -> dict:
-        """Counts for the metrics page: how much of this run a human touched."""
+        """Counts for the metrics page's "Reviewer decisions" tiles.
+
+        Every review is exactly one of three: `confirmed` (the reviewer
+        confirmed the Sentinel result), `unresolved` (a correction whose
+        outcome is still NEEDS_REVIEW -- the reviewer could not decide, so the
+        case stays escalated) or `corrected` (any other correction -- the
+        reviewer overrode the Sentinel result; shown as "Overridden").
+        `unresolved` is additive: the earlier keys are kept for old clients.
+        """
         with self._lock:
             reviews = list(self._reviews.get(run_id, {}).values())
-        corrected = [r for r in reviews if r.get("decision") == "correct"]
+        corrections = [r for r in reviews if r.get("decision") == "correct"]
+        unresolved = sum(1 for r in corrections if r.get("status") == "NEEDS_REVIEW")
         return {
             "reviewed": len(reviews),
-            "confirmed": len(reviews) - len(corrected),
-            "corrected": len(corrected),
+            "confirmed": len(reviews) - len(corrections),
+            "corrected": len(corrections) - unresolved,
+            "unresolved": unresolved,
         }
 
     # -- re-checking a case on re-sent documents -------------------------

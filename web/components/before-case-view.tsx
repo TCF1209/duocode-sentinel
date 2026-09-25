@@ -165,7 +165,7 @@ export function BeforeCaseView({ report, caseId }: { report: CaseReport; caseId:
       <motion.div className="flex flex-col gap-2 rounded-lg border bg-card p-3" variants={fadeUp}>
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {fields.length} fields to read out and compare, by hand
+            {fields.length} fields to copy out and compare manually
           </span>
           <span className="text-xs text-muted-foreground">Sentinel took {report.duration_ms} ms on this pair.</span>
         </div>
@@ -176,7 +176,7 @@ export function BeforeCaseView({ report, caseId }: { report: CaseReport; caseId:
                 <th className="py-1.5 pr-3">Field</th>
                 <th className="py-1.5 pr-3">On the SI</th>
                 <th className="py-1.5 pr-3">On the BL</th>
-                <th className="py-1.5">Same?</th>
+                <th className="py-1.5">Consistent?</th>
               </tr>
             </thead>
             <tbody>
@@ -185,7 +185,7 @@ export function BeforeCaseView({ report, caseId }: { report: CaseReport; caseId:
                   <td className="py-1.5 pr-3">{FIELD_LABELS[f]}</td>
                   {["si", "bl", "same"].map((col) => (
                     <td key={col} className={col === "same" ? "py-1.5" : "py-1.5 pr-3"}>
-                      <span className="block h-6 w-full max-w-48 rounded border border-dashed text-muted-foreground/60" aria-label="blank, to be read by hand" />
+                      <span className="block h-6 w-full max-w-48 rounded border border-dashed text-muted-foreground/60" aria-label="blank, to be filled in manually" />
                     </td>
                   ))}
                 </tr>
@@ -197,7 +197,7 @@ export function BeforeCaseView({ report, caseId }: { report: CaseReport; caseId:
           <p className="text-xs text-muted-foreground">Read both, copy out 7 fields, compare — for every pair in the inbox.</p>
           <Button size="sm" onClick={() => setMode("with")}>
             <Sparkles className="size-4" />
-            See what Sentinel read
+            See what Sentinel extracted
           </Button>
         </div>
       </motion.div>

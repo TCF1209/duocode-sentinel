@@ -2,9 +2,10 @@ import type { CaseStatus, Category, ReviewReason } from "@/lib/api";
 
 /**
  * The one place backend field/category/reason codes turn into words a
- * person reads. Used by the case report, the run table's Defects column,
- * the metrics charts, and the reply-draft generator — before this existed,
- * three of those four had their own hand-copied version of the same map,
+ * person reads. Used by the case report, the run table's "Discrepant
+ * fields" column, the metrics charts, and the reply-draft generator —
+ * before this existed, three of those four had their own hand-copied
+ * version of the same map,
  * and the metrics charts had none, so a backend code could show up
  * formatted in one place and verbatim ("container_count") in another.
  */
@@ -39,18 +40,15 @@ export const CATEGORY_BADGE_LABELS: Record<Category, string> = {
 };
 
 // "OK" reads as a chat acknowledgement, not the outcome of a 7-field
-// verification — "Matched" says what actually happened, and pairs with
-// "Mismatch" the same way the two outcomes already pair everywhere else
-// (VerdictBadge already uses MATCH/MISMATCH per field). NEEDS_REVIEW gets a
-// space instead of shipping its underscore straight into a badge.
+// verification, and a backend code (NEEDS_REVIEW) never goes straight into a
+// badge. The case outcome reads "No discrepancy" / "Discrepancy" /
+// "Escalated" -- the document-checking terms, a claim about the documents
+// rather than about the tool.
 export const STATUS_LABELS: Record<CaseStatus, string> = {
-  // "No mismatch detected" is the problem statement's own phrase for a clean
-  // pair, and judges told the mentors they dislike "Matched/Mismatched" as a
-  // pair of labels -- "matched" reads as a claim about the tool rather than
-  // about the documents. Every status word in the app comes from this map.
-  OK: "No mismatch",
-  MISMATCH: "Mismatch",
-  NEEDS_REVIEW: "Needs review",
+  // Every status word in the app comes from this map.
+  OK: "No discrepancy",
+  MISMATCH: "Discrepancy",
+  NEEDS_REVIEW: "Escalated",
 };
 
 // Full standalone sentences, for the case report's review banner. Also the
@@ -58,13 +56,13 @@ export const STATUS_LABELS: Record<CaseStatus, string> = {
 // `reviewReasonClause` below) and the metrics chart's tooltip, instead of
 // each of those keeping its own independently-worded copy.
 export const REVIEW_REASON_TEXT: Record<ReviewReason, string> = {
-  wrong_doc_type: "An attachment is not the document it claims to be.",
-  missing_attachment: "A document is missing from this email.",
-  unreadable: "A document couldn't be read.",
-  missing_value: "Some fields are blank, or under a label Sentinel doesn't recognise.",
+  wrong_doc_type: "An attachment is not the expected SI or draft BL.",
+  missing_attachment: "The SI or the draft BL is missing from this email.",
+  unreadable: "A document could not be read.",
+  missing_value: "One or more fields are blank or carry a label Sentinel does not recognise.",
 };
 
-/** "An expected document is missing from this email." -> "an expected document is missing from this email" */
+/** "The SI or the draft BL is missing from this email." -> "the SI or the draft BL is missing from this email" */
 export function reviewReasonClause(reason: ReviewReason): string {
   const sentence = REVIEW_REASON_TEXT[reason];
   return sentence.charAt(0).toLowerCase() + sentence.slice(1).replace(/\.$/, "");
@@ -73,8 +71,8 @@ export function reviewReasonClause(reason: ReviewReason): string {
 // Short form of the same four reasons, for chart axes/legends where the
 // full sentence above doesn't fit.
 export const REVIEW_REASON_LABELS: Record<ReviewReason, string> = {
-  wrong_doc_type: "Wrong document type",
-  missing_attachment: "Missing attachment",
+  wrong_doc_type: "Wrong document",
+  missing_attachment: "Missing document",
   unreadable: "Unreadable document",
-  missing_value: "Missing value",
+  missing_value: "Blank or unrecognised field",
 };

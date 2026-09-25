@@ -4,7 +4,7 @@ import { CATEGORY_BADGE_LABELS, STATUS_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 
 // Every badge reads in sentence case, like every other label in the app:
-// "Match", "Rules", "Running…". The backend's own codes (MATCH, llm,
+// "Consistent", "Rules", "Running…". The backend's own codes (MATCH, llm,
 // running) never reach the screen -- one rule, applied here once.
 
 const STATUS_STYLE: Record<CaseStatus, string> = {
@@ -49,9 +49,9 @@ const VERDICT_STYLE: Record<Verdict, string> = {
 };
 
 const VERDICT_LABEL: Record<Verdict, string> = {
-  MATCH: "Match",
-  MISMATCH: "Mismatch",
-  UNCOMPARABLE: "Uncomparable",
+  MATCH: "Consistent",
+  MISMATCH: "Discrepancy",
+  UNCOMPARABLE: "Unverified",
 };
 
 export function VerdictBadge({ verdict }: { verdict: Verdict }) {

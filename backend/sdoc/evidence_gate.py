@@ -84,10 +84,10 @@ _UNREADABLE_RECOVERY: dict[str, str] = {
     "empty_file": "Ask the sender to re-send {roles} — the file arrived empty.",
     "missing_file": "Ask the sender to re-send {roles} — the attachment is referenced but not present.",
     "corrupt": "Ask the sender to re-send {roles} — the file will not open.",
-    "no_text_layer": "Open {roles} by eye: it is an image-only scan, so nothing was machine-readable.",
+    "no_text_layer": "Check {roles} manually: it is an image-only scan with no machine-readable text.",
     "unsupported": "Ask the sender for {roles} in PDF, Word, Excel or plain text.",
 }
-_UNREADABLE_DEFAULT = "Open {roles} by hand and confirm the seven fields."
+_UNREADABLE_DEFAULT = "Verify the seven fields on {roles} manually."
 
 
 @dataclass(frozen=True)
@@ -446,7 +446,7 @@ def evaluate(
             review_reason="unreadable",
             reason="The evidence gate could not verify this case, so it was not auto-decided.",
             blocked_signals=[f"gate_error:{type(exc).__name__}"],
-            recovery="Check the SI and the draft BL by hand.",
+            recovery="Verify the SI and the draft BL manually.",
         )
 
 
@@ -557,7 +557,7 @@ def _evaluate(
             reason="Neither document yielded values we could compare, so there is nothing to decide on.",
             blocked_signals=["comparisons:none"] + _blank_signals_from_fields(
                 COMPARE_FIELDS, si_fields, bl_fields),
-            recovery="Open both documents and check the seven fields by hand.",
+            recovery="Verify the seven fields on both documents manually.",
         )
 
     blank_fields: list[str] = []
@@ -645,7 +645,7 @@ def _evaluate(
                 " discrepancy, but the text alone cannot settle which."
             ),
             blocked_signals=[f"ocr_confusable:{f}" for f in fields],
-            recovery="Compare both values against the pages; if they are the same party or port, this field is clean.",
+            recovery="Compare both values against the pages; if they are the same party or port, treat this field as consistent.",
         )
 
     # ---- 6. can we actually find what we claim to have read? --------------

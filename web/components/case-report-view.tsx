@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 // The backend computes `model_offered` and `model_used` so the page can say
 // which tier answered instead of the reader inferring it from extractor tags.
 // Nothing rendered them, which made the most interesting outcome invisible:
-// "we asked the model and adopted nothing" looked exactly like "the model was
+// "we asked the model and accepted nothing" looked exactly like "the model was
 // switched off". That distinction is the product's own thesis -- the model is a
 // fallback that has to earn each value -- so it belongs on screen, and on the
 // /compare page it is the one place a judge can watch it happen.
@@ -38,7 +38,7 @@ function ModelTier({ offered, used }: { offered?: boolean; used?: boolean }) {
     ? "Model off"
     : used
       ? "Model answered"
-      : "Model asked, nothing adopted";
+      : "Model asked, nothing accepted";
   return (
     <span
       className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
@@ -46,8 +46,8 @@ function ModelTier({ offered, used }: { offered?: boolean; used?: boolean }) {
         !offered
           ? "No model was configured for this run; every value came from the deterministic readers."
           : used
-            ? "At least one field was filled by the model and re-located in its source before being adopted."
-            : "The model was available and was asked, but nothing it returned could be traced back to the document, so nothing was adopted."
+            ? "At least one field was filled by the model and re-located in its source before being accepted."
+            : "The model was available and was asked, but nothing it returned could be traced back to the document, so nothing was accepted."
       }
     >
       {label}
@@ -95,10 +95,10 @@ function DocumentStatus({ side, doc, caseId }: { side: "si" | "bl"; doc: Documen
     text = `Could not be read — ${UNREADABLE_TEXT[doc.unreadable_reason ?? ""] ?? (doc.unreadable_reason ?? "unknown reason").replace(/_/g, " ")}`;
   } else if (doc.doc_type !== EXPECTED_DOC_TYPE[side]) {
     tone = "warn";
-    text = `Read as a ${doc.doc_type.replace(/_/g, " ").toLowerCase()} — not a ${SIDE_NAME[side]}`;
+    text = `Identified as a ${doc.doc_type.replace(/_/g, " ").toLowerCase()} — expected a ${SIDE_NAME[side]}`;
   } else {
     tone = "ok";
-    text = `Read as a ${SIDE_NAME[side]}`;
+    text = `Identified as a ${SIDE_NAME[side]}`;
   }
   const Icon = tone === "ok" ? CheckCircle2 : tone === "warn" ? AlertTriangle : XCircle;
   const transcript = transcriptOf(doc);
@@ -114,17 +114,24 @@ function DocumentStatus({ side, doc, caseId }: { side: "si" | "bl"; doc: Documen
           </div>
         )}
         {/* An image-only scan that a vision model was allowed to read arrives
-            with the page already read out for the reviewer. It sits under the
+            with the page already transcribed for the reviewer. It sits under the
             "could not be read" line on purpose: the document is still
             unreadable to the pipeline and the case is still here, the card
             only saves the reviewer from starting at zero. */}
         {transcript && (
-          <div className="mt-2">
+          <div className="mt-2 hidden sm:block">
             <ScanTranscriptCard role={side === "si" ? "SI" : "BL"} transcript={transcript} />
           </div>
         )}
       </div>
       {doc && caseId && <AttachmentAction caseId={caseId} side={side} ext={doc.ext} path={doc.path} />}
+      {/* On a phone the column beside "View original" is a third of the
+          screen; there the transcript takes the card's full width instead. */}
+      {transcript && (
+        <div className="mt-1 basis-full sm:hidden">
+          <ScanTranscriptCard role={side === "si" ? "SI" : "BL"} transcript={transcript} />
+        </div>
+      )}
     </div>
   );
 }
@@ -157,7 +164,7 @@ export function CaseReportView({
    *  flagged on it -- for the history badge on a mismatched field's card
    *  (field-comparison-row.tsx). */
   priorDefectCounts?: Record<string, number>;
-  /** Re-check on re-sent documents (recheck-panel.tsx). Absent on /compare,
+  /** Re-check on amended documents (recheck-panel.tsx). Absent on /compare,
    *  which has no case to store the result against. */
   onRecheck?: (files: RecheckFiles) => Promise<void>;
   rechecking?: boolean;
@@ -181,7 +188,7 @@ export function CaseReportView({
   // exactly as it always did when this is null -- the system's answer is
   // never replaced, only joined by the person's where they differ.
   const liveCorrection = report.effective?.source === "review" ? report.effective : null;
-  // "Sentinel's original" view: the whole page rendered exactly as Sentinel
+  // "Sentinel result" view: the whole page rendered exactly as Sentinel
   // produced it, correction set aside -- asked for as "let me see the
   // unchanged version too". Everything below keys off `correction`, so
   // flipping this one value flips the header, the banner and every field
@@ -193,10 +200,10 @@ export function CaseReportView({
   // reviewer has moved it anywhere else (a correction *to* NEEDS_REVIEW
   // keeps it). The "Suggested action:" note is promoted into the review
   // box's line then, and on /compare the box is shown without a row. Once
-  // reviewed, the summary's "Sentinel said" carries the reason instead.
+  // reviewed, the summary's "Sentinel result" carries the reason instead.
   const showWorkspace = report.status === "NEEDS_REVIEW" && (!correction || correction.status === "NEEDS_REVIEW");
 
-  // Where re-sent documents can be dropped in: a comparison request whose
+  // Where amended documents can be dropped in: a comparison request whose
   // standing outcome is still a problem -- Sentinel's, or a reviewer's
   // correction to one. Not on an OK case (nothing to resolve), and never on
   // an email with no SI/BL pair to compare (the backend refuses those with
@@ -207,8 +214,8 @@ export function CaseReportView({
   const recheckable = Boolean(onRecheck) && report.category === "BL_COMPARISON";
   const offerRecheck = recheckable && (standingStatus === "MISMATCH" || standingStatus === "NEEDS_REVIEW");
 
-  // The re-sent documents area lives inside the review box, under its row
-  // of actions, behind the "Attach re-sent SI/BL" button there. It starts
+  // The amended documents area lives inside the review box, under its row
+  // of actions, behind the "Attach amended SI/BL" button there. It starts
   // open in two cases, both the user's rule: a page opened at it
   // (?spotlight=recheck, the home tile) and a case with nothing on file --
   // there the sample pair is the only way to watch a re-check, and a folded
@@ -225,10 +232,10 @@ export function CaseReportView({
         variant={showWorkspace && report.fields.length === 0 ? "default" : "outline"}
         aria-expanded={recheckOpen}
         onClick={() => setRecheckOpen((o) => !o)}
-        title="Got a corrected SI or BL back from the sender? Attach it and the same check runs again"
+        title="Attach the amended SI or draft BL from the sender; the same check runs again"
       >
         <Upload className="size-4" />
-        Attach re-sent SI/BL
+        Attach amended SI/BL
       </Button>
     ) : null;
 
@@ -288,13 +295,13 @@ export function CaseReportView({
     else corrections[field] = sides;
     review.commit({ ...draft, corrections }, field);
   }
-  // The controls sit on the cards only in the live view: "Sentinel's
-  // original" is a way of looking, not of editing.
+  // The controls sit on the cards only in the live view: "Sentinel
+  // result" is a way of looking, not of editing.
   const decideOn = inPlace && !showOriginal;
 
   // What stands on each field for the reviewer's eye: the corrected pair's
   // verdict when there is one, the one-click choice on top of that -- or
-  // Sentinel's own under "Sentinel's original". All seven fields stay on
+  // Sentinel's own under "Sentinel result". All seven fields stay on
   // the page in the documents' order (the user's ask: "I only saw the ones
   // I had to change"): a field that differs, or that the reviewer touched,
   // is a full card; a field that agrees, or that Sentinel could not
@@ -364,7 +371,7 @@ export function CaseReportView({
     setPanel(null);
     review.commit({ ...draft, cantTell: true }, "case");
   }
-  // The scan read-out (scan-transcript-card.tsx): what the model read on an
+  // The scan transcription (scan-transcript-card.tsx): what the model read on an
   // image-only page, per side, for the fields Sentinel itself could not
   // read. Evidence for a person, never a decision -- readers/scan.py's own
   // rule -- so the button opens a list the reviewer ticks after checking
@@ -392,7 +399,7 @@ export function CaseReportView({
       if (r.bl) sides.bl = r.bl;
       corrections[r.field] = sides;
     }
-    const provenance = `Values adopted from the scan read-out (${readOutModel}) by the reviewer after checking them against the scan.`;
+    const provenance = `Values accepted from the scan transcription (${readOutModel}) after the reviewer verified them against the scan.`;
     setPanel(null);
     review.commit({ ...draft, corrections, cantTell: false, note: draft.note.trim() ? draft.note : provenance }, "case");
   }
@@ -408,8 +415,8 @@ export function CaseReportView({
   // same shape, as a mismatch case (the user: the old two-box version read
   // as "twice the text of the mismatch page, and less tidy"). Nothing here
   // is new data: review_reason, the pipeline's "Suggested action:" note and
-  // the per-field present flags were all already on the page. "Unread on
-  // the BL: …" is named only when it is some of the fields, not all --
+  // the per-field present flags were all already on the page. "Not extracted
+  // from the BL: …" is named only when it is some of the fields, not all --
   // when nothing on a document could be read, the reason already says so
   // -- and only when both documents were actually read: a blank field on a
   // document that could not be read at all is the unreadability itself.
@@ -423,27 +430,27 @@ export function CaseReportView({
         .filter((g) => g.fields.length > 0 && g.fields.length < report.fields.length)
     : [];
   const sentence = (s: string) => (/[.!?]$/.test(s) ? s : `${s}.`);
-  const needsReviewHeading = "Sentinel couldn't check this one";
+  const needsReviewHeading = "Escalated — manual check required";
   const needsReviewLine = (
     <>
-      {report.review_reason ? REVIEW_REASON_TEXT[report.review_reason] : "Sentinel could not decide this one automatically."}{" "}
-      {suggestedAction ? sentence(suggestedAction) : "Look at the documents, then say what you found."}
+      {report.review_reason ? REVIEW_REASON_TEXT[report.review_reason] : "Sentinel did not decide this case automatically."}{" "}
+      {suggestedAction ? sentence(suggestedAction) : "Verify both documents and record a decision."}
       {unread.length > 0 && (
         <span className="block">
           {unread.map((g, i) => (
             <span key={g.side}>
               {i > 0 && " · "}
-              Unread on the {g.side.toUpperCase()}: <span className="font-medium text-foreground">{g.fields.join(", ")}</span>
+              Not extracted from the {g.side.toUpperCase()}: <span className="font-medium text-foreground">{g.fields.join(", ")}</span>
             </span>
           ))}
         </span>
       )}
       {hasReadOut && (
         <span className="block">
-          The model read the scans for you ({legibleSummary})
+          The model transcribed the scans ({legibleSummary})
           {review
-            ? " — adopt what you have checked against the image and the rules compare the pair."
-            : " — check each value against the image."}
+            ? " — accept the values you have verified against the scan; the rules then compare the pair."
+            : " — verify each value against the scan."}
         </span>
       )}
     </>
@@ -466,47 +473,47 @@ export function CaseReportView({
       ? null
       : report.status === "MISMATCH"
         ? {
-            heading: "Sentinel found a mismatch",
-            line: `${listNames(defectNames)} differ${defectNames.length === 1 ? "s" : ""} between the SI and the BL — each value below carries the line it was read from.`,
+            heading: "Discrepancy found",
+            line: `${listNames(defectNames)} differ${defectNames.length === 1 ? "s" : ""} between the SI and the draft BL. Each value below shows the line it was read from.`,
             buttons: (
               <>
                 {findingButton(
-                  "Agree — it's a mismatch",
+                  "Confirm discrepancy",
                   review.confirm,
-                  "You checked the cards and the documents really differ there: record that you agree with Sentinel",
+                  "Records Confirmed: the SI and the draft BL differ on these fields",
                   true,
                 )}
                 {findingButton(
-                  "Change the fields…",
+                  "Flag fields…",
                   () => togglePanel("picker"),
-                  "Adjust which fields differ: untick one Sentinel flagged, tick one it missed",
+                  "Select the discrepant fields; Sentinel's flags are pre-selected",
                   false,
                   panel === "picker",
                 )}
                 {findingButton(
-                  "No mismatch",
+                  "Mark no discrepancy",
                   noMismatch,
-                  "The flagged values are the same thing written two ways: take them all off the list; Sentinel's reading stays on the record",
+                  "The flagged values are the same value in a different format; clears every flag, Sentinel's result stays on record",
                 )}
-                {findingButton("Can't tell", cantTell, "Send the whole case to Needs review: you looked and could not decide")}
+                {findingButton("Escalate", cantTell, "Records Unresolved; the case becomes Escalated")}
               </>
             ),
           }
         : report.status === "OK"
           ? {
-              heading: "No mismatch found",
-              line: `All ${report.fields.length} fields agree, each with the line it was read from. Agree to sign it off, or say what Sentinel missed.`,
+              heading: "No discrepancy found",
+              line: `All ${report.fields.length} fields are consistent, each with the line it was read from. Confirm the result, or flag the fields Sentinel missed.`,
               buttons: (
                 <>
-                  {findingButton("Agree — no mismatch", review.confirm, "You looked and nothing is wrong: sign the case off", true)}
+                  {findingButton("Confirm no discrepancy", review.confirm, "Records Confirmed: no discrepancy on any field", true)}
                   {findingButton(
-                    "Mismatch…",
+                    "Flag fields…",
                     () => togglePanel("picker"),
-                    "Pick the fields that differ; Sentinel's evidence stays beside your call",
+                    "Select the discrepant fields; Sentinel's evidence stays beside the reviewer decision",
                     false,
                     panel === "picker",
                   )}
-                  {findingButton("Can't tell", cantTell, "Send the whole case to Needs review: you looked and could not decide")}
+                  {findingButton("Escalate", cantTell, "Records Unresolved; the case becomes Escalated")}
                 </>
               ),
             }
@@ -523,28 +530,28 @@ export function CaseReportView({
                         disabled={saving}
                         aria-expanded={panel === "adopt"}
                         onClick={() => togglePanel("adopt")}
-                        title="The model's reading of each scan, for you to adopt field by field after checking it against the image; the rules then compare the pair"
+                        title="The model's transcription of each scan; accept values field by field after verifying them against the image, then the rules compare the pair"
                       >
                         <Sparkles className="size-4 text-ai" />
-                        Use the scan read-out
+                        Use scan transcription
                       </Button>
                     )}
-                    {findingButton("No mismatch", noMismatch, "You read both documents: the fields Sentinel could not compare are fine")}
+                    {findingButton("Mark no discrepancy", noMismatch, "Verified against both documents: the unverified fields are consistent")}
                     {findingButton(
-                      "Mismatch…",
+                      "Flag fields…",
                       () => togglePanel("picker"),
-                      "Pick the fields that differ; Sentinel's evidence stays beside your call",
+                      "Select the discrepant fields; Sentinel's evidence stays beside the reviewer decision",
                       false,
                       panel === "picker",
                     )}
-                    {findingButton("Still can't tell", cantTell, "Leave it in review: you looked and could not decide either")}
+                    {findingButton("Keep escalated", cantTell, "Records Unresolved; the case stays Escalated")}
                   </>
                 ),
               }
             : {
                 heading: needsReviewHeading,
                 line: needsReviewLine,
-                buttons: findingButton("Still can't tell", cantTell, "Leave it in review: you looked and could not decide either"),
+                buttons: findingButton("Keep escalated", cantTell, "Records Unresolved; the case stays Escalated"),
               };
   const rowEnd = (
     <RowEnd>
@@ -585,14 +592,14 @@ export function CaseReportView({
         <CategoryBadge category={report.category} />
         {/* The outcome that currently stands leads; Sentinel's own is kept
             beside it in words when the two differ. Same status corrected
-            (e.g. a mismatch trimmed to fewer fields) shows one badge --
-            "Sentinel said Mismatch" next to a Mismatch badge would only
-            be noise, and the review panel below already says "corrected". */}
+            (e.g. a discrepancy trimmed to fewer fields) shows one badge --
+            "Sentinel result: Discrepancy" next to a Discrepancy badge would
+            only be noise, and the review record below already shows the change. */}
         {correction && correction.status !== report.status ? (
           <>
             <StatusBadge status={correction.status} />
-            <span className="text-xs text-muted-foreground" title="Sentinel's own outcome, before a reviewer corrected it">
-              Sentinel said {STATUS_LABELS[report.status]}
+            <span className="text-xs text-muted-foreground" title="Sentinel result, before the reviewer override">
+              Sentinel result: {STATUS_LABELS[report.status]}
             </span>
           </>
         ) : (
@@ -621,7 +628,7 @@ export function CaseReportView({
                 !showOriginal ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              With correction
+              Reviewer decision
             </button>
             <button
               type="button"
@@ -632,14 +639,14 @@ export function CaseReportView({
                 showOriginal ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              Sentinel&apos;s original
+              Sentinel result
             </button>
           </div>
         )}
       </motion.div>
 
       {/* Leads once the case has been re-checked: the answer below was
-          reached on re-sent documents, and what it replaced is one
+          reached on amended documents, and what it replaced is one
           disclosure away. */}
       {report.recheck && (
         <motion.div variants={fadeUp}>
@@ -662,7 +669,7 @@ export function CaseReportView({
           a sign-off with nothing behind it. */}
       {review && !comparison && (
         <motion.p className="text-sm text-muted-foreground" variants={fadeUp} data-testid="nothing-to-review">
-          Sorted as {CATEGORY_BADGE_LABELS[report.category]} — not a document check, so there is nothing to review.
+          Classified as {CATEGORY_BADGE_LABELS[report.category]} — not an SI/BL check; nothing to review.
         </motion.p>
       )}
 
@@ -672,7 +679,7 @@ export function CaseReportView({
           every status: what Sentinel found (and, escalated, why it stopped
           and what to do), then one row holding everything a reviewer can do
           with the whole case: the findings (Sentinel's own first, so
-          agreeing is one click), the re-sent SI/BL (the area opens under
+          confirming is one click), the amended SI/BL (the area opens under
           the row) and the reply draft at the row's end. */}
       {review && comparison && finding && (
         <motion.div variants={fadeUp} data-spotlight="review">

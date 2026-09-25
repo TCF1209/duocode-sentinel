@@ -38,7 +38,7 @@ export type DraftSituation =
  * open one of the attachments"), `facts` are quoted from the case's own
  * evidence, and `action` is the decision the reply carries ("please confirm
  * the gross weight", "no need to re-send"). A model that rewrote `context`
- * could turn "some fields do not match" into "everything agrees" in words no
+ * could turn "found discrepancies" into "everything agrees" in words no
  * filter reliably catches, so it is not offered the sentence at all.
  */
 export interface DraftParts {
@@ -197,8 +197,9 @@ function mismatchLine(f: FieldComparisonReport): string {
  * Every field the reply is about is listed, including a real mismatch that
  * sits beside a blank one: the gate escalates on the blank before it looks at
  * the mismatch, but the mismatch is still on the document, and a reply that
- * asked only about the blank and then said "the other fields agree" would
- * read as a clean bill of health for a BL that has a wrong consignee on it.
+ * asked only about the blank and then said "the other fields are consistent"
+ * would read as a clean bill of health for a BL that has a wrong consignee on
+ * it.
  */
 function valuesToConfirm(report: CaseReport): DraftParts | null {
   const asked = report.fields.filter((f) => f.verdict === "UNCOMPARABLE" && ASK_REASONS.has(f.reason ?? ""));
@@ -209,11 +210,11 @@ function valuesToConfirm(report: CaseReport): DraftParts | null {
 
   let agreedLine: string[] = [];
   if (agreed && unread.length) {
-    agreedLine = [`  - ${agreed} of the other fields agree between the two documents; our team is checking the rest by hand.`];
+    agreedLine = [`  - ${agreed} of the other fields are consistent between the two documents; our team is checking the rest manually.`];
   } else if (agreed === 1) {
-    agreedLine = ["  - The other field agrees between the two documents."];
+    agreedLine = ["  - The other field is consistent between the two documents."];
   } else if (agreed) {
-    agreedLine = [`  - The other ${agreed} fields agree between the two documents.`];
+    agreedLine = [`  - The other ${agreed} fields are consistent between the two documents.`];
   }
 
   const asks: string[] = [];
@@ -279,7 +280,7 @@ function reviewParts(report: CaseReport, reviewReason: string | null): DraftPart
     const scanned = unread.filter(({ doc }) => doc.unreadable_reason === "no_text_layer");
     const broken = unread.filter(({ doc }) => doc.unreadable_reason !== "no_text_layer");
     const scanLines = scanned.map(
-      ({ side, doc }) => `  - ${capitalise(SIDE_NAMES[side])} (${fileName(doc)}): a scanned image, which we read by hand.`,
+      ({ side, doc }) => `  - ${capitalise(SIDE_NAMES[side])} (${fileName(doc)}): a scanned image, which we check manually.`,
     );
     if (broken.length) {
       // "Export it again" is advice for a damaged file. A file that never
@@ -318,8 +319,8 @@ function reviewParts(report: CaseReport, reviewReason: string | null): DraftPart
         greeting: GREETING,
         context:
           scanned.length === 1
-            ? "One of the documents came through as a scanned image, which we check by hand rather than automatically."
-            : "The documents came through as scanned images, which we check by hand rather than automatically.",
+            ? "One of the documents came through as a scanned image, which we check manually rather than automatically."
+            : "The documents came through as scanned images, which we check manually rather than automatically.",
         facts: scanLines,
         action:
           `There is no need to re-send ${scanned.length === 1 ? "it" : "them"}. ` +
@@ -433,18 +434,18 @@ export function buildReplyDraft(report: CaseReport, reference = report.email_id)
       greeting: GREETING,
       context: "We compared the draft Bill of Lading against the Shipping Instruction across all seven fields we check.",
       facts: [],
-      action: "No mismatch was found.",
+      action: "No discrepancy was found.",
       closing: "Thank you.",
     };
   } else if (status === "NEEDS_REVIEW") {
-    fallbackSubject = "action needed before we can check this";
+    fallbackSubject = "SI/BL check on hold: action required";
     parts = reviewParts(report, reviewReason);
   } else {
     fallbackSubject = "discrepancy found between SI and draft BL";
     parts = {
       situation: "discrepancy",
       greeting: GREETING,
-      context: "We compared the draft Bill of Lading against the Shipping Instruction and found fields that do not match.",
+      context: "We compared the draft Bill of Lading against the Shipping Instruction and found discrepancies in the following fields.",
       facts: report.fields
         .filter((f) => defectFields.includes(f.field))
         .map((f) => `  - ${label(f.field)}: SI says "${f.si.raw ?? "?"}", draft BL says "${f.bl.raw ?? "?"}"`),
@@ -503,12 +504,12 @@ export function mailtoHref(to: string | undefined | null, draft: ReplyDraft): st
  */
 export function buildPatternDraft(shipper: string, fieldLabel: string, emailIds: string[]): ReplyDraft {
   return {
-    subject: `Recurring mismatch: ${fieldLabel} across ${emailIds.length} shipments`,
+    subject: `Recurring discrepancy: ${fieldLabel} across ${emailIds.length} shipments`,
     body: [
       "Hello,",
       "",
-      `Across ${emailIds.length} recent shipments from ${shipper}, we've found the same field does not ` +
-        `match between the Shipping Instruction and the draft Bill of Lading: ${fieldLabel}.`,
+      `Across ${emailIds.length} recent shipments from ${shipper}, we've found the same discrepancy on this ` +
+        `field between the Shipping Instruction and the draft Bill of Lading: ${fieldLabel}.`,
       "",
       "Affected bookings:",
       ...emailIds.map((id) => `  - ${id}`),

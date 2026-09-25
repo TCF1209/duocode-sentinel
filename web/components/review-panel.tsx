@@ -9,18 +9,19 @@ import { FIELD_LABELS, STATUS_LABELS, reviewReasonClause } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import type { CaseReport, CaseStatus, FieldComparisonReport, FieldCorrection, FieldDecision, ReviewBody } from "@/lib/api";
 
-/** "Mismatch on Container Count, Port of Discharge" / "No mismatch" -- one
- *  outcome as a phrase, for the before/after lines in the reviewed state
- *  (and the same lines in recheck-panel.tsx, which reuses it). */
+/** "Discrepancy (Container Count, Port of Discharge)" / "No discrepancy" --
+ *  one outcome as a phrase, for the before/after lines in the reviewed state
+ *  (and the same lines in recheck-panel.tsx, which reuses it). Parentheses,
+ *  not a colon: its callers already put it after "previous result:". */
 export function describeOutcome(status: CaseStatus, defectFields: string[]): string {
   const label = STATUS_LABELS[status];
   if (status !== "MISMATCH" || defectFields.length === 0) return label;
-  return `${label} on ${defectFields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}`;
+  return `${label} (${defectFields.map((f) => FIELD_LABELS[f] ?? f).join(", ")})`;
 }
 
 /**
  * The review as the reviewer builds it, one change at a time: a finding on
- * the whole case (no mismatch / mismatch on these fields / can't tell), a
+ * the whole case (no discrepancy / discrepancy on these fields / escalate), a
  * one-click choice on a field card, a value corrected on a side, and a
  * note. Each change is saved as it is made (case-detail-page-view.tsx), so
  * this is also exactly what the saved review holds -- `draftFromReview`
@@ -32,7 +33,7 @@ export function describeOutcome(status: CaseStatus, defectFields: string[]): str
 export interface CorrectionDraft {
   decisions: Record<string, FieldDecision>;
   corrections: Record<string, FieldCorrection>;
-  /** "Can't tell" -- the whole case goes to Needs review regardless. */
+  /** "Escalate" (Unresolved) -- the whole case is Escalated regardless. */
   cantTell: boolean;
   note: string;
 }
@@ -40,7 +41,7 @@ export interface CorrectionDraft {
 export const EMPTY_DRAFT: CorrectionDraft = { decisions: {}, corrections: {}, cantTell: false, note: "" };
 
 /** True when the draft changes nothing about Sentinel's answer: no field
- *  decided, no value corrected, not "can't tell". A note alone is not a
+ *  decided, no value corrected, not Unresolved. A note alone is not a
  *  review. */
 export function isEmptyDraft(draft: CorrectionDraft): boolean {
   return Object.keys(draft.decisions).length === 0 && Object.keys(draft.corrections).length === 0 && !draft.cantTell;
@@ -128,7 +129,7 @@ const TONE: Record<CaseStatus, { container: string; icon: string }> = {
  * and one line the page writes for the status the case stands at; one row
  * of findings (`children`), the first of them Sentinel's own answer so
  * agreeing is one click; and under the row whatever a button opened
- * (`below`: the field picker, the re-sent documents area). The user's
+ * (`below`: the field picker, the amended documents area). The user's
  * reading of the old box: "Confirm outcome" confirmed an abstract word, and
  * a first-time reviewer took it for "I confirm this email is wrong" -- so
  * every button here says the finding in plain words instead.
@@ -184,7 +185,7 @@ export function RowEnd({ children }: { children: ReactNode }) {
 
 /** The note, saved when the reviewer clicks away -- there is no Save button
  *  anywhere in the review, and the note is no exception. Uncontrolled on
- *  purpose: the value only leaves the box on blur. Opened from an "Add a
+ *  purpose: the value only leaves the box on blur. Opened from an "Add
  *  note" link rather than always on screen: an empty box under every
  *  finding read as "you have to say why". */
 function NoteField({ value, onSave, onDone }: { value: string; onSave: (note: string) => void; onDone: () => void }) {
@@ -192,7 +193,7 @@ function NoteField({ value, onSave, onDone }: { value: string; onSave: (note: st
     <Textarea
       autoFocus
       defaultValue={value}
-      placeholder="A note for whoever reads this next — saved when you click away"
+      placeholder="Note for the next reviewer — saved when you click away"
       aria-label="Review note"
       rows={1}
       className="mt-2 min-h-8 bg-background/60"
@@ -210,7 +211,7 @@ function NoteField({ value, onSave, onDone }: { value: string; onSave: (note: st
  * said -- both kept, because "the system said X, a person said Y, here is
  * what both were looking at" is the whole point of the page; hiding X would
  * turn an audit trail into a silent overwrite. The field cards below show
- * the same thing one field at a time. `children` end the row (the re-sent
+ * the same thing one field at a time. `children` end the row (the amended
  * documents button, the reply draft); `below` is what a button opened.
  */
 export function ReviewSummary({
@@ -236,7 +237,7 @@ export function ReviewSummary({
   const sentinelSaid = (
     <>
       <StatusBadge status={report.status} />
-      {report.status === "MISMATCH" && report.defect_fields.length > 0 && <span>on {fieldNames(report.defect_fields)}</span>}
+      {report.status === "MISMATCH" && report.defect_fields.length > 0 && <span>{fieldNames(report.defect_fields)}</span>}
       {report.status === "NEEDS_REVIEW" && report.review_reason && <span>— {reviewReasonClause(report.review_reason)}</span>}
     </>
   );
@@ -256,7 +257,7 @@ export function ReviewSummary({
         body: (
           <>
             <span className="font-medium">{name}</span> · {side.toUpperCase()}:{" "}
-            <span className="text-muted-foreground line-through">{original?.present ? (original.raw ?? "") : "not read"}</span> →{" "}
+            <span className="text-muted-foreground line-through">{original?.present ? (original.raw ?? "") : "not extracted"}</span> →{" "}
             <span className="font-medium">{sides[side]}</span>
             {now && (
               <>
@@ -276,11 +277,15 @@ export function ReviewSummary({
       body: (
         <>
           <span className="font-medium">{FIELD_LABELS[f] ?? f}</span> ·{" "}
-          {d === "cleared" ? "not a mismatch — the two are the same thing" : d === "flagged" ? "flagged as a mismatch" : "fine — you read both documents"}
+          {d === "cleared"
+            ? "cleared — same value, different format"
+            : d === "flagged"
+              ? "flagged as a discrepancy"
+              : "verified against both documents"}
           {sentinel && (
             <span className="text-muted-foreground">
               {" "}
-              (Sentinel: <VerdictBadge verdict={sentinel} />)
+              (Sentinel result: <VerdictBadge verdict={sentinel} />)
             </span>
           )}
         </>
@@ -292,42 +297,42 @@ export function ReviewSummary({
   return (
     <div className="rounded-lg border bg-muted/40 p-4 text-sm" data-testid="review-summary">
       <div className="flex flex-wrap items-center gap-2 font-medium">
-        Reviewed
+        Review record
         {saving ? (
           <span className="text-xs font-normal text-muted-foreground">Saving…</span>
         ) : savedCase ? (
           <span className="text-xs font-normal text-ok">Saved</span>
         ) : null}
       </div>
-      {/* The same three-line shape every time -- what Sentinel said, what
-          you said, what changed -- in the label column the filter card and
+      {/* The same three-line shape every time -- Sentinel result, reviewer
+          decision, changes -- in the label column the filter card and
           the field cards use, so a reviewer reads their own review at a
           glance instead of working it out from two sentences. */}
-      <div className="mt-2 grid gap-x-4 gap-y-1.5 sm:grid-cols-[7rem_minmax(0,1fr)]">
-        <span className={label}>Sentinel said</span>
+      <div className="mt-2 grid gap-x-4 gap-y-1.5 sm:grid-cols-[10rem_minmax(0,1fr)]">
+        <span className={label}>Sentinel result</span>
         <span className={cell}>{sentinelSaid}</span>
-        <span className={label}>You said</span>
+        <span className={label}>Reviewer decision</span>
         <span className={cell}>
           {agreed ? (
             <>
               <StatusBadge status={report.status} />
-              <span>the same — agreed</span>
+              <span>Confirmed</span>
             </>
           ) : draft.cantTell ? (
             <>
               <StatusBadge status="NEEDS_REVIEW" />
-              <span>couldn&apos;t tell</span>
+              <span>Unresolved</span>
             </>
           ) : (
             <>
               <StatusBadge status={after.status} />
-              {after.status === "MISMATCH" && after.defect_fields.length > 0 && <span>on {fieldNames(after.defect_fields)}</span>}
+              {after.status === "MISMATCH" && after.defect_fields.length > 0 && <span>{fieldNames(after.defect_fields)}</span>}
             </>
           )}
         </span>
         {changes.length > 0 && (
           <>
-            <span className={label}>Changed</span>
+            <span className={label}>Changes</span>
             <ul className="flex min-w-0 flex-col gap-1">
               {changes.map((c) => (
                 <li key={c.key} className={cell}>
@@ -339,7 +344,7 @@ export function ReviewSummary({
         )}
         {review.reviewer && (
           <>
-            <span className={label}>By</span>
+            <span className={label}>Reviewed by</span>
             <span className={cell}>{review.reviewer}</span>
           </>
         )}
@@ -363,10 +368,10 @@ export function ReviewSummary({
           size="sm"
           variant="ghost"
           onClick={control.withdraw}
-          title="Take this review back altogether: Sentinel's answer stands and nobody has signed it off"
+          title="Remove the reviewer decision; the Sentinel result stands and the case returns to Not reviewed"
         >
           <Undo2 className="size-3.5" />
-          Undo review
+          Withdraw review
         </Button>
         {!noteOpen && (
           <button
@@ -374,7 +379,7 @@ export function ReviewSummary({
             onClick={() => setNoteOpen(true)}
             className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
           >
-            {draft.note ? "Edit note" : "Add a note"}
+            {draft.note ? "Edit note" : "Add note"}
           </button>
         )}
         {children}
@@ -392,7 +397,7 @@ function pairText(f: FieldComparisonReport): string {
 }
 
 /**
- * "Mismatch…" on a case Sentinel passed or could not check: which fields
+ * "Flag fields…" on a case Sentinel passed or could not check: which fields
  * differ, as one checkbox per field with both readings beside it. Saving
  * flags the chosen fields (and takes any of Sentinel's own off the list
  * that were not chosen); the backend derives the outcome from those
@@ -418,7 +423,7 @@ export function FieldPicker({
   const picked = fields.map((f) => f.field).filter((k) => chosen[k]);
   return (
     <div className="rounded-md border bg-background p-3" data-testid="field-picker">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Which fields differ?</div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Discrepant fields</div>
       <div className="mt-2 grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
         {fields.map((f) => (
           <label key={f.field} className="flex min-w-0 items-center gap-2 text-sm">
@@ -438,8 +443,8 @@ export function FieldPicker({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button size="sm" disabled={picked.length === 0 || busy} onClick={() => onSave(picked)}>
           {picked.length === 0
-            ? "Pick at least one field"
-            : `Save — mismatch on ${picked.length} field${picked.length === 1 ? "" : "s"}`}
+            ? "Select at least one field"
+            : `Save (${picked.length} discrepant field${picked.length === 1 ? "" : "s"})`}
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel} disabled={busy}>
           Cancel
@@ -459,7 +464,7 @@ export interface ReadOutRow {
 }
 
 /**
- * "Use the scan read-out": the model's reading of each scan, laid out for
+ * "Use scan transcription": the model's reading of each scan, laid out for
  * the reviewer to adopt field by field. readers/scan.py's rule holds here:
  * a transcript is evidence for a person and never grounds for a decision,
  * so nothing is saved until the reviewer ticks what they have checked
@@ -489,16 +494,16 @@ export function ScanAdoptPanel({
     <div className="rounded-md border border-ai/40 bg-ai-bg/30 p-3" data-testid="scan-adopt">
       <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ai">
         <Sparkles className="size-3.5" strokeWidth={2} />
-        Read from the scans by {model}
+        Transcribed from the scans by {model}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        Nothing here was compared yet. Tick what you have checked against the image; the rules then compare the pair, and
-        every value stays editable on its card.
+        Not compared yet. Select the values you have verified against the scan; the rules then compare the pair, and every
+        value stays editable on its card.
       </p>
       <div className="mt-2 grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
         {rows.map((r) => {
           const none = !r.si && !r.bl;
-          const text = none ? "not legible on either scan — left blank" : `SI: ${r.si ?? "not legible"} · BL: ${r.bl ?? "not legible"}`;
+          const text = none ? "illegible on both scans — left blank" : `SI: ${r.si ?? "illegible"} · BL: ${r.bl ?? "illegible"}`;
           return (
             <label key={r.field} className={cn("flex min-w-0 items-start gap-2 text-sm", none && "text-muted-foreground")}>
               <input
@@ -521,8 +526,8 @@ export function ScanAdoptPanel({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button size="sm" disabled={picked.length === 0 || busy} onClick={() => onSave(picked)}>
           {picked.length === 0
-            ? "Tick at least one field"
-            : `Adopt ${values} value${values === 1 ? "" : "s"} — I checked them against the scan`}
+            ? "Select at least one field"
+            : `Accept ${values} value${values === 1 ? "" : "s"} — verified against the scan`}
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel} disabled={busy}>
           Cancel

@@ -23,11 +23,11 @@ add for eight. Read the portal first, then cut.
   - [ ] Start a run **with the model tier on**: `metrics.json` shows 6 model
         calls; `email_512`, `513`, `514` show the transcript card on both
         documents.
-  - [ ] `/compare`, the *unfamiliar labels* sample: toggle off → Needs
-        Review with "No label for … could be recognised"; toggle on → Mismatch
-        on consignee and notify party, badge **model answered**.
+  - [ ] `/compare`, the *unfamiliar labels* sample: toggle off → Escalated
+        with "No label for … could be recognised"; toggle on → Discrepancy:
+        Consignee, Notify Party, badge **model answered**.
   - [ ] `/compare`, the *scanned* sample, toggle on: transcript card.
-  - [ ] `/pitch` slide 3 chip reads **732 tests · 0 failing**; slide 4's
+  - [ ] `/pitch` slide 3 chip reads **733 tests · 0 failing**; slide 4's
         card is about `email_145`.
   - [ ] GitHub: the CI badge on the README is green (first run after the
         push). If it is red, read the log before the pitch — a red badge on
@@ -57,10 +57,10 @@ add for eight. Read the portal first, then cut.
       the first run after waking took 41.6 s when it was measured, the second
       12.7 s. **Start one run and throw it away** so the one on stage is the
       warm one.
-- [ ] **The re-upload tile has three turns per run.** *Correct by re-upload*
+- [ ] **The re-check tile has three turns per run.** *Re-check on amendment*
       opens an email with nothing attached (`email_506`, then `508`, then
-      `510`), and each *Load a sample pair → Re-check* turns one OK for
-      everyone looking at that run. The home page follows the latest finished
+      `510`), and each *Load a sample pair → Re-check* turns one case to
+      *No discrepancy* for everyone looking at that run. The home page follows the latest finished
       run, so a fresh run — the one thrown away above, or a Render restart —
       resets all three. Start another after any rehearsal that used them.
 - [ ] Open, in this tab order, so nothing is typed on stage: `/pitch` (slide
@@ -77,8 +77,8 @@ The deck's beats and timings are in `PITCH_DECK.md`. On the product:
 
 1. `/runs` → **Start a run** with the model tier on. While the ring fills:
    "the organisers' full inbox, 520 emails, on a free-tier container."
-   Point at the tally: **46 mismatches, 20 sent to a person with the reason,
-   thirteen seconds, 6 model calls — all six are scans read out for the
+   Point at the tally: **46 discrepancies, 20 escalated with the reason,
+   thirteen seconds, 6 model calls — all six are scans transcribed for the
    reviewer.**
 2. On the run, flip **Before Sentinel**: the inbox as it arrived — 520
    subject lines, 220 pairs to find among them, "≈ 17.6 h of work at our
@@ -88,40 +88,42 @@ The deck's beats and timings are in `PITCH_DECK.md`. On the product:
    five it agreed with. *(Light theme on stage. The five calls survive
    opening a case; "Start over" clears them for the next rehearsal.)*
 3. The filter card: **Sorted into** is step 1 (classify) with the counts;
-   **Outcome** is the check. Click *Mismatch 46*: the list narrows, the
-   mismatched fields are on every row.
+   **Outcome** is the check. Click *Discrepancy 46*: the list narrows, the
+   discrepant fields are on every row.
 4. **Patterns worth a second look** — it starts collapsed; open it, say what
-   the top group is (seven cases from one shipper wrong on the same field),
-   click into one.
-5. A **MISMATCH** case: the two documents on top (*View original*), all
-   seven fields in order — the two that disagree as full cards, the five
-   that agree as one line each (click one to open it) — and under every
-   value **the line it was read from**. The review box asks one thing — do
-   the SI and the BL match? — in one row: *Agree — it's a mismatch · No
-   mismatch · Can't tell · Attach re-sent SI/BL · Draft reply*; agreeing
-   with Sentinel is the one click. Then fix it where it is: *Edit* on the
-   BL value, type what the shipper confirmed,
+   the top group is (seven cases from one shipper with a discrepancy on the
+   same field), click into one.
+5. A **Discrepancy** case: the two documents on top (*View original*), all
+   seven fields in order — the two discrepant fields as full cards, the five
+   consistent ones as one line each (click one to open it) — and under every
+   value **the line it was read from**. The review box asks one thing — is
+   there a discrepancy between the SI and the BL? — in one row: *Confirm
+   discrepancy · Flag fields… · Mark no discrepancy · Escalate · Attach
+   amended SI/BL · Draft reply*; confirming the Sentinel result is the one
+   click. Then fix it where it is: *Edit* on the BL value, type what the
+   shipper confirmed,
    Enter — the pair is compared again with the run's own rules, the card
-   turns to *Match* with Sentinel's reading kept underneath, the outcome
-   above follows; *Undo* puts Sentinel's reading back. *No mismatch* in the
-   box is the one-click version when the two are the same party, and
-   *Change the fields…* adjusts which fields differ. The summary then reads
-   as three lines: Sentinel said · You said · Changed. Nothing to scroll
-   to, nothing to submit.
-6. A **NEEDS_REVIEW** case: `email_512` (a scan, needs the model run): "no
-   text layer, so it did not decide — but the model read the page for the
-   reviewer" — the transcript card, and the seven fields as amber rows. Then
-   *Use the scan read-out* → tick the fields you checked against the image
-   → *Adopt* → the rules compare the fourteen values and the case moves on,
-   with "adopted from the scan read-out by the reviewer" on the record. Or
-   `email_506` (the BL never arrived):
-   the review box already shows *Re-sent documents* (nothing on file) →
-   *No files? Load a sample pair* → *Re-check* → it comes back OK, and the
-   old answer stays on the case as v1.
+   turns to *Consistent* with the extracted value kept underneath, struck
+   through, the outcome above follows; *Revert* puts the extracted value
+   back. *Mark no discrepancy* in the box is the one-click version when the
+   two are the same party, and *Flag fields…* adjusts which fields differ.
+   The *Review record* then reads as three rows: Sentinel result · Reviewer
+   decision · Changes. Nothing to scroll to, nothing to submit.
+6. An **Escalated** case: `email_512` (a scan, needs the model run): "no
+   text layer, so it did not decide — but the model transcribed the page for
+   the reviewer" — the transcript card, and the seven fields as amber rows.
+   Then *Use scan transcription* → tick the fields you verified against the
+   image → *Accept N values — verified against the scan* → the rules compare
+   the fourteen values and the case moves on, with "Values accepted from the
+   scan transcription (…) after the reviewer verified them against the
+   scan." on the record. Or `email_506` (the BL never arrived):
+   the review box already shows *Amended documents* (nothing on file) →
+   *Load a sample pair* → *Re-check* → it comes back No discrepancy, and
+   the previous result stays on the case as v1.
 7. `/compare`, unfamiliar labels, **toggle off**: "wording our table has
-   never seen — the honest answer is *can't read it*, and it says which
-   labels." **Toggle on**: "the model reads them, every value is re-located
-   in the document before it is adopted, and it surfaces the real
+   never seen — the honest answer is that it cannot read them, so it
+   is *Escalated*, and it says which labels." **Toggle on**: "the model reads them, every value is re-located
+   in the document before it is accepted, and it surfaces the real
    discrepancy — badge says *Model answered*."
 8. Back to the deck for impact and close.
 
@@ -140,12 +142,12 @@ their order of emphasis, and what was done with each:
 | They said | What changed |
 |---|---|
 | Don't say "we use less AI". Say the AI is *reserved* for the cases rules can't handle — and the system performs just as well. | Slide 5's notes open with that sentence; the answer below is rewritten around it. |
-| At the top-ten stage everyone meets the brief; **differentiate on the special things** — correction by re-upload, the scan read-out, shipper history on a field, the original document beside the value, the drafted reply. | Slide 8 is now "What makes it different", five features, thirty seconds instead of fifteen. |
+| At the top-ten stage everyone meets the brief; **differentiate on the special things** — re-check on amendment, the scan transcription, shipper history on a field, the original document beside the value, the drafted reply. | Slide 8 is now "What makes it different", five features, thirty seconds instead of fifteen. |
 | The intro should say **why the system was built** and how long a manual check takes. | Slide 2 carries both; the time is our estimate (≈4 min a pair, 20 s an email) and is labelled as one. |
-| The pitch shows the pipeline steps but not **how a person uses it**. | Slide 3's footer is the four steps: run, open a case, confirm / correct a field / re-upload, send the reply. |
-| Design is better and more distinctive than most of the ten. **But**: font sizes too uniform; capitalisation inconsistent (`all` vs `All`); the Compare page's samples don't look clickable; mismatches should be visible from the list without opening a row. | Status labels are now "No mismatch / Mismatch / Needs review" (judges dislike "Matched/Mismatched"; "no mismatch detected" is the problem statement's phrase). Compare samples are obvious buttons with a "Load this pair →" footer and a three-step strip above them. Run-table emphasis, chip capitalisation and the case page's type hierarchy: session 8's list. |
+| The pitch shows the pipeline steps but not **how a person uses it**. | Slide 3's footer is the four steps: run, open a case, confirm or override it / correct a single value / attach the amended SI/BL, send the reply. |
+| Design is better and more distinctive than most of the ten. **But**: font sizes too uniform; capitalisation inconsistent (`all` vs `All`); the Compare page's samples don't look clickable; discrepancies should be visible from the list without opening a row. | Status labels are now "No discrepancy / Discrepancy / Escalated" (judges dislike "Matched/Mismatched"; the API still returns the problem statement's "No mismatch detected."). Compare samples are obvious buttons with a "Load this pair →" footer and a three-step strip above them. Run-table emphasis, chip capitalisation and the case page's type hierarchy: session 8's list. |
 | Nav: "Pitch" says nothing; Runs could come after Compare. | Home · Compare · Runs · How it works. |
-| A judge asked another team whether **20,000 KG against 20 MT** is caught as a unit mismatch. | It is handled, and re-checked on 24 Sep: `20 MT` → 20,000 kg, `21 MT` → 21,000 kg, so 20,000 KG vs 20 MT compares equal and 20,000 KG vs 21 MT is a mismatch. Answer below. |
+| A judge asked another team whether **20,000 KG against 20 MT** is caught as a unit mismatch. | It is handled, and re-checked on 24 Sep: `20 MT` → 20,000 kg, `21 MT` → 21,000 kg, so 20,000 KG vs 20 MT compares equal and 20,000 KG vs 21 MT is a discrepancy. Answer below. |
 
 ## Questions to expect, and the short true answer
 
@@ -154,7 +156,7 @@ little?"** — *the mentor's rule: never say "we use less AI".*
 The AI is reserved for the cases the rules can't handle — an ambiguous
 email, a label we have never seen, a scanned page — and the system performs
 just as well, because we measured it there: on wording we invented, rules
-alone send 168 of 188 cases to a human; with the model, 2, with false
+alone escalate 168 of 188 cases; with the model, 2, with false
 discrepancies still at zero. Using AI on every email would cost money on
 every email for no gain; on this inbox the rules are right every time, and
 that is a measured result, not an absence.
@@ -162,7 +164,7 @@ that is a measured result, not an absence.
 **"What about units — 20,000 KG on one document and 20 MT on the other?"**
 Both are normalised to kilograms before the comparison — 20 MT reads as
 20,000 kg, so that pair compares equal; 20,000 KG against 21 MT is reported
-as a mismatch. Same for thousands separators and bare numbers in a
+as a discrepancy. Same for thousands separators and bare numbers in a
 spreadsheet cell.
 
 **"A perfect score — is it overfitting?"**
@@ -204,8 +206,8 @@ own, and the plumbing to select one per desk is the roadmap's item 5.
 
 **"What is the one thing it gets wrong?"**
 `email_145`: a wrapped party name cut short to exactly what the other
-document says. The repair has nothing to repair, and a real mismatch reads
-as a match — once in 3,008 perturbed documents. The obvious guard would flag
+document says. The repair has nothing to repair, and a real discrepancy
+reads as consistent — once in 3,008 perturbed documents. The obvious guard would flag
 114 of 124 SI/BL pairs (92%), so it stays open and documented.
 *If asked how the 92% is counted:* the only sign that a name wrapped is a
 line with no label of its own right after it — which is also exactly what an
@@ -217,10 +219,10 @@ under it); `backend/tools/party_continuations.py` reproduces both.
 **"Why exact matching — isn't fuzzy matching smarter?"**
 The entity pools contain `APRIL FINE PAPER TRADING` and `APRIL FINE PAPER
 TRADING (MIDDLE EAST) FZE` — different companies. Any threshold loose enough
-to forgive a scanning artefact merges them and a real defect disappears.
-Fuzzy matching is for labels; values are exact after canonicalisation. The
-one amendment, for OCR-confusable characters, can only ever escalate — it
-never produces a match.
+to forgive a scanning artefact merges them and a real discrepancy
+disappears. Fuzzy matching is for labels; values are exact after
+canonicalisation. The one exception, for OCR-confusable characters, can
+only ever escalate — it never marks a field consistent.
 
 **"What does it cost to run?"**
 Nothing on this inbox. The model, where it is needed, is thirteen hundredths
@@ -238,7 +240,7 @@ changes only what survives a restart.
 - **"Our pipeline is 89% AI."** It is not; the model does no work on the
   graded inbox. The 168 → 2 is what happens on wording we invented.
 - **"574 tests"**, **"596 tests"**, **"one test pinned to fail"**, **"45
-  mismatches, 21 refused"** — all stale. It is **732 tests, 0 failing** and
+  mismatches, 21 refused"** — all stale. It is **733 tests, 0 failing** and
   **46 / 20**.
 - **"Thirteen seconds"** is a warm container. A cold one takes 40. Wake it.
 - **"Eleven hours of desk work"** only with *"at a conservative estimate"*

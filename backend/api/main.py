@@ -225,8 +225,8 @@ def _scan_state(c) -> tuple[bool, bool]:
     """(any document is an image-only scan, a vision model read one out).
 
     Read-only, like `_shipper_name`. `review_reason == "unreadable"` cannot
-    tell a scan from a corrupt file, and the home page's "Scans read out"
-    tile (web/lib/showcases.ts) opened a corrupt BL because of it -- there is
+    tell a scan from a corrupt file, and the home page's "Scans transcribed for the
+    reviewer" tile (web/lib/showcases.ts) opened a corrupt BL because of it -- there is
     nothing to read out of one. A scan is not always read out either: the
     startup warm run makes no model call by design, so its scans escalate
     with no transcript, and the tile has to know that too.
@@ -550,7 +550,7 @@ def retry_one_case(case_id: str) -> dict:
     if store.recheck_count(run_id, email_id):
         raise HTTPException(
             status_code=409,
-            detail="this case has been re-checked on re-sent documents; a retry would "
+            detail="this case has been re-checked on amended documents; reprocessing would "
                    "re-read the run's original files over them. Re-check it again instead.",
         )
 
@@ -608,7 +608,7 @@ async def recheck_one_case(
                    f"pair to compare; there is nothing to re-check.",
         )
     if si is None and bl is None:
-        raise HTTPException(status_code=422, detail="attach the re-sent SI, the re-sent BL, or both")
+        raise HTTPException(status_code=422, detail="attach the amended SI, the amended BL, or both")
     run = store.get_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail=f"no run '{run_id}'")
@@ -622,11 +622,11 @@ async def recheck_one_case(
         # through as NEEDS_REVIEW because it stores nothing, but here it
         # would push a real answer into history under a blank one.
         if not data:
-            raise HTTPException(status_code=422, detail=f"the re-sent {side.upper()} is empty (0 bytes)")
+            raise HTTPException(status_code=422, detail=f"the amended {side.upper()} is empty (0 bytes)")
         if len(data) > MAX_BYTES:
             raise HTTPException(
                 status_code=413,
-                detail=f"the re-sent {side.upper()} is {len(data)} bytes, above the {MAX_BYTES} limit",
+                detail=f"the amended {side.upper()} is {len(data)} bytes, above the {MAX_BYTES} limit",
             )
         uploaded[side] = (_safe_filename(upload.filename, side), data)
 

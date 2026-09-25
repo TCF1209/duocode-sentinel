@@ -81,7 +81,7 @@ export function PatternsPageView({ runId }: { runId: string }) {
         <Link href={`/runs/${runId}/metrics`}>
           <Button variant="outline" size="sm">
             <BarChart3 className="size-4" />
-            Run metrics
+            View metrics
           </Button>
         </Link>
       </motion.div>
@@ -89,18 +89,18 @@ export function PatternsPageView({ runId }: { runId: string }) {
       <motion.div className="grid gap-3 sm:grid-cols-4" variants={stagger(0, 0.05)}>
         <Stat label="emails" value={totals.emails} />
         <Stat label="comparison requests" value={totals.comparisons} />
-        <Stat label="with a defect" value={totals.with_defect} tone="danger" />
-        <Stat label="sent to a human" value={totals.escalated} tone="warn" />
+        <Stat label="with a discrepancy" value={totals.with_defect} tone="danger" />
+        <Stat label="escalated" value={totals.escalated} tone="warn" />
       </motion.div>
 
       {/* ---------------------------------------------------------------- */}
       <motion.section variants={fadeUp} className="flex flex-col gap-3 rounded-xl border bg-card p-5">
         <header className="flex items-center gap-2">
           <Layers className="size-4 text-primary" strokeWidth={1.75} />
-          <h2 className="font-heading font-semibold">Which fields go wrong</h2>
+          <h2 className="font-heading font-semibold">Discrepancies by field</h2>
         </header>
         <p className="text-sm text-muted-foreground">
-          {data.defect_fields_total} defective fields across {totals.with_defect} emails. This is
+          {data.defect_fields_total} discrepant fields across {totals.with_defect} emails. This is
           the actionable one: the top three are what a carrier should be asked to check before
           sending a draft.
         </p>
@@ -135,7 +135,7 @@ export function PatternsPageView({ runId }: { runId: string }) {
           <span className="font-mono font-medium text-foreground">
             {pct(data.baseline_defect_rate)}
           </span>{" "}
-          of comparison requests carrying a defect. A sender is only called{" "}
+          of comparison requests carrying a discrepancy. A sender is only called{" "}
           <em>above baseline</em> when the 95% interval for its own rate clears that number —
           otherwise the figures are here and the claim is not made.
         </p>
@@ -146,10 +146,10 @@ export function PatternsPageView({ runId }: { runId: string }) {
               <tr className="border-b text-left text-xs tracking-wide text-muted-foreground uppercase">
                 <th className="py-2 pr-3 font-medium">Sender</th>
                 <th className="py-2 pr-3 text-right font-medium">Compared</th>
-                <th className="py-2 pr-3 text-right font-medium">Defects</th>
+                <th className="py-2 pr-3 text-right font-medium">Discrepancies</th>
                 <th className="py-2 pr-3 text-right font-medium">Rate</th>
                 <th className="py-2 pr-3 font-medium">95% interval</th>
-                <th className="py-2 font-medium">Most often wrong</th>
+                <th className="py-2 font-medium">Most frequent discrepancy</th>
               </tr>
             </thead>
             <tbody>
@@ -212,7 +212,7 @@ export function PatternsPageView({ runId }: { runId: string }) {
         >
           <header className="flex items-center gap-2">
             <AlertTriangle className="size-4 text-warn" strokeWidth={1.75} />
-            <h2 className="font-heading font-semibold">Why cases reached a human</h2>
+            <h2 className="font-heading font-semibold">Escalations by reason</h2>
           </header>
           <div className="flex flex-wrap gap-2">
             {data.escalation_reasons.map((r) => (

@@ -59,8 +59,8 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
   // person would fill in, instead of the report.
   const [mode] = useViewMode();
   const before = mode === "before";
-  // For "this shipper has already had N mismatches on this field in this
-  // run" on a mismatched field's card -- a case detail page otherwise has
+  // For "same shipper, same field: N other cases in this run" on a
+  // discrepant field's card -- a case detail page otherwise has
   // no reason to know about any case but its own. Fetched alongside the
   // case itself, so the badge is there when the card is, not popping in
   // late. Best-effort: a failure here should not block the case report
@@ -111,8 +111,8 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
 
   // -- the in-place review ------------------------------------------------
   //
-  // Every finding on the case (agree, no mismatch, mismatch on these fields,
-  // can't tell), every choice on a field card, every corrected value and
+  // Every finding on the case (confirm, mark no discrepancy, flag fields,
+  // escalate), every choice on a field card, every corrected value and
   // the note is saved the moment it is made: there is no draft waiting for
   // a Save button, so there is nothing to lose by leaving the page.
   // `pending` is the change on its way to the server, shown as if saved so
@@ -175,7 +175,7 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
             // Sentinel's answer -- the list would go on tagging it.
             if (!isEmptyDraft(draft)) {
               persist(() => withdrawReview(runId, emailId), what, EMPTY_DRAFT, () =>
-                toast.success("Review withdrawn — Sentinel's answer stands"),
+                toast.success("Review withdrawn — Sentinel result restored"),
               );
               return;
             }
@@ -190,7 +190,7 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
         withdraw: () => {
           if (!report.review) return;
           persist(() => withdrawReview(runId, emailId), "case", EMPTY_DRAFT, () =>
-            toast.success("Review withdrawn — Sentinel's answer stands"),
+            toast.success("Review withdrawn — Sentinel result restored"),
           );
         },
       }
@@ -232,7 +232,7 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
   // workspace, next to "what to do" (case-report-view.tsx), so the header
   // only keeps it for the other case where re-reading can change the
   // answer: a run-level error on a case that was not escalated. Never once
-  // the case has been re-checked on re-sent documents: a retry would read
+  // the case has been re-checked on amended documents: a retry would read
   // the disk originals back over them, and the backend refuses it (409).
   const couldChange =
     report.status !== "NEEDS_REVIEW" && report.errors.length > 0 && !report.recheck;
@@ -244,8 +244,8 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
       setReport(fresh);
       toast.success(
         fresh.status === report?.status
-          ? `Re-processed — still ${STATUS_LABELS[fresh.status]}`
-          : `Re-processed — now ${STATUS_LABELS[fresh.status]}`,
+          ? `Reprocessed — still ${STATUS_LABELS[fresh.status]}`
+          : `Reprocessed — now ${STATUS_LABELS[fresh.status]}`,
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
@@ -265,8 +265,8 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
       setReport(fresh);
       toast.success(
         was
-          ? `Re-checked — was ${describeOutcome(was.status, was.defect_fields)}, now ${describeOutcome(fresh.status, fresh.defect_fields)}`
-          : `Re-checked — now ${describeOutcome(fresh.status, fresh.defect_fields)}`,
+          ? `Re-checked — previous result: ${describeOutcome(was.status, was.defect_fields)}; current result: ${describeOutcome(fresh.status, fresh.defect_fields)}`
+          : `Re-checked — current result: ${describeOutcome(fresh.status, fresh.defect_fields)}`,
       );
       // The list's prior-defect counts for this shipper may have moved with
       // this case; best-effort, same as on first load.
@@ -292,7 +292,7 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
             title="Read the attachments again and re-decide this one case"
           >
             <RotateCw className={retrying ? "animate-spin" : undefined} />
-            {retrying ? "Re-processing…" : "Retry this case"}
+            {retrying ? "Reprocessing…" : "Reprocess case"}
           </Button>
         )}
       </div>
@@ -306,7 +306,7 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
           ) : (
             <CaseReportView
               // Remounts after a re-check, so nothing shown about the old
-              // answer (the "Sentinel's original" toggle, say) outlives it.
+              // answer (the "Sentinel result" view toggle, say) outlives it.
               key={report.recheck?.count ?? 0}
               report={report}
               caseId={`${runId}:${emailId}`}

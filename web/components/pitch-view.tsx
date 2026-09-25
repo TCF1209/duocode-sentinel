@@ -383,11 +383,11 @@ const PROBLEMS = [
   {
     icon: Clock,
     title: "Finding the right emails takes time",
-    body: "Every message has to be read and routed by hand. A document request that is overlooked never reaches the checking step at all.",
+    body: "Every message has to be read and routed manually. A document request that is overlooked never reaches the checking step at all.",
   },
   {
     icon: Repeat,
-    title: "Comparing by hand is repetitive and easy to get wrong",
+    title: "Manual comparison is repetitive and easy to get wrong",
     body: "Names, ports, quantities and weight, across two documents. A missed discrepancy means corrections, delays and rework.",
   },
   {
@@ -407,7 +407,7 @@ function Problem() {
     >
       <motion.div variants={fadeUp} className="text-center">
         <h2 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-          A shipping desk checks every bill of lading by hand
+          A shipping desk checks every bill of lading manually
         </h2>
         <p className="mx-auto mt-2 max-w-3xl text-muted-foreground">
           Five kinds of mail arrive in one inbox. For a document check, someone opens the
@@ -441,7 +441,7 @@ function Problem() {
         </span>
         <p className="text-base">
           <span className="font-medium">And when it cannot be done.</span> An unreadable scan, a
-          blank field, the wrong document attached — the case has to reach a person{" "}
+          blank field, the wrong document attached — the case has to be escalated{" "}
           <span className="font-medium">with the reason and the evidence</span>, rather than be
           guessed at or fail quietly.
         </p>
@@ -487,7 +487,7 @@ const INFRA = [
   "FastAPI · 13 routes",
   "Docker on Render",
   "Next.js 16 on Vercel",
-  "732 tests · 0 failing",
+  "733 tests · 0 failing",
 ];
 
 function TechStack() {
@@ -556,7 +556,7 @@ function TechStack() {
           <span className="font-medium">The evidence gate sits after the comparison and can
           overrule it.</span>{" "}
           A value we cannot find again in the document it was read from is not reported as a
-          discrepancy — the case goes to a person with both readings attached.
+          discrepancy — the case is escalated with both readings attached.
         </p>
       </motion.div>
 
@@ -631,7 +631,7 @@ function Proof() {
             <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
             <span className="font-heading text-3xl font-semibold text-ai tabular-nums">2</span>
           </div>
-          <p className="text-center text-xs text-muted-foreground">forced to a human, rules alone vs. rules + model</p>
+          <p className="text-center text-xs text-muted-foreground">escalated, rules alone vs. rules + model</p>
           <p className="mt-auto border-t pt-2 text-center text-xs">
             False discrepancies, silent wrong values, masked discrepancies —{" "}
             <span className="font-medium">all zero, both ways.</span> Recall bought by guessing would
@@ -651,8 +651,8 @@ function Proof() {
             A party name that wraps onto a second line can be cut short to <em>exactly</em> what
             the other document says — <em>APRIL FINE PAPER TRADING</em> against{" "}
             <em>APRIL FINE PAPER TRADING (MIDDLE EAST) FZE</em>, two different companies — and
-            the repair that rejoins wrapped names has nothing left to repair. A real mismatch is
-            reported as a match: one masked discrepancy in 3,008 perturbed documents.
+            the repair that rejoins wrapped names has nothing left to repair. A real discrepancy is
+            reported as consistent: one masked discrepancy in 3,008 perturbed documents.
           </p>
           <p className="mt-auto border-t border-warn/30 pt-2 text-xs text-muted-foreground">
             A defect we hide is worse than one we miss. The obvious guard would flag 114 of 124
@@ -678,7 +678,7 @@ function Proof() {
 // --------------------------------------------------------------------------
 const NUMBERS = [
   { value: "520", label: "emails, end to end" },
-  { value: "225", label: "planted defects caught" },
+  { value: "225", label: "planted discrepancies caught" },
   { value: "80 / 80", label: "escalations correct" },
   { value: "$0", label: "to run the graded inbox" },
 ];

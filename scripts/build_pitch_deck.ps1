@@ -133,7 +133,7 @@ for ($i = 0; $i -lt 4; $i++) {
   Add-Body $s $caps[$i][1] ($x + 14) ($y + 54) ($bw - 28) 90 12 $C.ink | Out-Null
   $x += $bw + $gapx
 }
-Add-Text $s "Why we built it: today a documentation clerk does this by hand - about 4 minutes per SI/BL pair and 20 seconds to triage each email (a conservative estimate, not a measurement) - and a missed field becomes a correction, a delay, rework." $M 266 ($W - 2 * $M) 34 11.5 $C.ink 0 $BODY 1 1 | Out-Null
+Add-Text $s "Why we built it: today a documentation clerk does this manually - about 4 minutes per SI/BL pair and 20 seconds to triage each email (a conservative estimate, not a measurement) - and a missed field becomes a correction, a delay, rework." $M 266 ($W - 2 * $M) 34 11.5 $C.ink 0 $BODY 1 1 | Out-Null
 $pains = @(
   @("Finding the right emails takes time", "A document request that is overlooked never reaches the checking step."),
   @("Manual comparison is easy to get wrong", "Names, ports, quantities and weight across two documents; a missed discrepancy is a correction, a delay, rework."),
@@ -146,24 +146,24 @@ for ($i = 0; $i -lt 3; $i++) {
   $x += $cw + 16
 }
 Add-Rect $s $M 436 ($W - 2 * $M) 44 $C.warn 0.15 $null | Out-Null
-Add-Text $s "The fourth case: sometimes the check cannot be done at all - an unreadable scan, a blank field, the wrong document. That has to reach a person with the reason attached, not be guessed at. Sentinel does all four." ($M + 16) 443 ($W - 2 * $M - 32) 32 12 $C.ink 0 $BODY 1 3 | Out-Null
+Add-Text $s "The fourth case: sometimes the check cannot be done at all - an unreadable scan, a blank field, the wrong document. That has to be escalated to a reviewer with the reason attached, not guessed at. Sentinel does all four." ($M + 16) 443 ($W - 2 * $M - 32) 32 12 $C.ink 0 $BODY 1 3 | Out-Null
 Add-Tag $s "Criterion 5 · Solution effectiveness & user value" $false | Out-Null
-Set-Notes $s "Why we built it: a shipping desk gets five kinds of mail in one inbox, and for every document check a person compares the Shipping Instruction against the draft Bill of Lading - seven fields, by hand. At a conservative estimate that is about four minutes a pair and twenty seconds to triage each email; this inbox alone is a day and a half of desk work. Miss one field and it's a correction, a delay, rework. And there's a fourth case the statement names: sometimes the check can't be done - an unreadable scan, a blank field, the wrong document. That has to reach a person with the reason, not be guessed at. Sentinel does all four. (0:15-0:40)"
+Set-Notes $s "Why we built it: a shipping desk gets five kinds of mail in one inbox, and for every document check a person compares the Shipping Instruction against the draft Bill of Lading - seven fields, manually. At a conservative estimate that is about four minutes a pair and twenty seconds to triage each email; this inbox alone is a day and a half of desk work. Miss one field and it's a correction, a delay, rework. And there's a fourth case the statement names: sometimes the check can't be done - an unreadable scan, a blank field, the wrong document. That has to be escalated to a reviewer with the reason, not guessed at. Sentinel does all four. (0:15-0:40)"
 
 # ------------------------------------------------------ 3 · what it does
 $s = New-Slide $pres $C.white
 Add-Title $s "What it does, end to end" $false | Out-Null
 Add-Pic $s "$SHOTS\run_page.png" $M 100 540 | Out-Null
-$stats = @(@("520", "emails, classified and routed"), @("46", "mismatches, with the fields that differ"), @("20", "sent to a person - with the reason and what to do"), @("12.7 s", "for the whole inbox, on a free-tier container"))
+$stats = @(@("520", "emails, classified and routed"), @("46", "discrepancies, with the fields that differ"), @("20", "escalated - with the reason and what to do"), @("12.7 s", "for the whole inbox, on a free-tier container"))
 $x = 620; $y = 100
 foreach ($st in $stats) {
   Add-Text $s $st[0] $x $y 300 46 40 $C.amber $MSO_TRUE $HEAD 1 1 | Out-Null
   Add-Body $s $st[1] $x ($y + 46) 292 30 12 $C.ink | Out-Null
   $y += 92
 }
-Add-Text $s "How a desk uses it:   1  Run the inbox   ·   2  Open a flagged case   ·   3  Agree with it, correct a single field, or re-upload the corrected document   ·   4  Send the drafted reply" $M 450 ($W - 2 * $M) 30 11.5 $C.ink 0 $BODY 1 1 | Out-Null
+Add-Text $s "How a desk uses it:   1  Run the inbox   ·   2  Open a flagged case   ·   3  Confirm or override it - correct a single value or attach the amended SI/BL   ·   4  Send the drafted reply" $M 450 ($W - 2 * $M) 30 11.5 $C.ink 0 $BODY 1 1 | Out-Null
 Add-Tag $s "Criterion 1 · End-to-end functionality" $false | Out-Null
-Set-Notes $s "This is the whole inbox, live on Render and Vercel - not a sample, the organisers' 520 emails. Every email classified, every document pair compared, every case Sentinel can't decide sent to a person with the reason attached. Thirteen seconds. And this is how a desk uses it, four steps: run the inbox, open a flagged case, confirm it or correct one field or re-upload the corrected document, send the drafted reply. Do not say the accuracy here - that is slide 6. (0:40-1:05)"
+Set-Notes $s "This is the whole inbox, live on Render and Vercel - not a sample, the organisers' 520 emails. Every email classified, every document pair compared, every case Sentinel can't decide escalated with the reason attached. Thirteen seconds. And this is how a desk uses it, four steps: run the inbox, open a flagged case, confirm or override it - correct a single value or attach the amended SI/BL - then send the drafted reply. Do not say the accuracy here - that is slide 6. (0:40-1:05)"
 
 # ------------------------------------------------------ 4 · how it decides
 $s = New-Slide $pres $C.white
@@ -183,7 +183,7 @@ $gx = $M + 8 + 4 * ($sw + $sg); $cx = $M + 8 + 3 * ($sw + $sg)
 $veto = $s.Shapes.AddLine(($gx + $sw / 2), $y - 6, ($cx + $sw / 2), $y - 6)
 $veto.Line.ForeColor.RGB = $C.amberdk; $veto.Line.Weight = 1.5; $veto.Line.EndArrowheadStyle = 2; $veto.Line.DashStyle = 4
 Add-Text $s "can veto the comparison" ($cx + 10) ($y - 30) 260 18 10 $C.amberdk 0 $BODY 2 1 | Out-Null
-Add-Text $s "Six stages, one direction. The gate runs after the comparison: a value we cannot find again in the document it was read from is never reported as a discrepancy - it becomes a question for a person, with both readings attached." $M 190 ($W - 2 * $M) 36 12 $C.ink 0 $BODY 1 1 | Out-Null
+Add-Text $s "Six stages, one direction. The gate runs after the comparison: a value we cannot find again in the document it was read from is never reported as a discrepancy - it is escalated to a reviewer, with both readings attached." $M 190 ($W - 2 * $M) 36 12 $C.ink 0 $BODY 1 1 | Out-Null
 $dec = @(
   @("Labels by meaning, values exactly", "Never a similarity score. A threshold loose enough to forgive a scan artefact also merges two real companies - and this data has them."),
   @("Rules first, model second", "Every stage tries a deterministic answer before a model, and records which one answered (decided_by). The model is asked only where the rules admit they cannot read."),
@@ -198,15 +198,15 @@ for ($i = 0; $i -lt 3; $i++) {
 }
 Add-Text $s "Scaling, as built: state sits behind one class in one file (store.py) - Postgres is a one-file change · one worker on purpose · throughput is more copies of a stateless library · cost does not scale with volume on this inbox · per-desk rules slot into the existing stage boundaries." $M 418 ($W - 2 * $M) 40 11 $C.muted 0 $BODY 1 1 | Out-Null
 Add-Tag $s "Criterion 2 · Architecture & scalability" $false | Out-Null
-Set-Notes $s "Six stages, one direction. Two choices carry the design. Values are compared exactly after canonicalising, never by similarity - a threshold loose enough to forgive a scan artefact also merges two real companies, and the data has those. And the gate after the comparison can overrule it: a value we cannot find again in the document it was read from is never reported as a discrepancy - it becomes a question for a person. The pipeline is a stateless library with no web or database in it, which is also the scaling story: throughput is more copies of it; the state sits behind one class in one file. (1:05-1:40)"
+Set-Notes $s "Six stages, one direction. Two choices carry the design. Values are compared exactly after canonicalising, never by similarity - a threshold loose enough to forgive a scan artefact also merges two real companies, and the data has those. And the gate after the comparison can overrule it: a value we cannot find again in the document it was read from is never reported as a discrepancy - it is escalated to a reviewer. The pipeline is a stateless library with no web or database in it, which is also the scaling story: throughput is more copies of it; the state sits behind one class in one file. (1:05-1:40)"
 
 # ------------------------------------------------------ 5 · where the AI is
 $s = New-Slide $pres $C.white
 Add-Title $s "Where the AI is - and why it is aimed" $false | Out-Null
 $rows = @(
   @("C", "Classify", "an email the rules cannot separate", "asked only when the rule score is ambiguous; a closed five-way answer, never free text"),
-  @("R", "Read", "a field label the table has never seen", "asked only about fields no rule resolved; every value must be found again in the document before it is adopted"),
-  @("S", "See", "a scanned page with no text layer", "transcribed for the reviewer, never fed into a comparison - the case stays in review")
+  @("R", "Read", "a field label the table has never seen", "asked only about fields no rule resolved; every value must be found again in the document before it is accepted"),
+  @("S", "See", "a scanned page with no text layer", "transcribed for the reviewer, never fed into a comparison - the case stays escalated")
 )
 $y = 104
 foreach ($r in $rows) {
@@ -215,26 +215,26 @@ foreach ($r in $rows) {
   Add-Body $s $r[3] ($M + 48) ($y + 22) 470 44 11.5 $C.muted | Out-Null
   $y += 82
 }
-Add-Text $s "gpt-5-mini, structured output. One rule for all three: nothing the model returns is adopted until it is found again in the document." $M 352 520 40 12 $C.ink 0 $BODY 1 1 | Out-Null
+Add-Text $s "gpt-5-mini, structured output. One rule for all three: nothing the model returns is accepted until it is found again in the document." $M 352 520 40 12 $C.ink 0 $BODY 1 1 | Out-Null
 Add-Rect $s 600 104 312 226 $C.panel 0.08 $null | Out-Null
 Add-Text $s "168" 612 122 130 70 56 $C.muted $MSO_TRUE $HEAD 3 1 | Out-Null
 Add-Text $s "→" 748 130 30 50 30 $C.muted 0 $BODY 2 1 | Out-Null
 Add-Text $s "2" 786 122 110 70 56 $C.amber $MSO_TRUE $HEAD 1 1 | Out-Null
-Add-Body $s "cases forced to a human on wording we invented - rules alone vs rules + model, 188 documents" 616 200 280 40 11.5 $C.ink | Out-Null
+Add-Body $s "cases escalated on wording we invented - rules alone vs rules + model, 188 documents" 616 200 280 40 11.5 $C.ink | Out-Null
 Add-Bold $s "False discrepancies: 0 both ways. Recall bought by guessing would have shown up there; it didn't." 616 250 280 60 11.5 $C.slate | Out-Null
 Add-Rect $s $M 404 ($W - 2 * $M) 54 $C.warn 0.15 $null | Out-Null
-Add-Text $s "`$0.0013 per document at the published rates · cached · `$2 ceiling per run.   On this inbox: 0 classifier calls, 0 extractor calls, 6 scans read out for the reviewer - every decision is a rule's, and that is measured, not assumed." ($M + 16) 410 ($W - 2 * $M - 32) 42 11.5 $C.ink 0 $BODY 1 3 | Out-Null
+Add-Text $s "`$0.0013 per document at the published rates · cached · `$2 ceiling per run.   On this inbox: 0 classifier calls, 0 extractor calls, 6 scans transcribed for the reviewer - every decision is a rule's, and that is measured, not assumed." ($M + 16) 410 ($W - 2 * $M - 32) 42 11.5 $C.ink 0 $BODY 1 3 | Out-Null
 Add-Tag $s "Criterion 3 · Technology integration" $false | Out-Null
-Set-Notes $s "Never say 'we use less AI'. Say: the AI is reserved for the cases the rules cannot handle - and the system performs just as well. A judge in the first round said we use AI less than most teams. True, and measured. On this inbox the rules answer all 520 and the scoring is all-or-nothing per email, so a model that is almost always right costs places. The model goes only where the rules admit they can't read: an ambiguous email, a label we've never seen, a scanned page. On documents with wording we invented, rules alone send 168 of 188 cases to a human; with the model, two - and false discrepancies stay at zero, because nothing the model says is adopted until we find it again in the source. You'll see both in the demo: a scan read out for the reviewer, and four unknown labels read on request. (1:40-2:20)"
+Set-Notes $s "Never say 'we use less AI'. Say: the AI is reserved for the cases the rules cannot handle - and the system performs just as well. A judge in the first round said we use AI less than most teams. True, and measured. On this inbox the rules answer all 520 and the scoring is all-or-nothing per email, so a model that is almost always right costs places. The model goes only where the rules admit they can't read: an ambiguous email, a label we've never seen, a scanned page. On documents with wording we invented, rules alone escalate 168 of 188 cases; with the model, two - and false discrepancies stay at zero, because nothing the model says is accepted until we find it again in the source. You'll see both in the demo: a scan transcribed for the reviewer, and four unknown labels read on request. (1:40-2:20)"
 
 # ------------------------------------------------------ 6 · how we know
 $s = New-Slide $pres $C.white
 Add-Title $s "How we know it holds" $false | Out-Null
 $cards = @(
-  @("Not memorised", "1.0000 on four datasets, three from seeds we never developed against - 225 planted defects caught with the exact field set, 80/80 escalations correct."),
+  @("Not memorised", "1.0000 on four datasets, three from seeds we never developed against - 225 planted discrepancies caught with the exact field set, 80/80 escalations correct."),
   @("Attacked ourselves", "16 kinds of damage, 3,008 perturbed documents, 20,496 field reads, no answer key. Thirteen modes at zero movement; silent wrong values 982 -> 0."),
   @("A real carrier's form", "CMA CGM's public SI template, from outside the generator: four fields held, one bug found and fixed the same day."),
-  @("Engineering", "732 tests, 0 failing; CI on every push; a container that runs as a non-root user with no secret baked in; every value carries its evidence.")
+  @("Engineering", "733 tests, 0 failing; CI on every push; a container that runs as a non-root user with no secret baked in; every value carries its evidence.")
 )
 $cw = 272; $ch = 150; $x = $M; $y = 100
 for ($i = 0; $i -lt 4; $i++) {
@@ -246,7 +246,7 @@ for ($i = 0; $i -lt 4; $i++) {
 $hx = $M + 2 * ($cw + 14) + 4; $hw = $W - $M - $hx
 Add-Rect $s $hx 100 $hw 314 $C.warn 0.08 $null | Out-Null
 Add-Bold $s "What we haven't fixed" ($hx + 14) 112 ($hw - 28) 24 15 $C.amberdk | Out-Null
-Add-Body $s "email_145: a wrapped party name cut short to exactly what the other document says leaves the repair nothing to repair, and one real mismatch in 3,008 perturbed documents is reported as a match.`r`rThe obvious guard would flag 114 of 124 SI/BL pairs (92%) - worse than the gap - so it stays open and written down (ADVERSARIAL.md 5.2)." ($hx + 14) 142 ($hw - 28) 200 11.5 $C.ink | Out-Null
+Add-Body $s "email_145: a wrapped party name cut short to exactly what the other document says leaves the repair nothing to repair, and one real discrepancy in 3,008 perturbed documents is reported as consistent.`r`rThe obvious guard would flag 114 of 124 SI/BL pairs (92%) - worse than the gap - so it stays open and written down (ADVERSARIAL.md 5.2)." ($hx + 14) 142 ($hw - 28) 200 11.5 $C.ink | Out-Null
 Add-Bold $s "A defect we hide is worse than one we miss." ($hx + 14) 352 ($hw - 28) 50 12 $C.amberdk | Out-Null
 Add-Text $s "A perfect score on the dataset you were handed proves you didn't memorise it. It doesn't prove the reader works - so we went looking for the failures ourselves." $M 432 ($W - 2 * $M) 30 11.5 $C.muted 0 $BODY 1 1 | Out-Null
 Add-Tag $s "Criterion 4 · Engineering quality & robustness" $false | Out-Null
@@ -259,8 +259,8 @@ Add-Text $s "90 seconds, on the deployed URLs" $M 84 500 24 14 $C.amber 0 $BODY 
 $steps = @(
   "Start a run with the model tier on - then Before / With Sentinel: the inbox as it arrived, and what it made of it",
   "Patterns worth a second look - one shipper, one field, seven times",
-  "A mismatch case - under every value, the line it was read from",
-  "A scanned case - the page read out for the reviewer; the case still in review, decided per field",
+  "A discrepancy case - under every value, the line it was read from",
+  "A scanned case - the page transcribed for the reviewer; the case still escalated, decided per field",
   "Compare, unfamiliar labels: model off, then on - 'model answered'"
 )
 $y = 124
@@ -271,17 +271,17 @@ for ($i = 0; $i -lt 5; $i++) {
 }
 Add-Pic $s "$SHOTS\scan_case.png" 520 110 392 | Out-Null
 Add-Text $s "Fallback if the venue network fails: the same inbox on the laptop, 1.5 s, no network - only the model beat changes." $M 448 460 40 11 $C.dtext 0 $BODY 1 1 | Out-Null
-Set-Notes $s "At the mismatch case: 'Under every value - the line it was read from. A reviewer never has to open the source document to trust this.' At the scan: 'No text layer, so Sentinel did not decide. But the model read the page for the reviewer - seven fields, and it says which ones it couldn't read rather than guessing. The case stays in review; the person decides, per field.' At Compare, off: 'wording our table has never seen - the honest answer is can't read it, and it says which labels.' On: 'the model reads them, every value re-located in the document before it's adopted, and it surfaces the real discrepancy - badge says model answered.' (2:55-4:25)"
+Set-Notes $s "At the discrepancy case: 'Under every value - the line it was read from. A reviewer never has to open the source document to trust this.' At the scan: 'No text layer, so Sentinel did not decide. But the model transcribed the page for the reviewer - seven fields, and it marks the illegible ones rather than guessing. The case stays escalated; the reviewer decides, per field.' At Compare, off: 'wording our table has never seen - the honest answer is that it cannot read them, so it is escalated, and it says which labels.' On: 'the model reads them, every value re-located in the document before it's accepted, and it surfaces the real discrepancy - badge says model answered.' (2:55-4:25)"
 
 # ------------------------------------------------------ 8 · reviewer UX
 $s = New-Slide $pres $C.white
 Add-Title $s "What makes it different" $false | Out-Null
 $feat = @(
-  @("Correct by re-upload", "The sender re-sends a fixed SI or BL? Attach it on the case and the same check runs again. The old answer stays on record."),
-  @("Scans read out for the reviewer", "An image-only PDF still goes to a person - but with the seven fields already read by the model, marked as evidence, not a verdict."),
-  @("Shipper history on the field", "Correcting a field shows how often this shipper was wrong on that same field before. A count, not a guess."),
+  @("Re-check on amendment", "The sender amends the SI or BL? Attach the amended document on the case and the same check runs again. The previous result stays on record."),
+  @("Scans transcribed for the reviewer", "An image-only PDF is still escalated - but with the seven fields already transcribed by the model, marked as evidence, not a verdict."),
+  @("Shipper history on the field", "Correcting a field shows how often this shipper had a discrepancy on that same field before. A count, not a guess."),
   @("The original, one click away", "Every value carries its line, and the source document opens beside it."),
-  @("A reply drafted from the corrected outcome", "Subject and body ready, built from what the reviewer decided - not the stale answer. A person still presses send.")
+  @("A reply drafted from the reviewer decision", "Subject and body ready, built from what the reviewer decided - not the Sentinel result it overrode. A person still presses send.")
 )
 $y = 96
 for ($i = 0; $i -lt 5; $i++) {
@@ -291,11 +291,11 @@ for ($i = 0; $i -lt 5; $i++) {
   $y += 68
 }
 Add-Pic $s "$SHOTS\scan_case_crop.png" 540 96 372 236 | Out-Null
-Add-Body $s "The scan read-out, as the reviewer sees it: seven fields, the model's confidence, and the sentence that none of it entered the comparison." 540 340 372 44 10.5 $C.muted | Out-Null
+Add-Body $s "The scan transcription, as the reviewer sees it: seven fields, the model's confidence, and the sentence that none of it entered the comparison." 540 340 372 44 10.5 $C.muted | Out-Null
 Add-Rect $s $M 440 ($W - 2 * $M) 40 $C.warn 0.15 $null | Out-Null
 Add-Text $s "Every flag carries the line it came from. Every escalation carries the reason and what to do about it. Most teams at this stage meet the brief; these are the things a reviewer actually uses." ($M + 16) 446 ($W - 2 * $M - 32) 28 11.5 $C.ink 0 $BODY 1 3 | Out-Null
 Add-Tag $s "Criterion 6 · User experience & differentiation" $false | Out-Null
-Set-Notes $s "At the top-ten stage everyone meets the brief, so this is the slide to slow down on - thirty seconds. Five things the others mostly don't have: the sender re-sends a fixed document and you re-upload it on the case, the check runs again and the old answer stays on record; a scan still goes to a person but already read out by the model; correcting a field shows this shipper's history on that field; the original document is one click away from every value; and the reply is drafted from what the reviewer decided, not the stale answer. (4:10-4:40)"
+Set-Notes $s "At the top-ten stage everyone meets the brief, so this is the slide to slow down on - thirty seconds. Five things the others mostly don't have: the sender amends a document and you attach the amended one on the case, the check runs again and the previous result stays on record; a scan is still escalated but already transcribed by the model; correcting a field shows this shipper's history on that field; the original document is one click away from every value; and the reply is drafted from what the reviewer decided, not the stale answer. (4:10-4:40)"
 
 # ------------------------------------------------------ 9 · impact & next
 $s = New-Slide $pres $C.white
@@ -313,7 +313,7 @@ $tbl.ApplyStyle("{5940675A-B579-460E-94D1-54222C63F5DA}", 0)
 $cells = @(
   @("Measure", "Today (graded inbox)", "The pilot watches"),
   @("Escalation rate", "20 of 220 requests (9.1%), all correct", "precision at 1.0 as unfamiliar templates grow"),
-  @("False alarms", "0 of 46 defects; 0 across 16 perturbation modes", "the weekly number"),
+  @("False discrepancies", "0 of 46 discrepancies; 0 across 16 perturbation modes", "the weekly number"),
   @("Reviewer minutes per escalation", "not measured yet", "the pilot's first new measurement")
 )
 for ($ri = 1; $ri -le 4; $ri++) { for ($ci = 1; $ci -le 3; $ci++) {

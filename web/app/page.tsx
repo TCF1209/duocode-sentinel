@@ -37,11 +37,11 @@ export default function HomePage() {
             Shipping document verification
           </p>
           <h1 className="font-heading text-3xl font-semibold tracking-tight text-balance">
-            Catch a mismatched shipment before the paperwork ships
+            Catch an SI/BL discrepancy before the paperwork ships
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Reads the inbox, checks each Shipping Instruction against its draft Bill of Lading on 7 fields, and sends
-            anything it can&apos;t confirm to a person — with the evidence.
+            Reads the inbox, checks each Shipping Instruction against its draft Bill of Lading on 7 fields, and
+            escalates anything it cannot verify to a reviewer — with the evidence.
           </p>
         </div>
 
@@ -60,12 +60,12 @@ export default function HomePage() {
             {
               icon: GitCompareArrows,
               step: "3. Compare",
-              text: "Which fields agree and which don't, side by side.",
+              text: "Consistent and discrepant fields, side by side.",
             },
             {
               icon: UserCheck,
               step: "4. Escalate",
-              text: "Missing, unreadable or unsure? A person gets it, with the reason.",
+              text: "Missing, unreadable or unverified? Escalated to a reviewer, with the reason.",
             },
           ]}
         />
@@ -108,7 +108,7 @@ export default function HomePage() {
 
 /**
  * The mentor's largest point (24 Sep): the features that set this apart --
- * correction by re-upload, scans read out, shipper history, the original a
+ * re-check on amendment, scans transcribed, shipper history, the original a
  * click away, a drafted reply, patterns -- all live deep inside a case page,
  * where a judge exploring alone never finds them. These tiles bring them to
  * the landing page, and each one links not just to a case but to the panel
@@ -130,16 +130,16 @@ const SHOWCASES: Showcase[] = [
   {
     key: "recheck",
     icon: RefreshCw,
-    title: "Correct by re-upload",
-    text: "Re-send the BL; the check runs again.",
+    title: "Re-check on amendment",
+    text: "Attach the amended BL; the check runs again.",
     pick: "recheck",
     spotlight: "recheck",
   },
   {
     key: "scan",
     icon: ScanLine,
-    title: "Scans read out for the reviewer",
-    text: "Image-only PDF, read out for the reviewer.",
+    title: "Scans transcribed for the reviewer",
+    text: "Image-only PDF, transcribed for the reviewer.",
     pick: "scan",
     spotlight: "documents",
   },
@@ -213,12 +213,12 @@ function SeeItLive() {
         // Said on the tile when it cannot go where its text promises.
         let note: string | null = null;
         if (s.pick === "scan" && !picks.scanReadOut) {
-          // No scan in this run was read out -- the API's own startup run
+          // No scan in this run was transcribed -- the API's own startup run
           // makes no model call, by design -- so a scan here would open on
           // "could not be read" and nothing more. The Compare page's scanned
           // pair, with the model on, shows what this tile promises, live.
           href = SAMPLE_SCAN_HREF;
-          cta = "Read a sample scan out";
+          cta = "Transcribe a sample scan";
           note = "This run ran without the model.";
         } else if (runId) {
           if (s.pick === "patterns") {
@@ -396,9 +396,9 @@ function LiveStats() {
     <div className="flex flex-col gap-3">
       <div className="grid gap-3 sm:grid-cols-3">
         <BigStat label="Emails processed" value={m.emails} accent="primary" href={runHref} />
-        <BigStat label="Mismatches caught" value={mismatches} accent="danger" href={`${runHref}?status=MISMATCH`} />
+        <BigStat label="Discrepancies found" value={mismatches} accent="danger" href={`${runHref}?status=MISMATCH`} />
         <BigStat
-          label="Escalated to a person"
+          label="Escalated"
           value={escalated}
           accent="warn"
           href={`${runHref}?status=NEEDS_REVIEW`}

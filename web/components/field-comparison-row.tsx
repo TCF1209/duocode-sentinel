@@ -10,7 +10,7 @@ export type DocSideKey = "si" | "bl";
 /**
  * One side of a field: the value Sentinel read, with the line it was read
  * from -- or, once a reviewer has corrected it, the value they typed with
- * Sentinel's reading kept underneath ("was …"). Decided directly: when the
+ * Sentinel's reading kept underneath ("extracted: …"). Decided directly: when the
  * shipper confirms what a document should say, the reviewer changes the
  * value right here and saves; the pair is compared again by the backend
  * with the same rules the run used, and the outcome follows.
@@ -27,14 +27,14 @@ function Side({
   /** The reviewer's value for this side, when they corrected it. */
   correction?: string;
   /** Save a corrected value, or `null` to go back to Sentinel's reading.
-   *  Absent where the value cannot be edited (Sentinel's original view,
+   *  Absent where the value cannot be edited (the Sentinel result view,
    *  /compare, a reviewed-as-a-whole case). */
   onCorrect?: (value: string | null) => void;
   busy?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const label = side.toUpperCase();
-  const sentinelText = value.present ? value.raw : value.blank ? "blank / placeholder value" : "not found";
+  const sentinelText = value.present ? value.raw : value.blank ? "blank" : "not extracted";
   const shown = correction ?? value.raw ?? "";
 
   function save(next: string) {
@@ -67,7 +67,7 @@ function Side({
             title={
               correction !== undefined
                 ? "Change the corrected value"
-                : `Edit the ${label} value — what the document should read`
+                : `Correct the extracted ${label} value`
             }
             className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
@@ -92,7 +92,7 @@ function Side({
             autoFocus
             defaultValue={shown}
             aria-label={`${label} value`}
-            placeholder={`What the ${label} should read`}
+            placeholder={`Value as printed on the ${label}`}
             onKeyDown={(e) => {
               if (e.key === "Escape") setEditing(false);
             }}
@@ -126,18 +126,19 @@ function Side({
           {correction !== undefined && (
             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
               <span>
-                was <span className="line-through decoration-muted-foreground/60">{sentinelText}</span> · changed by you
+                extracted: <span className="line-through decoration-muted-foreground/60">{sentinelText}</span> · corrected by
+                reviewer
               </span>
               {onCorrect && (
                 <button
                   type="button"
                   onClick={() => onCorrect(null)}
                   disabled={busy}
-                  title="Back to what Sentinel read"
+                  title="Revert to the extracted value"
                   className="inline-flex items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <Undo2 className="size-3" strokeWidth={2} />
-                  Undo
+                  Revert
                 </button>
               )}
             </div>
@@ -181,18 +182,27 @@ const ROW_STYLE: Record<Verdict, string> = {
   UNCOMPARABLE: "border-warn/30 bg-warn-bg/40 hover:bg-warn-bg/70",
 };
 
-// Most uncomparable reasons are a state ("BL missing") and read fine as a
-// label. This one is a claim about the two values, and "Ocr confusable" tells
-// a reviewer nothing about what to do -- they need to know that both readings
-// are there and that the difference is in glyphs a scanner mixes up.
+// Every reason compare.py emits has its own wording: "BL: not found" says
+// which side and what happened. ocr_confusable is a claim about the two
+// values, and "Ocr confusable" tells a reviewer nothing about what to do --
+// they need to know that both values are there and that the difference is
+// in glyphs a scanner mixes up.
 const REASON_TEXT: Record<string, string> = {
+  // "not extracted", the same words the value box and the review box use
+  // for a value Sentinel could not read.
+  si_missing: "SI: not extracted",
+  bl_missing: "BL: not extracted",
+  si_blank: "SI: blank",
+  bl_blank: "BL: blank",
+  si_unparseable: "SI: invalid format",
+  bl_unparseable: "BL: invalid format",
   ocr_confusable:
-    "Same length, differing only in characters OCR confuses (O/0, I/1, S/5, B/8) -- likely one value read two ways. Check both against the pages.",
+    "Possible OCR error: the values differ only in look-alike characters (O/0, I/1, S/5, B/8). Verify both against the documents.",
 };
 
-// "bl_missing" -> "BL missing", not "Bl missing" -- si/bl are the document
-// acronyms this whole app is built around, so a generic capitalize-first-
-// letter reads like a typo of them.
+// Any other code: "si_x_y" -> "SI x y", not "Si x y" -- si/bl are the
+// document acronyms this whole app is built around, so a generic
+// capitalize-first-letter reads like a typo of them.
 export function formatReason(reason: string) {
   const override = REASON_TEXT[reason];
   if (override) return override;
@@ -202,13 +212,13 @@ export function formatReason(reason: string) {
 }
 
 // For the badge's hover when a person overrode Sentinel on this field.
-const VERDICT_WORD: Record<Verdict, string> = { MATCH: "a match", MISMATCH: "a mismatch", UNCOMPARABLE: "uncomparable" };
+const VERDICT_WORD: Record<Verdict, string> = { MATCH: "Consistent", MISMATCH: "Discrepancy", UNCOMPARABLE: "Unverified" };
 
 /**
  * One field as a card: the name, one badge for what stands, both values
  * with the lines they were read from, and -- only where there is something
  * to correct -- Edit on a value. Decisions are not made here any more:
- * the review box above holds them (No mismatch, the field picker), and
+ * the review box above holds them (Mark no discrepancy, the field picker), and
  * the card only shows their effect. The user's reading of the old header
  * ("1 other case from this shipper · Flag as mismatch · Match · Mismatch"):
  * four things where one would do.
@@ -230,7 +240,7 @@ export function FieldComparisonRow({
    *  "same shipper, same field, again". */
   priorCount?: number;
   /** The reviewer's call on this field, made in the review box: saved, or
-   *  being saved. Absent under "Sentinel's original" and on /compare. */
+   *  being saved. Absent under "Sentinel result" and on /compare. */
   decision?: FieldDecision | null;
   /** The reviewer's corrected values on this field, per side. */
   corrections?: { si?: string; bl?: string };
@@ -271,7 +281,7 @@ export function FieldComparisonRow({
           {showHistory && (
             <span
               className="text-xs text-warn"
-              title="Other cases from this shipper in this run with a mismatch on this same field -- this is not a one-off"
+              title="Other cases from this shipper in this run with a discrepancy on this same field -- this is not a one-off"
             >
               same shipper, same field: {priorCount} other case{priorCount === 1 ? "" : "s"} in this run
             </span>
@@ -283,7 +293,13 @@ export function FieldComparisonRow({
           ) : justSaved ? (
             <span className="text-xs font-medium text-ok">Saved</span>
           ) : null}
-          <span title={overridden ? `Sentinel read this as ${VERDICT_WORD[comparison.verdict]}; what stands is your call` : undefined}>
+          <span
+            title={
+              overridden
+                ? `Sentinel result: ${VERDICT_WORD[comparison.verdict]}; the reviewer decision takes precedence`
+                : undefined
+            }
+          >
             <VerdictBadge verdict={standing} />
           </span>
         </div>
@@ -356,7 +372,7 @@ export function QuietFieldRow({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        title={open ? "Fold this field back to one line" : "Open this field: both readings, the lines they came from, and your choices"}
+        title={open ? "Fold this field back to one line" : "Open this field: both values and the lines they were read from"}
         className={cn(
           "flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2 text-left transition-colors",
           ROW_STYLE[comparison.verdict],

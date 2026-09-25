@@ -402,7 +402,7 @@ class TestRecheck:
         assert rows["email_001"]["recheck_count"] == 0
         assert client.get("/submission", params={"run_id": run_id}).json()["email_002"]["status"] == "OK"
         metrics = client.get("/metrics", params={"run_id": run_id}).json()
-        assert metrics["review"] == {"reviewed": 0, "confirmed": 0, "corrected": 0}
+        assert metrics["review"] == {"reviewed": 0, "confirmed": 0, "corrected": 0, "unresolved": 0}
         assert metrics["recheck"] == {"cases": 1, "rechecks": 1}
 
     def test_attachments_serve_the_resent_file_and_the_superseded_one(
@@ -691,7 +691,7 @@ class TestReviewInPlace:
         assert rows["email_002"]["status"] == "MISMATCH"
         assert rows["email_002"]["reviewed"] is False
         assert client.get("/metrics", params={"run_id": run_id}).json()["review"] == {
-            "reviewed": 0, "confirmed": 0, "corrected": 0,
+            "reviewed": 0, "confirmed": 0, "corrected": 0, "unresolved": 0,
         }
         submission = client.get("/submission", params={"run_id": run_id}).json()
         assert submission["email_002"]["status"] == "MISMATCH"
@@ -700,3 +700,32 @@ class TestReviewInPlace:
         assert client.delete(f"/cases/{case}/review").status_code == 404
         assert client.delete(f"/cases/{run_id}:email_999/review").status_code == 404
         assert client.delete("/cases/not-a-valid-id/review").status_code == 400
+
+    def test_review_counts_keep_unresolved_apart_from_overridden(
+        self, client: TestClient, synthetic_inbox: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The metrics page's "Reviewer decisions": a reviewer who could not
+        decide leaves the case escalated, which is not an override of the
+        Sentinel result and is not counted as one."""
+        run_id = _finished_run(client, synthetic_inbox, monkeypatch)
+
+        # Could not decide on email_002 (MISMATCH on consignee): no per-field
+        # choice, and the case stays NEEDS_REVIEW.
+        undecided = client.post(
+            f"/cases/{run_id}:email_002/review",
+            json={"decision": "correct", "decisions": {}, "corrections": {}, "cant_tell": True},
+        )
+        assert undecided.status_code == 200, undecided.text
+        assert undecided.json()["status"] == "NEEDS_REVIEW"
+
+        # Overrode email_001 (OK): a field Sentinel found consistent is flagged.
+        overridden = client.post(
+            f"/cases/{run_id}:email_001/review",
+            json={"decision": "correct", "decisions": {"consignee": "flagged"}},
+        )
+        assert overridden.status_code == 200, overridden.text
+        assert overridden.json()["status"] == "MISMATCH"
+
+        assert client.get("/metrics", params={"run_id": run_id}).json()["review"] == {
+            "reviewed": 2, "confirmed": 0, "corrected": 1, "unresolved": 1,
+        }

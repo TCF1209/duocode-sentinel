@@ -175,7 +175,7 @@ export default function RunsPage() {
             {health === null
               ? "Checking whether this server allows model runs…"
               : modelAllowed
-                ? "Also reads the six scanned PDFs for the reviewer. Every decision still comes from rules; the cost is capped."
+                ? "Also transcribes the six scanned PDFs for the reviewer. Every decision still comes from rules; the cost is capped."
                 : "Off on this server — every run is rules only, as the graded inbox was scored. The model tier is on Compare."}
           </span>
         </span>
@@ -337,7 +337,7 @@ function RunCard({ run }: { run: RunStatus }) {
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">
                 {run.processed} / {run.total_emails} emails
-                {run.llm_enabled ? " · model fallback on" : " · rules only"}
+                {run.llm_enabled ? " · model tier on" : " · rules only"}
                 {run.error && <span className="ml-2 text-danger">{run.error}</span>}
               </CardContent>
             </Card>

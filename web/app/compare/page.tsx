@@ -52,7 +52,7 @@ const SAMPLES = [
     title: "Labels we have never seen",
     tagline: "rules escalate; the model reads it",
     blurb:
-      "Labels our table has never seen — rules escalate, the model reads them, the real defect surfaces.",
+      "Labels our table has never seen — rules escalate, the model reads them, the real discrepancy surfaces.",
     si: "unfamiliar-labels_SI.txt",
     bl: "unfamiliar-labels_BL.txt",
     needsModel: true,
@@ -60,9 +60,9 @@ const SAMPLES = [
   {
     id: "scanned",
     title: "A scan with no text layer",
-    tagline: "the vision path reads it out",
+    tagline: "the vision path transcribes it",
     blurb:
-      "Image-only PDFs — the model transcribes both for the reviewer; the case still goes to a person.",
+      "Image-only PDFs — the model transcribes both for the reviewer; the case is still escalated.",
     si: "scanned_SI.pdf",
     bl: "scanned_BL.pdf",
     needsModel: true,
@@ -79,8 +79,8 @@ async function fetchSample(name: string): Promise<File> {
 
 /**
  * `?sample=<id>` arrives with that pair already loaded: the home page's
- * "Scans read out" tile sends a visitor here when no scan in the latest run
- * was read out. A pair that needs the model switches it on as well; pressing
+ * "Scans transcribed for the reviewer" tile sends a visitor here when no scan
+ * in the latest run was transcribed. A pair that needs the model switches it on as well; pressing
  * Compare stays the visitor's move, as it is for every sample. Its own
  * component inside <Suspense> so the rest of the page still prerenders
  * (next/dist/docs/01-app/03-api-reference/04-functions/use-search-params.md).
@@ -382,7 +382,7 @@ function NextStep({
   if (bothDone) {
     headline = "You have now seen this pair both ways.";
   } else if (sample.needsModel && !reportLlm) {
-    headline = "Rules alone sent this pair to a person. Now let the model try.";
+    headline = "Rules alone escalated this pair. Now let the model try.";
     action = { label: "Flip the switch and compare again", withLlm: true };
   } else if (sample.needsModel && reportLlm) {
     headline = "That was with the model. See what the rules alone make of it.";
@@ -391,7 +391,7 @@ function NextStep({
     headline = "The rules answered it; no model needed — like the whole graded inbox.";
     action = { label: "Run it with the model on anyway", withLlm: true };
   } else {
-    headline = "Same answer with the model on: nothing needed it.";
+    headline = "Same result with the model on: nothing needed it.";
     action = { label: "Compare with the model off", withLlm: false };
   }
   return (

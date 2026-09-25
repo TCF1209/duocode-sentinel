@@ -89,7 +89,7 @@ export function MetricsPageView({ runId }: { runId: string }) {
       <motion.div className="grid grid-cols-2 gap-3 sm:grid-cols-4" variants={stagger()}>
         <Stat label="Emails" value={metrics.emails} />
         <Stat label="Mean ms per email" value={metrics.mean_ms_per_email} decimals={2} />
-        <Stat label="Resolved by rules" value={metrics.rule_share * 100} format={(v) => `${Math.round(v)}%`} accent="ok" />
+        <Stat label="Decided by rules" value={metrics.rule_share * 100} format={(v) => `${Math.round(v)}%`} accent="ok" />
         <Stat label="Model calls" value={metrics.llm_calls} accent={metrics.llm_calls > 0 ? "ai" : undefined} />
       </motion.div>
       <motion.div className={cn("grid grid-cols-2 gap-3", metrics.llm?.available ? "sm:grid-cols-3" : "sm:grid-cols-2")} variants={stagger()}>
@@ -102,7 +102,7 @@ export function MetricsPageView({ runId }: { runId: string }) {
         {metrics.llm?.available && <Stat label="Model cost" value={costUsd} format={(v) => `$${v.toFixed(4)}`} />}
       </motion.div>
 
-      {/* Its own row, under its own heading, not three more tiles in the
+      {/* Its own row, under its own heading, not more tiles in the
           grid above: the grid is what Sentinel did, this is what people
           did to it afterwards, and /metrics reports them beside each other
           for exactly that reason (main.py's own comment on the route).
@@ -110,16 +110,17 @@ export function MetricsPageView({ runId }: { runId: string }) {
           shipped; nothing on this page showed them until now. */}
       {metrics.review && (
         <motion.div className="flex flex-col gap-2" variants={fadeUp}>
-          <div className="text-xs font-medium text-muted-foreground">Human review of this run</div>
+          <div className="text-xs font-medium text-muted-foreground">Reviewer decisions</div>
           <motion.div
-            className={cn("grid gap-3", metrics.recheck ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}
+            className={cn("grid grid-cols-2 gap-3", metrics.recheck ? "sm:grid-cols-5" : "sm:grid-cols-4")}
             variants={stagger()}
           >
             <Stat label="Reviewed" value={metrics.review.reviewed} />
-            <Stat label="Agreed" value={metrics.review.confirmed} accent="ok" />
-            <Stat label="Corrected" value={metrics.review.corrected} />
-            {/* Cases re-run on documents the sender re-sent -- the other
-                thing a person does to a run after it finished. */}
+            <Stat label="Confirmed" value={metrics.review.confirmed} accent="ok" />
+            <Stat label="Overridden" value={metrics.review.corrected} />
+            <Stat label="Unresolved" value={metrics.review.unresolved ?? 0} />
+            {/* Cases re-run on amended documents from the sender -- the
+                other thing a person does to a run after it finished. */}
             {metrics.recheck && <Stat label="Re-checked" value={metrics.recheck.cases} />}
           </motion.div>
         </motion.div>
@@ -205,7 +206,7 @@ export function MetricsPageView({ runId }: { runId: string }) {
           <motion.div className="sm:col-span-2" variants={fadeUp}>
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm font-medium">Escalated for review, by reason</CardTitle>
+                <CardTitle className="text-sm font-medium">Escalations by reason</CardTitle>
               </CardHeader>
               <CardContent className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
@@ -215,7 +216,7 @@ export function MetricsPageView({ runId }: { runId: string }) {
                     <YAxis
                       type="category"
                       dataKey="name"
-                      width={140}
+                      width={220}
                       tick={{ fontSize: 12 }}
                       tickFormatter={(key: string) => REVIEW_REASON_LABELS[key as ReviewReason] ?? key}
                     />
@@ -285,7 +286,7 @@ function ThroughputProjection({ metrics, costUsd }: { metrics: PipelineMetrics; 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <MiniStat label="Processing time" value={formatDuration(totalSeconds)} />
           <MiniStat
-            label={`At today's mix (${ruleSharePct}% by rule)`}
+            label={`At today's mix (${ruleSharePct}% by rules)`}
             value={`$${projectedAtTodaysMix.toFixed(projectedAtTodaysMix < 1 ? 4 : 2)}`}
           />
           <MiniStat label="Worst case — every email unfamiliar" value={`$${projectedWorstCase.toFixed(2)}`} accent="warn" />

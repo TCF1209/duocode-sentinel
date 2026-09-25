@@ -45,22 +45,24 @@ const STATUSES: CaseStatus[] = ["OK", "MISMATCH", "NEEDS_REVIEW"];
 // looked at together". Not a backend field -- derived from what the case
 // list already carries (reviewed, outcome_source, status), exactly as the
 // table's own tags are, so the filter can never disagree with the tag on
-// the row. The words are the review box's own (case page): a reviewer
-// *agrees* with Sentinel, *corrects* it, or *can't tell*. Only a document
-// check (BL_COMPARISON) is ever reviewed; the other categories have nothing
-// to compare, so they never carry a state here.
+// the row. The labels are the review record's own (case page): a reviewer
+// *confirms* the Sentinel result, *overrides* it, or leaves it
+// *unresolved*; the keys stay as they were, since they are the ?review=
+// values in saved links. Only a document check (BL_COMPARISON) is ever
+// reviewed; the other categories have nothing to compare, so they never
+// carry a state here.
 type ReviewFilter = "pending" | "agreed" | "corrected" | "cant_tell";
 const REVIEW_FILTERS: ReviewFilter[] = ["pending", "agreed", "corrected", "cant_tell"];
 const REVIEW_FILTER_LABELS: Record<ReviewFilter, string> = {
   pending: "Not reviewed",
-  agreed: "Agreed",
-  corrected: "Corrected",
-  cant_tell: "Can't tell",
+  agreed: "Confirmed",
+  corrected: "Overridden",
+  cant_tell: "Unresolved",
 };
 const REVIEW_TAG_TITLE: Record<Exclude<ReviewFilter, "pending">, string> = {
-  agreed: "A reviewer looked and agreed with Sentinel's answer",
-  corrected: "A reviewer changed Sentinel's answer; both are kept on the case",
-  cant_tell: "A reviewer looked and could not decide; the case stays in review",
+  agreed: "The reviewer confirmed the Sentinel result",
+  corrected: "The reviewer overrode the Sentinel result; both are kept on the case",
+  cant_tell: "The reviewer could not decide; the case stays escalated",
 };
 type ListOrder = "attention" | "inbox";
 const LIST_ORDERS: ListOrder[] = ["attention", "inbox"];
@@ -81,7 +83,7 @@ const STATUS_DOT: Record<CaseStatus, string> = { OK: "bg-ok", MISMATCH: "bg-dang
 const TH = "text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground";
 const reviewable = (c: CaseSummary) => c.category === "BL_COMPARISON";
 function reviewStateOf(c: CaseSummary): ReviewFilter {
-  // A reviewer only ever moves a case *to* Needs review by "can't tell".
+  // A reviewer only ever moves a case *to* Escalated by leaving it Unresolved.
   if (c.outcome_source === "review") return c.status === "NEEDS_REVIEW" ? "cant_tell" : "corrected";
   return c.reviewed ? "agreed" : "pending";
 }
@@ -126,7 +128,7 @@ export function RunPageView({ runId }: { runId: string }) {
   const searchParams = useSearchParams();
 
   // Filters live in the URL (?category=&status=), not just component state,
-  // so "Mismatches caught" on the home page can link straight to a
+  // so "Discrepancies found" on the home page can link straight to a
   // pre-filtered table instead of dumping the visitor on the unfiltered
   // list and making them find it themselves.
   const categoryParam = searchParams.get("category");
@@ -587,7 +589,7 @@ export function RunPageView({ runId }: { runId: string }) {
               find among them
             </span>
             <span>
-              <span className="font-medium tabular-nums">{workload.fields.toLocaleString()}</span> fields to check by eye
+              <span className="font-medium tabular-nums">{workload.fields.toLocaleString()}</span> fields to check manually
             </span>
             <span>
               ≈ <span className="font-medium tabular-nums">{formatHours(workload.hours)}</span> of work
@@ -631,13 +633,13 @@ export function RunPageView({ runId }: { runId: string }) {
                   select below does, so the number and the control can never
                   mean different things. */}
               <span
-                title={`${reviewCounts.agreed} agreed · ${reviewCounts.corrected} corrected · ${reviewCounts.cant_tell} can't tell · ${reviewCounts.pending} not reviewed yet — of the ${reviewCounts.checks} document checks; the other categories have nothing to review`}
+                title={`${reviewCounts.agreed} confirmed · ${reviewCounts.corrected} overridden · ${reviewCounts.cant_tell} unresolved · ${reviewCounts.pending} not reviewed — of the ${reviewCounts.checks} comparisons; other categories have no SI/BL pair to review`}
               >
                 Reviewed{" "}
                 <span className="font-medium tabular-nums text-foreground">
                   {reviewCounts.agreed + reviewCounts.corrected + reviewCounts.cant_tell}
                 </span>{" "}
-                / {reviewCounts.checks} checks
+                / {reviewCounts.checks} comparisons
               </span>
               {run?.metrics && (
                 <span>
@@ -653,9 +655,9 @@ export function RunPageView({ runId }: { runId: string }) {
               <select
                 value={reviewFilterOff ? "" : (reviewFilter ?? "")}
                 disabled={reviewFilterOff}
-                title={reviewFilterOff ? "Only document checks are reviewed; this category has nothing to compare" : undefined}
+                title={reviewFilterOff ? "Only comparison requests are reviewed; this category has no SI/BL pair" : undefined}
                 onChange={(e) => setFilters({ review: (e.target.value || null) as ReviewFilter | null })}
-                aria-label="Review state"
+                aria-label="Review status"
                 className="rounded-md border bg-background px-2 py-1 text-sm text-foreground disabled:opacity-50"
               >
                 <option value="">All</option>
@@ -740,7 +742,7 @@ export function RunPageView({ runId }: { runId: string }) {
                 )}
               </span>
               <Button size="sm" onClick={() => setMode("with")}>
-                See what Sentinel said
+                See Sentinel&apos;s classification
               </Button>
               <Button size="sm" variant="ghost" onClick={startOver} title="Clear your calls and the clock">
                 Start over
@@ -784,7 +786,7 @@ export function RunPageView({ runId }: { runId: string }) {
                   <span className="font-medium tabular-nums">{sentinelSeconds.toFixed(1)} s</span>.{" "}
                 </>
               )}
-              Agreed with you on{" "}
+              Same as your call on{" "}
               <span className="font-medium">
                 {agreed} of {firstFive.length}
               </span>
@@ -801,7 +803,7 @@ export function RunPageView({ runId }: { runId: string }) {
                   <span
                     key={c.email_id}
                     className={right ? "text-ok" : "text-danger"}
-                    title={`You said ${CATEGORY_LABELS[guesses[c.email_id]!]}; Sentinel said ${CATEGORY_LABELS[c.category]}`}
+                    title={`Your call: ${CATEGORY_LABELS[guesses[c.email_id]!]}; Sentinel classified it as ${CATEGORY_LABELS[c.category]}`}
                   >
                     {c.email_id} {right ? "✓" : "✗"}
                   </span>
@@ -851,8 +853,8 @@ export function RunPageView({ runId }: { runId: string }) {
                   <TableHead className={TH}>Email</TableHead>
                   <TableHead className={TH}>Category</TableHead>
                   <TableHead className={TH}>Confidence</TableHead>
-                  <TableHead className={TH}>Status</TableHead>
-                  <TableHead className={TH}>Mismatched fields</TableHead>
+                  <TableHead className={TH}>Outcome</TableHead>
+                  <TableHead className={TH}>Discrepant fields</TableHead>
                   <TableHead className={TH}>Decided by</TableHead>
                   <TableHead />
                 </>
@@ -936,7 +938,7 @@ export function RunPageView({ runId }: { runId: string }) {
                           )}
                           title="Your own call on this email, from Before Sentinel"
                         >
-                          you said {CATEGORY_LABELS[guesses[c.email_id]]} {guesses[c.email_id] === c.category ? "✓" : "✗"}
+                          your call: {CATEGORY_LABELS[guesses[c.email_id]]} {guesses[c.email_id] === c.category ? "✓" : "✗"}
                         </span>
                       )}
                     </TableCell>
@@ -963,7 +965,7 @@ export function RunPageView({ runId }: { runId: string }) {
                           className="ml-2 whitespace-nowrap text-xs text-muted-foreground"
                           title={
                             reviewStateOf(c) === "corrected"
-                              ? `Sentinel said ${STATUS_LABELS[c.system_status]}; ${REVIEW_TAG_TITLE.corrected}`
+                              ? `Sentinel result: ${STATUS_LABELS[c.system_status]}. ${REVIEW_TAG_TITLE.corrected}`
                               : REVIEW_TAG_TITLE[reviewStateOf(c) as Exclude<ReviewFilter, "pending">]
                           }
                         >
@@ -971,13 +973,13 @@ export function RunPageView({ runId }: { runId: string }) {
                         </span>
                       )}
                       {/* The other way a case moves on after the run: the
-                          sender re-sent a document and the check ran
+                          sender sent an amended document and the check ran
                           again. The answer this row shows was reached on
                           that, not on what arrived in the inbox. */}
                       {c.recheck_count > 0 && (
                         <span
                           className="ml-2 whitespace-nowrap text-xs text-muted-foreground"
-                          title="Re-checked on re-sent documents; the previous answer is kept on the case"
+                          title="Re-checked on amended documents; the previous result stays on the case"
                         >
                           Re-checked
                         </span>
@@ -1121,7 +1123,7 @@ function YourCall({ value, onChange }: { value?: Category; onChange: (cat: Categ
       aria-label="Your category for this email"
       className="rounded-md border bg-background px-2 py-1 text-xs text-foreground"
     >
-      <option value="">Pick one…</option>
+      <option value="">Select a category</option>
       {CATEGORIES.map((k) => (
         <option key={k} value={k}>
           {CATEGORY_LABELS[k]}
@@ -1171,7 +1173,7 @@ function CaseRowCard({
             <CategoryBadge category={c.category} />
             {guess && (
               <span className={cn("text-xs", guess === c.category ? "text-ok" : "text-danger")}>
-                you said {CATEGORY_LABELS[guess]} {guess === c.category ? "✓" : "✗"}
+                your call: {CATEGORY_LABELS[guess]} {guess === c.category ? "✓" : "✗"}
               </span>
             )}
             <span>{Math.round(c.category_confidence * 100)}%</span>
@@ -1180,7 +1182,7 @@ function CaseRowCard({
               <span
                 title={
                   reviewStateOf(c) === "corrected"
-                    ? `Sentinel said ${STATUS_LABELS[c.system_status]}; ${REVIEW_TAG_TITLE.corrected}`
+                    ? `Sentinel result: ${STATUS_LABELS[c.system_status]}. ${REVIEW_TAG_TITLE.corrected}`
                     : REVIEW_TAG_TITLE[reviewStateOf(c) as Exclude<ReviewFilter, "pending">]
                 }
               >
@@ -1188,7 +1190,7 @@ function CaseRowCard({
               </span>
             )}
             {c.recheck_count > 0 && (
-              <span title="Re-checked on re-sent documents; the previous answer is kept on the case">Re-checked</span>
+              <span title="Re-checked on amended documents; the previous result stays on the case">Re-checked</span>
             )}
           </div>
           {c.defect_fields.length > 0 && (

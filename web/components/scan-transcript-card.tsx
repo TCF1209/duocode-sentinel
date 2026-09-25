@@ -36,7 +36,7 @@ export function ScanTranscriptCard({ role, transcript }: { role: "SI" | "BL"; tr
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ai">
           <Sparkles className="size-3.5" strokeWidth={2} />
-          {role} scan, read by {transcript.model}
+          {role} scan — transcribed by {transcript.model}
         </div>
         <div className="text-xs text-muted-foreground tabular-nums">
           {transcript.legible_count}/{transcript.fields.length} fields legible · confidence{" "}
@@ -49,18 +49,18 @@ export function ScanTranscriptCard({ role, transcript }: { role: "SI" | "BL"; tr
           <div key={f.field} className="contents">
             <dt className="text-muted-foreground">{FIELD_LABELS[f.field] ?? f.field}</dt>
             <dd className={f.legible ? "font-medium" : "text-muted-foreground italic"}>
-              {f.legible ? f.value : "not legible — blank rather than guessed"}
+              {f.legible ? f.value : "illegible — left blank, not guessed"}
             </dd>
           </div>
         ))}
       </dl>
 
-      {/* The one sentence a reviewer must carry away: the model read the
-          page out loud so they do not start from zero, but the page still
-          has no text layer, so nothing here was compared to anything and the
-          case stays in review until a person confirms it against the image. */}
+      {/* The one sentence a reviewer must carry away: the model transcribed
+          the page so they do not start from zero, but the page still has no
+          text layer, so nothing here was compared to anything and the case
+          stays escalated until a reviewer verifies it against the image. */}
       <p className="border-t border-ai/30 pt-2 text-xs text-muted-foreground">
-        Read from the image, not compared — check each value against the scan.
+        Transcribed from the image, not compared. Verify each value against the scan.
       </p>
     </div>
   );

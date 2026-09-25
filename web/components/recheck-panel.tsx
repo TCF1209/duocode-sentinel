@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import type { CaseReport, CaseVersion, DocSide } from "@/lib/api";
 
 /**
- * Re-sent documents: the follow-up a MISMATCH or an unreadable attachment
+ * Amended documents: the follow-up a MISMATCH or an unreadable attachment
  * actually gets. Raised as "can I drop the latest SI and BL back in and have
  * the system detect it again?" -- yes: the panel below takes one side or
  * both, POST /cases/{id}/recheck runs the same comparison /compare runs, and
@@ -48,14 +48,14 @@ async function fetchSample(name: string): Promise<File> {
 }
 
 /** What the case is read from on this side right now, for the picker's
- *  "currently: …" line -- a re-sent copy says so, because the file name
+ *  "currently …" line -- an amended copy says so, because the file name
  *  alone ("email_013_BL_rev2.txt") does not tell a reader it never came
  *  through the inbox. */
 function currentFile(report: CaseReport, side: DocSide): string {
   const doc = report.documents[side];
   if (!doc) return "nothing on file";
   const resent = report.recheck?.sources[side] === "resent";
-  return `${basename(doc.path)}${resent ? " (re-sent)" : ""}`;
+  return `${basename(doc.path)}${resent ? " (amended)" : ""}`;
 }
 
 function FilePick({
@@ -92,7 +92,7 @@ function FilePick({
         />
         {file ? <FileCheck2 className="size-4 shrink-0 text-ok" /> : <Upload className="size-4 shrink-0 text-muted-foreground" />}
         <div className="min-w-0 flex-1">
-          <div className="truncate font-medium">{file ? file.name : `Attach the re-sent ${SIDE_SHORT[side]}`}</div>
+          <div className="truncate font-medium">{file ? file.name : `Attach the amended ${SIDE_SHORT[side]}`}</div>
           {/* The file name is the useful part and the box is narrow, so the
               side's long name goes in the title, not in front of it: seen
               live, "Shipping Instruction (SI) · currently ema…" truncated
@@ -120,8 +120,8 @@ function FilePick({
 }
 
 /**
- * The re-sent documents area itself. Whether it is on screen is the
- * caller's (case-report-view.tsx): it opens from the "Attach re-sent SI/BL"
+ * The amended documents area itself. Whether it is on screen is the
+ * caller's (case-report-view.tsx): it opens from the "Attach amended SI/BL"
  * button on the review box's row of actions, and starts open when the page
  * was opened at it (?spotlight=recheck, the home tile) or when the case has
  * nothing on file -- there the sample pair below is the only way to watch a
@@ -180,7 +180,7 @@ export function RecheckPanel({
   return (
     <div className={cn("rounded-md border bg-background p-3", className)}>
       <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Re-sent documents</div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amended documents</div>
         {onClose && (
           <button
             type="button"
@@ -194,7 +194,7 @@ export function RecheckPanel({
         )}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Attach the re-sent SI or BL; the same check runs again. The previous answer stays on the case.
+        Attach the amended SI or draft BL; the same check runs again. The previous result stays on the case.
       </p>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         {SIDES.map((side) => (
@@ -213,10 +213,10 @@ export function RecheckPanel({
           size="sm"
           disabled={chosen.length === 0 || rechecking}
           onClick={submit}
-          title={chosen.length === 0 ? "Attach the re-sent SI, the re-sent BL, or both" : undefined}
+          title={chosen.length === 0 ? "Attach the amended SI, the amended BL, or both" : undefined}
         >
           <RotateCw className={rechecking ? "animate-spin" : undefined} />
-          {rechecking ? "Re-checking…" : chosen.length > 0 ? `Re-check with the re-sent ${sidesPhrase(chosen)}` : "Re-check"}
+          {rechecking ? "Re-checking…" : chosen.length > 0 ? `Re-check with the amended ${sidesPhrase(chosen)}` : "Re-check"}
         </Button>
         {offerSample && (
           <Button
@@ -227,7 +227,7 @@ export function RecheckPanel({
             title="Sample paperwork, not this shipment's -- it shows the re-check working"
           >
             <Play />
-            {loadingSample ? "Loading…" : "No files? Load a sample pair"}
+            {loadingSample ? "Loading…" : "Load a sample pair"}
           </Button>
         )}
         {error && <span className="text-xs text-danger">{error}</span>}
@@ -236,15 +236,15 @@ export function RecheckPanel({
   );
 }
 
-/** "Mismatch on Port of Discharge — confirmed by a reviewer": what stood for a
+/** "Discrepancy: Port of Discharge — confirmed by reviewer": what stood for a
  *  superseded version, review included, the same way the live case is
- *  reported (store.py's effective outcome), so "was" and "now" compare like
- *  with like. */
+ *  reported (store.py's effective outcome), so "Previous result" and
+ *  "Current result" compare like with like. */
 function whatStood(v: CaseVersion): string {
   const outcome = describeOutcome(v.effective.status, v.effective.defect_fields);
   if (!v.review) return outcome;
-  if (v.review.decision === "confirm") return `${outcome} — confirmed by a reviewer`;
-  return `${outcome} — corrected by a reviewer from Sentinel's ${describeOutcome(v.report.status, v.report.defect_fields)}`;
+  if (v.review.decision === "confirm") return `${outcome} — confirmed by reviewer`;
+  return `${outcome} — overridden by reviewer; Sentinel result: ${describeOutcome(v.report.status, v.report.defect_fields)}`;
 }
 
 function VersionRow({ v, caseId }: { v: CaseVersion; caseId?: string }) {
@@ -258,7 +258,7 @@ function VersionRow({ v, caseId }: { v: CaseVersion; caseId?: string }) {
       {v.review?.note && <div className="text-muted-foreground">&ldquo;{v.review.note}&rdquo;</div>}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
         <span>
-          Replaced {timeAgo(v.replaced_at * 1000)} by a re-check with the re-sent {sidesPhrase(v.resubmitted)}
+          Superseded {timeAgo(v.replaced_at * 1000)} by a re-check on the amended {sidesPhrase(v.resubmitted)}
           {v.resubmitted.length > 0 && ` (${v.resubmitted.map((s) => v.uploaded[s] ?? "?").join(", ")})`}
         </span>
         {caseId &&
@@ -284,8 +284,9 @@ function VersionRow({ v, caseId }: { v: CaseVersion; caseId?: string }) {
 
 /** Leads the report once a case has been re-checked: what it was, what it
  *  is now, and each superseded version behind a disclosure -- with the
- *  file that version was actually read from, so "Sentinel said MISMATCH on
- *  the first BL" can be checked against that first BL, not the current one. */
+ *  file that version was actually read from, so a Sentinel result of
+ *  Discrepancy on the first BL can be checked against that first BL, not the
+ *  current one. */
 export function RecheckHistory({ report, caseId }: { report: CaseReport; caseId?: string }) {
   const info = report.recheck;
   const history = report.history ?? [];
@@ -297,14 +298,14 @@ export function RecheckHistory({ report, caseId }: { report: CaseReport; caseId?
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <History className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} />
         <span className="font-medium">
-          Re-checked {timeAgo(info.last_at * 1000)} with the re-sent {sidesPhrase(info.last_resubmitted)}
+          Re-checked {timeAgo(info.last_at * 1000)} on the amended {sidesPhrase(info.last_resubmitted)}
         </span>
         {info.count > 1 && <span className="text-xs text-muted-foreground">{info.count} re-checks in all</span>}
       </div>
       <div className="mt-1.5 grid gap-x-3 gap-y-0.5 text-xs sm:grid-cols-[auto_1fr]">
-        <span className="text-muted-foreground">Was</span>
+        <span className="text-muted-foreground">Previous result</span>
         <span>{whatStood(last)}</span>
-        <span className="text-muted-foreground">Now</span>
+        <span className="text-muted-foreground">Current result</span>
         <span className="font-medium">{describeOutcome(now.status, now.defect_fields)}</span>
       </div>
       <details className="mt-2 text-xs">

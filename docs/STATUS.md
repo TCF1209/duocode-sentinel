@@ -4,6 +4,85 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-25 (evening) — Claude session · one professional term per concept, everywhere
+
+The user asked whether "Needs review" was worded the same everywhere and
+asked for trade terminology instead of casual phrasing ("can't tell"). A
+read-only audit of 962 user-visible strings found it was not: the
+escalated outcome had nine names ("Needs review", "Sentinel couldn't check
+this one", "sent to a person", "Escalate", "stays in review", "Ask for
+help", …), the reviewer's "cannot decide" had five ("Can't tell", "Still
+can't tell", "couldn't tell", …), "review" meant both the outcome and the
+human step, and the UI said "mismatch" where the emails, deck and backend
+said "discrepancy". Industry usage was checked on the web (UCP 600 art. 16
+"discrepancy"; carriers' "SI amendment" / "B/L amendment"; review queues'
+confirm / override / escalate). Four decisions went to the user; the
+recommended option was taken each time.
+
+**Done**
+- **Outcomes** (`lib/labels.ts`): No discrepancy / Discrepancy / Escalated.
+  **Field badges** (`status-badges.tsx`): Consistent / Discrepancy /
+  Unverified; column "Discrepant fields"; reason lines "SI: not
+  extracted", "BL: blank", "SI: invalid format". The API values OK /
+  MISMATCH / NEEDS_REVIEW / MATCH / UNCOMPARABLE, the reason codes and the
+  required "No mismatch detected." are unchanged.
+- **Reviewer actions** (case page): *Confirm discrepancy* / *Confirm no
+  discrepancy* (primary), *Flag fields…*, *Mark no discrepancy*,
+  *Escalate* (*Keep escalated* on an escalated case), *Attach amended
+  SI/BL*, *Use scan transcription*. **Review states** (run filter, row
+  tags, metrics): Not reviewed / Confirmed / Overridden / Unresolved. The
+  review record reads *Sentinel result* / *Reviewer decision* / *Changes*;
+  *Withdraw review*; the header toggle *Reviewer decision* / *Sentinel
+  result*. Box headings *Discrepancy found*, *No discrepancy found*,
+  *Escalated — manual check required*.
+- **Amended documents** (was "re-sent"), **scan transcription** (was "read
+  out"), "manually" (was "by hand / by eye"), "Reprocess" (was "Retry
+  this case"), "Identified as a shipping instruction" (was "Read as a …").
+- **Unresolved is counted apart** (`backend/api/store.py`
+  `review_summary`): a new `unresolved` key; `corrected` no longer includes
+  those reviews, so the metrics page's Overridden / Unresolved tiles and the
+  run page's filter count the same sets (checked: one Escalate on email_004
+  showed Unresolved 1 on both pages). One new API test; **733 tests** (591
+  passed / 142 skipped without `data/bundle`; 733 passed with it), and
+  every quoted count moved to 733.
+- The teammate's pages, with the user's approval: Patterns ("with a
+  discrepancy", "Escalations by reason", "Discrepancies by field", "View
+  metrics"), `/pitch` ("escalated", "a real discrepancy is reported as
+  consistent", "manually"), and the reply email ("No discrepancy was
+  found.", "Recurring discrepancy:", subject "SI/BL check on hold: action
+  required"); "release" and "bookings" kept as they are professional.
+- Backend wording that reaches the page (`evidence_gate.py` recovery
+  sentences "… manually"; `main.py` refusal messages "amended"). The words
+  the tests pin ("scan", "re-send", "draft BL", "Ask the sender", "label
+  table") are kept; `submission.json` over `bundle_data` is byte-identical
+  (`1c08cd215b0ba4d3c607a7133212a6f9`), so no SCORING row.
+- Deck and talk track (`build_pitch_deck.ps1`, PITCH_DECK, PITCH_DAY):
+  the same vocabulary; slide 3's footer "Confirm or override it - correct a
+  single value or attach the amended SI/BL"; captures re-taken from a fresh
+  model-tier run and the deck rebuilt.
+- Also: on a phone the scan transcription now takes the document card's
+  full width; the metrics reason chart's label column is wider so "Blank or
+  unrecognised field" stays on one line.
+- Verified: tsc / eslint / `next build` clean; pytest as above; every
+  status page, run page, metrics, home, Compare in light and dark, 1280 and
+  375 px; Escalate → Unresolved end to end, then withdrawn.
+
+**Next**
+- Not changed on purpose: slide 2 and PITCH_DECK quote the organisers' own
+  four capabilities ("Ask for help", "Surface any mismatched fields"), so
+  those stay verbatim; "A defect we hide is worse than one we miss" (a
+  Sentinel bug) stays; README.md and the superseded VIDEO_* docs describe
+  the API and old scripts and were left, apart from the test counts; the
+  teammate's reply panel still says "AI" where the rest says "model".
+
+**Careful**
+- `GET /metrics` `review.corrected` now excludes unresolved reviews (an
+  additive `unresolved` key carries them). The web reads both.
+- The backend was restarted for this; the runs in memory are
+  `run_000001_*` (rules, startup) and `run_000002_1790314413` (model tier).
+
+---
+
 ## 2026-09-25 (afternoon, later) — Claude session · every status in its colour, one box on a needs-review case, less empty band at the top
 
 Three things the user saw on the live page; the two with a design choice
