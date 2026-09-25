@@ -38,12 +38,18 @@ that commit.
 ## The day before / the night before
 
 - [ ] The stage laptop has a fresh `git pull` of `main`, `.venv` installed,
-      `npm ci` done, and the two local servers start cleanly
-      (`uvicorn backend.api.main:app --port 8000` with
-      `SENTINEL_DATA_ROOT=bundle_data`, then `cd web && npm run dev`). Local
-      is the fallback if the venue network fails. **The model beats need
-      `.env` with the key and `SENTINEL_ALLOW_LLM_RUNS=1` on that laptop**;
-      without them the fallback skips beats 4-on, 7.
+      `npm ci` done, and the two local servers start cleanly. In one
+      PowerShell: `$env:SENTINEL_DATA_ROOT="bundle_data";
+      $env:SENTINEL_ALLOW_LLM_RUNS="1"; .venv\Scripts\python.exe -m uvicorn
+      backend.api.main:app --port 8000`; in another, `cd web; npm run dev`.
+      Local is the fallback if the venue network fails. **The model beats
+      need the key in `.env` and `SENTINEL_ALLOW_LLM_RUNS` set in the shell
+      that starts uvicorn** — the API reads that flag before it loads `.env`,
+      so putting it only in `.env` leaves model runs off. Without them the
+      fallback skips beats 4-on, 7. **Check `web/.env.local`**: if it exists,
+      its `NEXT_PUBLIC_SENTINEL_API_URL` must name the same port (8000), or
+      the dashboard calls a port nothing answers on; delete it to use the
+      default, 8000.
 - [ ] Phone hotspot charged and tested as the second network.
 - [ ] PowerPoint: open `Sentinel-final-pitch.pptx`, check slides 1–7 show and
       8–16 are hidden (skipped). Put a copy of the PDF on a USB stick and a
@@ -106,7 +112,7 @@ is what the hands do.
 | 0:15–0:50 | A | Slide 2 | Do not say "eleven hours" here. Ends "Chye Fong." |
 | 0:50–1:50 | B | Slide 3 | Points at stage 5 when saying "the gate". |
 | 1:50 | B | Slide 4 for ~2 s, then Alt+Tab to tab 1 `/runs` | |
-| 1:50–2:40 | B | Tick **Run with the model tier** → *Start a run*; the run page opens when done | Say the cloud line while it runs. Read nothing aloud you can't see. |
+| 1:50–2:40 | B | Tick **Run with the model tier** → *Start a run*; the run page opens at once and fills in live — wait for it to finish | Say the cloud line while it runs. Read nothing aloud you can't see. |
 | 2:40–3:00 | B | *Before Sentinel* → point at 124 pairs / ≈ 11.2 h / Sentinel's seconds → *With Sentinel* | "about eleven hours **at our own estimate**" |
 | 3:00–3:50 | B | Outcome chip *Discrepancy 46* → open **email_004** → point at the evidence line under each value (BL Consignee: label "To the Order of") → click **1 note from Sentinel** → "Every compared value (14/14) was located in its source document." | Say "the gate found all fourteen" only once the note is open. |
 | 3:50–4:50 | B | Tab 2 `/compare` → *Labels we have never seen* → *Compare* (switch off) → Escalated, names the fields → *Flip the switch and compare again* → "Model answered", Discrepancy on Consignee and Notify Party | 168 → 2 is said **here**, once. Ends "Yee Teng — how a reviewer uses it." |
@@ -114,7 +120,7 @@ is what the hands do.
 | 5:15–6:10 | A | On email_031: point at **Gross Weight**'s line "same shipper, same field: 6 other cases" (Container Count's says 5 — don't point there) → *View original* on the BL, close → *Edit* on the **BL** Gross Weight → select all, type `21,114 KG`, Enter → card turns *Consistent*, old value struck through → *Draft reply to counterparty* → point at the LOCKED blocks | The reply then asks only about Container Count (checked 25 Sep). |
 | 6:10–7:00 | A | Home → tile **Scans transcribed for the reviewer** → email_512: the two transcription cards → *Use scan transcription* → **branch A**: *Accept 14 values — verified against the scan* → the rules compare · **branch B**: untick the misread fields (Consignee, Notify Party) → *Accept 10 values* → the case stays *Escalated · Unresolved*, those fields left for the person | Branch B line: "Look — on the BL the model read 'ALGURG'; the scan says 'AL GURG'. I untick those two and accept the rest: the rules compare only what a person verified. That's why a transcription is never a verdict." |
 | 7:00–7:40 | A | Home → tile **Re-check on amendment** → email_506 (panel already open, "nothing on file") → *Load a sample pair* → *Re-check with the amended SI and BL* → "Previous result Escalated · Current result No discrepancy · Previous version (1)" | email_506's attachments were **dropped** (both). Not "the BL never arrived". |
-| 7:40–7:55 | A | — | The alternatives line. Ends "Chye Fong." B Alt+Tabs to the slide show and presses →→ to slide 5. |
+| 7:40–7:55 | A | — | The alternatives line. Ends "Chye Fong." B Alt+Tabs to the slide show and presses → **once** to slide 5 (the show is still on slide 4 from 1:50). |
 | 7:55–8:50 | B | Slide 5 | "982 → 0 **under OCR damage**". Ends "Yee Teng." |
 | 8:50–9:45 | A | Slide 6 (B advances) | "about a tenth of a cent per document" = $0.0013. |
 | 9:45–10:00 | A | Slide 7 | Stop at "Thank you." |
@@ -123,7 +129,8 @@ is what the hands do.
 "we'll continue on the laptop — same code, no network", and carries on from
 the same beat. The inbox run is identical; the model beats (Compare on, the
 scan) need the laptop's `.env` — otherwise skip them and say what they would
-show. **If both fail:** Alt+Tab to the slide show, type the backup slide
+show (the model beats also need `SENTINEL_ALLOW_LLM_RUNS` set in the
+uvicorn shell, see the night-before list). **If both fail:** Alt+Tab to the slide show, type the backup slide
 number and Enter (8 run page · 9 Before · 10 email_004 · 11 Compare · 12
 patterns · 13 email_031 · 14 reply · 15 scan · 16 re-check).
 
@@ -197,7 +204,8 @@ not a redesign.
 **"Why can't Sentinel read a scanned Bill of Lading itself?"**
 It reads it — the model transcribes the scan — but it won't decide from that
 reading alone. On real scans the transcript got 50 of 56 slots right and the
-two misreads would have been false alarms; you saw one misread today. So the
+two misreads would have been false alarms; on 25 Sep it read 'AL GURG' as
+'ALGURG' (say "you just saw one" only if branch B ran on stage). So the
 transcript is evidence: the reviewer ticks what they checked, then the rules
 compare. Photo files (.png/.jpg) are not supported yet.
 
@@ -294,8 +302,10 @@ accounts. In that order, because the first two change what a desk gets.
   cannot prove" (`email_145`).
 - **"Zero silent errors"** — only "under OCR damage, 982 to zero".
 - **"Only we…" / "no other team…"** — never; and never name a team.
-- **"$1.30 per 1,000 emails"** (the metrics page's ceiling multiplies emails
-  by a per-document rate — wrong unit). Say "$0.0013 per document".
+- **"$1.30 per 1,000 emails"** — $0.0013 is per document, and not every
+  email carries one. The metrics page now scales by the run's documents per
+  email (about $0.63 per 1,000 emails on the graded mix, "hardest case
+  measured"). Say "$0.0013 per document".
 - **"It reads any bill of lading"** — it does not yet read real boxed forms.
   **Do not upload a real carrier form live**: it will escalate every field.
 - **"574 / 596 / 646 / 732 / 733 / 756 / 757 tests"**, "45 mismatches, 21

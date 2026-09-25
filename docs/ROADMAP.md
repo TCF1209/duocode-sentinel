@@ -273,7 +273,8 @@ whole participant bundle. **(T) to decide.**
   `web/components/metrics-page-view.tsx`, the metrics page. Two figures, both
   grounded rather than guessed: processing time scales the run's own measured
   `mean_ms_per_email`, and cost shows both "at today's mix" (the run's own
-  measured $/email) and a worst-case ceiling at $0.0013/document
+  measured $/email) and the hardest case measured, $0.0013/document scaled by
+  the run's documents per email
   (`docs/ADVERSARIAL.md` §8, the rate measured when every field is unfamiliar
   wording).
 - Multi-tenant: per-desk rules (AIE / AFPTME / AFRT / AFEMY)

@@ -183,8 +183,8 @@ only this exact company, not its namesake without 'Middle East', because
 values match exactly. The original is one click away. Say the shipper
 confirms the weight: [edit] the same rules compare it again — now consistent,
 and the extracted value stays on record, struck through. [Draft reply] The
-reply is drafted from the reviewer's decision — it now asks only about the
-container count. The facts are locked; the model may only reword the
+reply follows the corrected values — it now asks only about the container
+count. The facts are locked; the model may only reword the
 greeting and the closing. A person still presses send."
 
 **A · a scan (6:10–7:00)** — "An escalated case: both documents are scans

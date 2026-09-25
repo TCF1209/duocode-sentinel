@@ -542,8 +542,9 @@ Beyond the hackathon, in the order we would actually build them:
    projects both onto a desk's own volume: processing time scales the run's
    own measured ms/email, and cost shows two figures rather than one guess —
    "at today's mix" (this run's own measured $/email, $0 on the graded set)
-   and a worst-case ceiling at $0.0013/document, the rate measured when every
-   field carries wording the rules have never seen (§8 below).
+   and the hardest case measured, $0.0013/document scaled by the run's
+   documents per email — the rate measured when every field carries wording
+   the rules have never seen (§8 below).
 5. **Per-desk rules.** The four desks in this dataset (AIE, AFPTME, AFRT,
    AFEMY) have different forms and different tolerances. The stage boundaries
    already allow a per-desk label table and a per-desk escalation policy; the
@@ -572,7 +573,7 @@ What a pilot would measure, and where each figure stands today:
 | False alarms | 0 of 46 defects on the graded set; 0 invented defects across 16 perturbation modes (`docs/ADVERSARIAL.md`) | the weekly number — one fabricated flag costs the trust every later flag needs |
 | Defects caught before the BL is released | 46 of 46, exact field set | the same, on the desk's real corrections log |
 | Reviewer minutes per escalation | not measured — the review panel records the decision, not the time | the pilot's first new measurement, and the one that decides whether item 1 (confidence calibration) is worth building |
-| Cost per 1,000 emails | $0 at today's mix; $1.30 ceiling at 100% unfamiliar wording (metrics page) | that the ceiling stays a ceiling as templates the rules have never seen arrive |
+| Cost per 1,000 emails | $0 at today's mix; about $0.63 in the hardest case measured, 100% unfamiliar wording ($0.0013/document × 0.48 documents/email, metrics page) | that the ceiling stays a ceiling as templates the rules have never seen arrive |
 | Time to a report | 12.7 s for 520 emails on a free-tier container | seconds, at the desk's daily volume — the metrics page projects it from the run's own ms/email |
 
 The first four columns are results; the last column is a target. They are
