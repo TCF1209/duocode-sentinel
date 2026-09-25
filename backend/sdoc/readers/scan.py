@@ -39,7 +39,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from .. import normalize
+from .. import labels, normalize
 from ..llm import LLMClient, LLMUnavailable
 from ..schema import COMPARE_FIELDS, ParsedDoc
 
@@ -360,6 +360,7 @@ def _to_transcript(readout: _ScanReadout, *, model: str,
     for name in COMPARE_FIELDS:
         item = seen.get(name)
         value = (item.value or "").strip() if item is not None else ""
+        value = _without_caption(name, value)
         legible = bool(item.legible) if item is not None else False
         if not legible or normalize.is_blank(value):
             value, legible = "", False
@@ -379,6 +380,21 @@ def _to_transcript(readout: _ScanReadout, *, model: str,
         pages_read=pages_read,
         note=_note(legible_count, len(fields), confidence, pages_read, model),
     )
+
+
+def _without_caption(field: str, value: str) -> str:
+    """The value without a printed caption the model copied in front of it.
+
+    On some runs the model answers "Shipper: APRIL FAR EAST (M) SDN BHD" for
+    the shipper. Accepted as a reviewer correction, the caption is compared as
+    part of the name, and every field of an agreeing pair turns into a
+    discrepancy. Only a caption the label table resolves to this same field is
+    dropped, so a colon inside a real value stays where it is.
+    """
+    head, sep, rest = value.partition(":")
+    if sep and rest.strip() and labels.resolve(head) == field:
+        return rest.strip()
+    return value
 
 
 def _note(legible_count: int, total: int, confidence: float,

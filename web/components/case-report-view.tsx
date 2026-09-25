@@ -1,13 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { AlertTriangle, CheckCircle2, Sparkles, Upload, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleDashed, Sparkles, Upload, XCircle } from "lucide-react";
 import type { CaseReport, DocumentReport, FieldComparisonReport, Verdict } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { CategoryBadge, DecidedByBadge, StatusBadge } from "@/components/status-badges";
 import { FieldComparisonRow, QuietFieldRow, type DocSideKey } from "@/components/field-comparison-row";
 import {
   EMPTY_DRAFT,
+  escalationText,
   FieldPicker,
+  isEmptyDraft,
   ReviewBox,
   ReviewSummary,
   RowEnd,
@@ -21,7 +23,7 @@ import { AttachmentAction } from "@/components/attachment-action";
 import { RecheckHistory, RecheckPanel, type RecheckFiles } from "@/components/recheck-panel";
 import { Separator } from "@/components/ui/separator";
 import { fadeUp, stagger } from "@/lib/motion";
-import { CATEGORY_BADGE_LABELS, FIELD_LABELS, REVIEW_REASON_TEXT, STATUS_LABELS } from "@/lib/labels";
+import { CATEGORY_BADGE_LABELS, FIELD_LABELS, STATUS_LABELS } from "@/lib/labels";
 import { ScanTranscriptCard, transcriptOf } from "@/components/scan-transcript-card";
 import { cn } from "@/lib/utils";
 
@@ -78,17 +80,30 @@ function formatBytes(n: number): string {
 }
 const SIDE_NAME = { si: "shipping instruction", bl: "draft bill of lading" } as const;
 const SIDE_LABEL = { si: "Shipping Instruction (SI)", bl: "Draft Bill of Lading (BL)" } as const;
-const TONE_TEXT = { ok: "text-ok", warn: "text-warn", danger: "text-danger" } as const;
+const TONE_TEXT = { ok: "text-ok", warn: "text-warn", danger: "text-danger", muted: "text-muted-foreground" } as const;
+const TONE_ICON = { ok: CheckCircle2, warn: AlertTriangle, danger: XCircle, muted: CircleDashed } as const;
 
 /** One document's state, as the thing a reviewer needs to know first:
  *  not attached / could not be read (and why) / read as the wrong kind of
  *  document / fine. Everything here is already in `report.documents`; it was
- *  only ever shown as a one-line "SI: path (TYPE, 621b)" at the bottom. */
-function DocumentStatus({ side, doc, caseId }: { side: "si" | "bl"; doc: DocumentReport | null; caseId?: string }) {
+ *  only ever shown as a one-line "SI: path (TYPE, 621b)" at the bottom.
+ *  `notYet`: no pair is expected yet (the sender asked us for the draft
+ *  BL), so a missing document is grey, not an error. */
+function DocumentStatus({
+  side,
+  doc,
+  caseId,
+  notYet,
+}: {
+  side: "si" | "bl";
+  doc: DocumentReport | null;
+  caseId?: string;
+  notYet?: boolean;
+}) {
   let tone: keyof typeof TONE_TEXT;
   let text: string;
   if (!doc) {
-    tone = "danger";
+    tone = notYet ? "muted" : "danger";
     text = "Not attached to this email";
   } else if (!doc.readable) {
     tone = "danger";
@@ -100,7 +115,7 @@ function DocumentStatus({ side, doc, caseId }: { side: "si" | "bl"; doc: Documen
     tone = "ok";
     text = `Identified as a ${SIDE_NAME[side]}`;
   }
-  const Icon = tone === "ok" ? CheckCircle2 : tone === "warn" ? AlertTriangle : XCircle;
+  const Icon = TONE_ICON[tone];
   const transcript = transcriptOf(doc);
   return (
     <div className="flex flex-wrap items-start gap-x-2 gap-y-1 rounded-md border bg-background p-2.5 text-sm">
@@ -135,6 +150,10 @@ function DocumentStatus({ side, doc, caseId }: { side: "si" | "bl"; doc: Documen
     </div>
   );
 }
+
+/** What the review box says and offers on a case not reviewed yet (and,
+ *  behind "Change decision", on one that is). */
+type Finding = { heading: string; line: ReactNode; buttons: ReactNode; neutral?: boolean };
 
 /**
  * The discrepancy report — "the screen the whole project exists to produce"
@@ -192,8 +211,11 @@ export function CaseReportView({
   // produced it, correction set aside -- asked for as "let me see the
   // unchanged version too". Everything below keys off `correction`, so
   // flipping this one value flips the header, the banner and every field
-  // card together; nothing is re-fetched and nothing is written.
-  const [showOriginal, setShowOriginal] = useState(false);
+  // card together; nothing is re-fetched and nothing is written. Only while
+  // there is a correction to set aside: once the review is withdrawn the
+  // toggle is gone, and the page is back on the live view.
+  const [originalView, setOriginalView] = useState(false);
+  const showOriginal = originalView && liveCorrection !== null;
   const correction = showOriginal ? null : liveCorrection;
 
   // The case still genuinely needs a person: Sentinel escalated it and no
@@ -239,27 +261,20 @@ export function CaseReportView({
       </Button>
     ) : null;
 
-  // A "See it live" tile on the home page lands on the panel it promised,
-  // not on the top of a long
-  // report: the tagged panel is scrolled to the middle of the screen. No
-  // highlight on top of that -- decided directly: the attention cue belongs
-  // to the Compare page's first sample only; here the panel's own heading
-  // says what it is. The short delay lets the report's own entrance finish
-  // laying out first.
-  useEffect(() => {
-    if (!spotlight) return;
-    const el = document.querySelector<HTMLElement>(`[data-spotlight="${spotlight}"]`);
-    if (!el) return;
-    const show = setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 250);
-    return () => clearTimeout(show);
-  }, [spotlight, report.email_id]);
-
   // The pipeline already writes one "Suggested action: ..." sentence per
   // escalation reason (pipeline.py's notes); the workspace promotes it to a
   // heading and drops it from the bullet list so it isn't said twice.
   const suggestedNote = readableNotes.find((n) => n.startsWith("Suggested action:"));
   const suggestedAction = suggestedNote ? suggestedNote.replace(/^Suggested action:\s*/, "") : null;
-  const notesToShow = showWorkspace && suggestedNote ? readableNotes.filter((n) => n !== suggestedNote) : readableNotes;
+  // A document check that passed with no field compared: the sender asked
+  // us to issue the draft BL, so there is no pair yet. Its box says so in
+  // Sentinel's own note and suggested action, and drops both from the list
+  // while it does (once reviewed the box shows the record instead).
+  const nothingToCompare = report.category === "BL_COMPARISON" && report.status === "OK" && report.fields.length === 0;
+  const contextNote = nothingToCompare ? readableNotes.find((n) => n !== suggestedNote) : undefined;
+  const inBox =
+    nothingToCompare && review && !report.review ? [contextNote, suggestedNote] : showWorkspace ? [suggestedNote] : [];
+  const notesToShow = readableNotes.filter((n) => !inBox.includes(n));
 
   // A document that could not be read at all leaves seven UNCOMPARABLE
   // fields; they render as seven one-line rows below (QuietFieldRow), each
@@ -270,6 +285,24 @@ export function CaseReportView({
   const historyField = report.fields.find(
     (f) => f.verdict === "MISMATCH" && (priorDefectCounts?.[f.field] ?? 0) > 0,
   )?.field;
+
+  // A "See it live" tile on the home page lands on the panel it promised,
+  // not on the top of a long
+  // report: the tagged panel is scrolled to the middle of the screen. No
+  // highlight on top of that -- decided directly: the attention cue belongs
+  // to the Compare page's first sample only; here the panel's own heading
+  // says what it is. The short delay lets the report's own entrance finish
+  // laying out first. The history target only exists once the run's list
+  // has filled `priorDefectCounts`, which can land after the case itself,
+  // so that one waits for it.
+  const spotlightReady = spotlight === "history" ? historyField : spotlight;
+  useEffect(() => {
+    if (!spotlightReady) return;
+    const el = document.querySelector<HTMLElement>(`[data-spotlight="${spotlight}"]`);
+    if (!el) return;
+    const show = setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 250);
+    return () => clearTimeout(show);
+  }, [spotlight, spotlightReady, report.email_id]);
 
   // In-place review: the reviewer decides each field on its own card, and
   // each choice is saved as it is made (case-detail-page-view.tsx owns the
@@ -284,7 +317,9 @@ export function CaseReportView({
   const draft = review?.draft ?? EMPTY_DRAFT;
   // A corrected value on one side of a field, saved with the field's other
   // corrections; `null` puts that side back to Sentinel's reading. The
-  // backend compares the corrected pair again and the outcome follows.
+  // backend compares the corrected pair again and the outcome follows. A
+  // call made on the field before (cleared, flagged) was made on the old
+  // values, so it goes: the corrected pair's verdict stands instead.
   function correct(field: string, side: DocSideKey, value: string | null) {
     if (!review) return;
     const corrections = { ...draft.corrections };
@@ -293,7 +328,9 @@ export function CaseReportView({
     else sides[side] = value;
     if (Object.keys(sides).length === 0) delete corrections[field];
     else corrections[field] = sides;
-    review.commit({ ...draft, corrections }, field);
+    const decisions = { ...draft.decisions };
+    delete decisions[field];
+    review.commit({ ...draft, decisions, corrections }, field);
   }
   // The controls sit on the cards only in the live view: "Sentinel
   // result" is a way of looking, not of editing.
@@ -339,17 +376,42 @@ export function CaseReportView({
   // operations (the same choices the field cards make, for several fields
   // at once); the backend derives the outcome, never the page.
   const [panel, setPanel] = useState<"picker" | "adopt" | null>(null);
+  // Once a review is saved the box shows its record, and the findings come
+  // back behind "Change decision" -- for the review as it stands: any save
+  // replaces `report.review`, which closes them again.
+  const [changingOf, setChangingOf] = useState<object | null>(null);
+  const changing = Boolean(report.review) && changingOf === report.review;
+  // A finding was recorded: whatever it opened closes, and the page goes
+  // back to the live view to show what it did.
+  function closePanels() {
+    setPanel(null);
+    setChangingOf(null);
+    setOriginalView(false);
+  }
   const saving = review ? review.busy !== null : false;
   const standingDefects = report.fields.filter((f) => standsOn(f) === "MISMATCH").map((f) => f.field);
+  // What the field's pair reads as before any call on it: the corrected
+  // pair's verdict once a value was corrected, Sentinel's otherwise -- so a
+  // finding made after a correction (an accepted scan value, say) is made
+  // on the values the reviewer actually sees.
+  const pairVerdict = (f: FieldComparisonReport): Verdict =>
+    (draft.corrections[f.field] && report.review?.field_verdicts?.[f.field]?.verdict) || f.verdict;
   function noMismatch() {
     if (!review) return;
     const decisions = { ...draft.decisions };
     for (const f of report.fields) {
-      if (f.verdict === "MISMATCH") decisions[f.field] = "cleared";
-      else if (f.verdict === "UNCOMPARABLE") decisions[f.field] = "fine";
+      const v = pairVerdict(f);
+      if (v === "MISMATCH") decisions[f.field] = "cleared";
+      else if (v === "UNCOMPARABLE") decisions[f.field] = "fine";
       else delete decisions[f.field];
     }
-    setPanel(null);
+    // Escalated with every pair consistent (the gate stopped it on
+    // something else): nothing above is a change, and an empty draft saves
+    // nothing at all -- so the finding is recorded as each field verified.
+    if (isEmptyDraft({ ...draft, decisions, cantTell: false })) {
+      for (const f of report.fields) decisions[f.field] = "fine";
+    }
+    closePanels();
     review.commit({ ...draft, decisions, cantTell: false }, "case");
   }
   function mismatchOn(chosen: string[]) {
@@ -357,19 +419,36 @@ export function CaseReportView({
     const picked = new Set(chosen);
     const decisions = { ...draft.decisions };
     for (const f of report.fields) {
+      const v = pairVerdict(f);
       if (picked.has(f.field)) {
-        if (f.verdict === "MISMATCH") delete decisions[f.field];
+        if (v === "MISMATCH") delete decisions[f.field];
         else decisions[f.field] = "flagged";
-      } else if (f.verdict === "MISMATCH") decisions[f.field] = "cleared";
+      } else if (v === "MISMATCH") decisions[f.field] = "cleared";
       else if (decisions[f.field] === "flagged") delete decisions[f.field];
     }
-    setPanel(null);
+    closePanels();
+    if (isEmptyDraft({ ...draft, decisions, cantTell: false })) {
+      // Sentinel's own flags saved unchanged: that is agreeing with it, and
+      // is recorded as a confirmation rather than dropped as no change.
+      if (report.status === "MISMATCH") {
+        review.confirm();
+        return;
+      }
+      // Escalated, and the picks are pairs that already differ: flagged
+      // outright, so the discrepancy is on record.
+      for (const f of chosen) decisions[f] = "flagged";
+    }
     review.commit({ ...draft, decisions, cantTell: false }, "case");
   }
   function cantTell() {
     if (!review) return;
-    setPanel(null);
+    closePanels();
     review.commit({ ...draft, cantTell: true }, "case");
+  }
+  function confirmSentinel() {
+    if (!review) return;
+    closePanels();
+    review.confirm();
   }
   // The scan transcription (scan-transcript-card.tsx): what the model read on an
   // image-only page, per side, for the fields Sentinel itself could not
@@ -392,16 +471,23 @@ export function CaseReportView({
   function adoptReadOut(chosen: string[]) {
     if (!review) return;
     const corrections = { ...draft.corrections };
+    // Same rule as correct(): a call made on the old values goes, and the
+    // transcribed pair's verdict stands instead.
+    const decisions = { ...draft.decisions };
     for (const r of readOutRows) {
       if (!chosen.includes(r.field)) continue;
       const sides = { ...(corrections[r.field] ?? {}) };
       if (r.si) sides.si = r.si;
       if (r.bl) sides.bl = r.bl;
       corrections[r.field] = sides;
+      delete decisions[r.field];
     }
     const provenance = `Values accepted from the scan transcription (${readOutModel}) after the reviewer verified them against the scan.`;
-    setPanel(null);
-    review.commit({ ...draft, corrections, cantTell: false, note: draft.note.trim() ? draft.note : provenance }, "case");
+    closePanels();
+    review.commit(
+      { ...draft, decisions, corrections, cantTell: false, note: draft.note.trim() ? draft.note : provenance },
+      "case",
+    );
   }
   const listNames = (names: string[]) =>
     names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
@@ -433,7 +519,7 @@ export function CaseReportView({
   const needsReviewHeading = "Escalated — manual check required";
   const needsReviewLine = (
     <>
-      {report.review_reason ? REVIEW_REASON_TEXT[report.review_reason] : "Sentinel did not decide this case automatically."}{" "}
+      {escalationText(report) ?? "Sentinel did not decide this case automatically."}{" "}
       {suggestedAction ? sentence(suggestedAction) : "Verify both documents and record a decision."}
       {unread.length > 0 && (
         <span className="block">
@@ -468,7 +554,10 @@ export function CaseReportView({
       {label}
     </Button>
   );
-  const finding: { heading: string; line: ReactNode; buttons: ReactNode } | null =
+  // Confirming is Sentinel's answer as read: a value corrected since is
+  // taken back with it, and the button says so.
+  const confirmDrops = Object.keys(draft.corrections).length > 0 ? "; the corrected values are removed" : "";
+  const caseFinding: Finding | null =
     !review || !comparison
       ? null
       : report.status === "MISMATCH"
@@ -479,8 +568,8 @@ export function CaseReportView({
               <>
                 {findingButton(
                   "Confirm discrepancy",
-                  review.confirm,
-                  "Records Confirmed: the SI and the draft BL differ on these fields",
+                  confirmSentinel,
+                  `Records Confirmed: the SI and the draft BL differ on these fields${confirmDrops}`,
                   true,
                 )}
                 {findingButton(
@@ -505,7 +594,12 @@ export function CaseReportView({
               line: `All ${report.fields.length} fields are consistent, each with the line it was read from. Confirm the result, or flag the fields Sentinel missed.`,
               buttons: (
                 <>
-                  {findingButton("Confirm no discrepancy", review.confirm, "Records Confirmed: no discrepancy on any field", true)}
+                  {findingButton(
+                    "Confirm no discrepancy",
+                    confirmSentinel,
+                    `Records Confirmed: no discrepancy on any field${confirmDrops}`,
+                    true,
+                  )}
                   {findingButton(
                     "Flag fields…",
                     () => togglePanel("picker"),
@@ -553,6 +647,33 @@ export function CaseReportView({
                 line: needsReviewLine,
                 buttons: findingButton("Keep escalated", cantTell, "Records Unresolved; the case stays Escalated"),
               };
+  // Nothing to compare yet (see `nothingToCompare`): grey, why in
+  // Sentinel's own words, and no "Flag fields…" -- there is no field to
+  // pick. Confirming or escalating still records the case as reviewed.
+  const finding: Finding | null =
+    review && nothingToCompare
+      ? {
+          heading: "Nothing to compare yet",
+          line: (
+            <>
+              {contextNote ? sentence(contextNote) : "No SI/BL pair is attached to this email."}
+              {suggestedAction && ` ${sentence(suggestedAction)}`}
+            </>
+          ),
+          buttons: (
+            <>
+              {findingButton(
+                "Confirm no discrepancy",
+                confirmSentinel,
+                "Records Confirmed: Sentinel's result stands; there is no SI/BL pair to compare yet",
+                true,
+              )}
+              {findingButton("Escalate", cantTell, "Records Unresolved; the case becomes Escalated")}
+            </>
+          ),
+          neutral: true,
+        }
+      : caseFinding;
   const rowEnd = (
     <RowEnd>
       <ReplyDraftPanel key={replyDraftKey(report)} report={report} />
@@ -621,7 +742,7 @@ export function CaseReportView({
           >
             <button
               type="button"
-              onClick={() => setShowOriginal(false)}
+              onClick={() => setOriginalView(false)}
               aria-pressed={!showOriginal}
               className={cn(
                 "rounded-full px-2.5 py-0.5 transition-colors",
@@ -632,7 +753,7 @@ export function CaseReportView({
             </button>
             <button
               type="button"
-              onClick={() => setShowOriginal(true)}
+              onClick={() => setOriginalView(true)}
               aria-pressed={showOriginal}
               className={cn(
                 "rounded-full px-2.5 py-0.5 transition-colors",
@@ -660,8 +781,8 @@ export function CaseReportView({
           mismatch page had a footer line at the bottom, and the top is
           where a reader looks for them. */}
       <motion.div className="grid gap-2 sm:grid-cols-2" variants={fadeUp} data-spotlight="documents">
-        <DocumentStatus side="si" doc={report.documents.si} caseId={caseId} />
-        <DocumentStatus side="bl" doc={report.documents.bl} caseId={caseId} />
+        <DocumentStatus side="si" doc={report.documents.si} caseId={caseId} notYet={nothingToCompare} />
+        <DocumentStatus side="bl" doc={report.documents.bl} caseId={caseId} notYet={nothingToCompare} />
       </motion.div>
 
       {/* A comparison request gets the review box; anything else has no
@@ -680,21 +801,64 @@ export function CaseReportView({
           and what to do), then one row holding everything a reviewer can do
           with the whole case: the findings (Sentinel's own first, so
           confirming is one click), the amended SI/BL (the area opens under
-          the row) and the reply draft at the row's end. */}
+          the row) and the reply draft at the row's end. Reviewed, the box
+          holds the record instead, and the findings come back behind
+          "Change decision" in the same row. */}
       {review && comparison && finding && (
         <motion.div variants={fadeUp} data-spotlight="review">
-          {report.review ? (
-            <ReviewSummary report={report} control={review} below={belowRow}>
-              {recheckButton}
-              {rowEnd}
-            </ReviewSummary>
-          ) : (
-            <ReviewBox status={report.status} heading={finding.heading} line={finding.line} saving={saving} below={belowRow}>
-              {finding.buttons}
-              {recheckButton}
-              {rowEnd}
-            </ReviewBox>
-          )}
+          <ReviewBox
+            status={report.status}
+            heading={finding.heading}
+            line={finding.line}
+            saving={saving}
+            neutral={finding.neutral}
+            record={
+              report.review ? (
+                <ReviewSummary
+                  report={report}
+                  control={{
+                    ...review,
+                    withdraw: () => {
+                      closePanels();
+                      review.withdraw();
+                    },
+                  }}
+                />
+              ) : undefined
+            }
+            below={belowRow}
+          >
+            {!report.review || changing ? (
+              <>
+                {finding.buttons}
+                {report.review && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={saving}
+                    onClick={() => {
+                      setPanel(null);
+                      setChangingOf(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={saving}
+                onClick={() => setChangingOf(report.review ?? null)}
+                title="Record a different finding on this case; corrected values stay unless you confirm Sentinel's result"
+              >
+                Change decision
+              </Button>
+            )}
+            {recheckButton}
+            {rowEnd}
+          </ReviewBox>
         </motion.div>
       )}
 

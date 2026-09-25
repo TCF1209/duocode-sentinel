@@ -267,21 +267,35 @@ class Store:
     def review_summary(self, run_id: str) -> dict:
         """Counts for the metrics page's "Reviewer decisions" tiles.
 
-        Every review is exactly one of three: `confirmed` (the reviewer
-        confirmed the Sentinel result), `unresolved` (a correction whose
-        outcome is still NEEDS_REVIEW -- the reviewer could not decide, so the
-        case stays escalated) or `corrected` (any other correction -- the
-        reviewer overrode the Sentinel result; shown as "Overridden").
-        `unresolved` is additive: the earlier keys are kept for old clients.
+        Every review is exactly one of three, judged by the outcome it left
+        rather than by which button was pressed: `unresolved` when the case
+        is still NEEDS_REVIEW after it (the case stays escalated), else
+        `confirmed` when that outcome is Sentinel's own (same status, same
+        defect fields), else `corrected` (the reviewer overrode the Sentinel
+        result; shown as "Overridden").
+
+        Old clients: `reviewed` means what it did, but `confirmed` and
+        `corrected` used to count decision == "confirm" / "correct". A client
+        that shows only those two tiles will not add up to `reviewed` once a
+        review is unresolved.
         """
         with self._lock:
-            reviews = list(self._reviews.get(run_id, {}).values())
-        corrections = [r for r in reviews if r.get("decision") == "correct"]
-        unresolved = sum(1 for r in corrections if r.get("status") == "NEEDS_REVIEW")
+            reviews = dict(self._reviews.get(run_id, {}))
+            cases = self._cases.get(run_id, {})
+            pairs = [(cases[eid], r) for eid, r in reviews.items() if eid in cases]
+        confirmed = corrected = unresolved = 0
+        for result, review in pairs:
+            outcome = self._effective(result, review)
+            if outcome["status"] == "NEEDS_REVIEW":
+                unresolved += 1
+            elif outcome["status"] == result.status and outcome["defect_fields"] == sorted(result.defect_fields):
+                confirmed += 1
+            else:
+                corrected += 1
         return {
-            "reviewed": len(reviews),
-            "confirmed": len(reviews) - len(corrections),
-            "corrected": len(corrections) - unresolved,
+            "reviewed": len(pairs),
+            "confirmed": confirmed,
+            "corrected": corrected,
             "unresolved": unresolved,
         }
 

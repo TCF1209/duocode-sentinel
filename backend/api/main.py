@@ -281,6 +281,10 @@ def list_cases(
             "reviewed": eff["reviewed"],
             "outcome_source": eff["source"],
             "system_status": c.status,
+            # Sentinel's own discrepant fields, so the list can tell a review
+            # that left Sentinel's outcome standing from one that changed it,
+            # by the same rule as store.review_summary.
+            "system_defect_fields": sorted(c.defect_fields),
             # How many times this case's answer was replaced by a re-check on
             # re-sent documents (0 for almost every row). The list is the
             # place a reviewer notices "this one has moved on since the run".

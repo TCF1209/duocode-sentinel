@@ -208,7 +208,7 @@ empty LBS box beside it), and one of them let a wrong BL clear. So pounds are
 still not converted. What shipped instead converts nothing: when the two
 weights agree only because one side is in pounds and the other in kilograms
 or tonnes ("8,010 KG" against "8,010 LBS"), the field is `UNCOMPARABLE /
-unit_differs` and the case goes to a person, whose reply draft asks the
+unit_differs` and the case is escalated to a person, whose reply draft asks the
 customer which unit is right. Like `ocr_confusable`, it can only turn a MATCH
 into a review. It never produces a MATCH or a MISMATCH, so a misreading costs
 one review and cannot clear or condemn a BL. The review's pair families from

@@ -74,8 +74,12 @@ export default function HomePage() {
       <motion.div className="flex flex-col gap-4 border-t pt-6" variants={fadeUp}>
         <div>
           <h2 className="font-heading text-xl font-semibold tracking-tight">What it&apos;s caught so far</h2>
+          {/* Sentinel's own result, as the run finished (run.metrics is a
+              snapshot, backend/api/store.py's finish_run). The run page
+              counts the outcome after any review or re-check, so the two
+              can differ once a reviewer has worked on the run. */}
           <p className="text-sm text-muted-foreground">
-            From the latest run over the graded inbox.
+            Sentinel&apos;s own result on the latest run over the graded inbox, before any review.
           </p>
         </div>
         <LiveStats />
@@ -391,17 +395,27 @@ function LiveStats() {
   const mismatches = m.by_status?.MISMATCH ?? 0;
   const escalated = m.by_status?.NEEDS_REVIEW ?? 0;
   const runHref = `/runs/${latest.run_id}`;
+  // The list these open counts the outcome after review; said on hover, so a
+  // number one short in the list reads as a reviewer's decision, not a bug.
+  const afterReview = "Sentinel's result when the run finished; the list shows the outcome after any review";
 
   return (
     <div className="flex flex-col gap-3">
       <div className="grid gap-3 sm:grid-cols-3">
         <BigStat label="Emails processed" value={m.emails} accent="primary" href={runHref} />
-        <BigStat label="Discrepancies found" value={mismatches} accent="danger" href={`${runHref}?status=MISMATCH`} />
+        <BigStat
+          label="Discrepancies found"
+          value={mismatches}
+          accent="danger"
+          href={`${runHref}?status=MISMATCH`}
+          title={afterReview}
+        />
         <BigStat
           label="Escalated"
           value={escalated}
           accent="warn"
           href={`${runHref}?status=NEEDS_REVIEW`}
+          title={afterReview}
         />
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -435,16 +449,19 @@ function BigStat({
   value,
   accent,
   href,
+  title,
 }: {
   label: string;
   value: number;
   accent: keyof typeof STAT_ACCENT;
   href: string;
+  title?: string;
 }) {
   const display = useCountUp(value);
   return (
     <Link
       href={href}
+      title={title}
       className="group rounded-xl border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-muted/40"
     >
       <div className={cn("font-heading text-4xl font-semibold tabular-nums", STAT_ACCENT[accent])}>{display}</div>

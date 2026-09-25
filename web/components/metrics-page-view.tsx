@@ -16,6 +16,14 @@ import { CATEGORY_LABELS, REVIEW_REASON_LABELS, STATUS_LABELS } from "@/lib/labe
 
 const CHART_MS = 420;
 
+// Spelled out, not built from the count: Tailwind only ships classes it
+// finds whole in the source.
+const REVIEW_GRID_COLS: Record<number, string> = {
+  3: "sm:grid-cols-3",
+  4: "sm:grid-cols-4",
+  5: "sm:grid-cols-5",
+};
+
 // Recharts' tooltip ships its own white box with a grey border and black
 // text, which was the one element on this page that ignored the theme --
 // a white card popping up over a dark chart. Styled from the same tokens
@@ -64,6 +72,7 @@ export function MetricsPageView({ runId }: { runId: string }) {
   const statusData = Object.entries(metrics.by_status).map(([name, value]) => ({ name, value }));
   const reasonData = Object.entries(metrics.by_review_reason).map(([name, value]) => ({ name, value }));
   const costUsd = (metrics.llm?.usage as { cost_usd?: number } | undefined)?.cost_usd ?? 0;
+  const hasUnresolved = metrics.review?.unresolved !== undefined;
 
   return (
     <motion.div className="flex flex-col gap-4" initial="hidden" animate="show" variants={stagger()}>
@@ -112,13 +121,19 @@ export function MetricsPageView({ runId }: { runId: string }) {
         <motion.div className="flex flex-col gap-2" variants={fadeUp}>
           <div className="text-xs font-medium text-muted-foreground">Reviewer decisions</div>
           <motion.div
-            className={cn("grid grid-cols-2 gap-3", metrics.recheck ? "sm:grid-cols-5" : "sm:grid-cols-4")}
+            className={cn(
+              "grid grid-cols-2 gap-3",
+              REVIEW_GRID_COLS[3 + (hasUnresolved ? 1 : 0) + (metrics.recheck ? 1 : 0)],
+            )}
             variants={stagger()}
           >
             <Stat label="Reviewed" value={metrics.review.reviewed} />
             <Stat label="Confirmed" value={metrics.review.confirmed} accent="ok" />
-            <Stat label="Overridden" value={metrics.review.corrected} />
-            <Stat label="Unresolved" value={metrics.review.unresolved ?? 0} />
+            {/* A backend from before `unresolved` counts every correction,
+                escalations included, in `corrected`: say so rather than
+                show a wrong Overridden and an Unresolved of 0. */}
+            <Stat label={hasUnresolved ? "Overridden" : "Overridden or unresolved"} value={metrics.review.corrected} />
+            {hasUnresolved && <Stat label="Unresolved" value={metrics.review.unresolved ?? 0} />}
             {/* Cases re-run on amended documents from the sender -- the
                 other thing a person does to a run after it finished. */}
             {metrics.recheck && <Stat label="Re-checked" value={metrics.recheck.cases} />}
@@ -171,7 +186,10 @@ export function MetricsPageView({ runId }: { runId: string }) {
         <motion.div variants={fadeUp}>
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm font-medium">By outcome</CardTitle>
+              {/* `by_status` is the snapshot the run finished with; reviews
+                  and re-checks never move it, while the run page's Outcome
+                  counts do -- so the title says whose result it is. */}
+              <CardTitle className="text-sm font-medium">Sentinel result at run end</CardTitle>
             </CardHeader>
             <CardContent className="h-64">
               <ResponsiveContainer width="100%" height="100%">

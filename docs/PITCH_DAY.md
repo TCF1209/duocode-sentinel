@@ -23,8 +23,10 @@ add for eight. Read the portal first, then cut.
   - [ ] Start a run **with the model tier on**: `metrics.json` shows 6 model
         calls; `email_512`, `513`, `514` show the transcript card on both
         documents.
-  - [ ] `/compare`, the *unfamiliar labels* sample: toggle off → Escalated
-        with "No label for … could be recognised"; toggle on → Discrepancy:
+  - [ ] `/compare`, the *Labels we have never seen* sample: toggle off →
+        Escalated, with "Not extracted from the SI: Shipper, Consignee,
+        Notify Party, Port of Loading" (the "No label for … could be
+        recognised" sentence is inside the folded notes line); toggle on → Discrepancy:
         Consignee, Notify Party, badge **model answered**.
   - [ ] `/compare`, the *scanned* sample, toggle on: transcript card.
   - [ ] `/pitch` slide 3 chip reads **757 tests · 0 failing**; slide 4's
@@ -64,7 +66,7 @@ add for eight. Read the portal first, then cut.
       run, so a fresh run — the one thrown away above, or a Render restart —
       resets all three. Start another after any rehearsal that used them.
 - [ ] Open, in this tab order, so nothing is typed on stage: `/pitch` (slide
-      1) · `/runs` · `/compare` with the unfamiliar-labels sample loaded ·
+      1) · `/runs` · `/compare` with the *Labels we have never seen* sample loaded ·
       the GitHub repository.
 - [ ] Browser: 1280×720 or the projector's native size, bookmarks hidden,
       notifications off, other tabs closed.
@@ -81,8 +83,8 @@ The deck's beats and timings are in `PITCH_DECK.md`. On the product:
    thirteen seconds, 6 model calls — all six are scans transcribed for the
    reviewer.**
 2. On the run, flip **Before Sentinel**: the inbox as it arrived — 520
-   subject lines, 220 pairs to find among them, "≈ 17.6 h of work at our
-   own estimate". Classify the first five yourself (the *Your call* column;
+   subject lines, 124 SI/BL pairs to find among them, "≈ 11.2 h of work at
+   our own estimate". Classify the first five yourself (the *Your call* column;
    the clock starts at the first pick). Flip **With Sentinel**: your pace
    projected over all 520, Sentinel's 1.3 s beside it, and how many of the
    five it agreed with. *(Light theme on stage. The five calls survive
@@ -99,7 +101,7 @@ The deck's beats and timings are in `PITCH_DECK.md`. On the product:
    value **the line it was read from**. The review box asks one thing — is
    there a discrepancy between the SI and the BL? — in one row: *Confirm
    discrepancy · Flag fields… · Mark no discrepancy · Escalate · Attach
-   amended SI/BL · Draft reply*; confirming the Sentinel result is the one
+   amended SI/BL · Draft reply to counterparty*; confirming the Sentinel result is the one
    click. Then fix it where it is: *Edit* on the BL value, type what the
    shipper confirmed,
    Enter — the pair is compared again with the run's own rules, the card
@@ -120,7 +122,7 @@ The deck's beats and timings are in `PITCH_DECK.md`. On the product:
    the review box already shows *Amended documents* (nothing on file) →
    *Load a sample pair* → *Re-check* → it comes back No discrepancy, and
    the previous result stays on the case as v1.
-7. `/compare`, unfamiliar labels, **toggle off**: "wording our table has
+7. `/compare`, *Labels we have never seen*, **toggle off**: "wording our table has
    never seen — the honest answer is that it cannot read them, so it
    is *Escalated*, and it says which labels." **Toggle on**: "the model reads them, every value is re-located
    in the document before it is accepted, and it surfaces the real
@@ -145,7 +147,7 @@ their order of emphasis, and what was done with each:
 | At the top-ten stage everyone meets the brief; **differentiate on the special things** — re-check on amendment, the scan transcription, shipper history on a field, the original document beside the value, the drafted reply. | Slide 8 is now "What makes it different", five features, thirty seconds instead of fifteen. |
 | The intro should say **why the system was built** and how long a manual check takes. | Slide 2 carries both; the time is our estimate (≈4 min a pair, 20 s an email) and is labelled as one. |
 | The pitch shows the pipeline steps but not **how a person uses it**. | Slide 3's footer is the four steps: run, open a case, confirm or override it / correct a single value / attach the amended SI/BL, send the reply. |
-| Design is better and more distinctive than most of the ten. **But**: font sizes too uniform; capitalisation inconsistent (`all` vs `All`); the Compare page's samples don't look clickable; discrepancies should be visible from the list without opening a row. | Status labels are now "No discrepancy / Discrepancy / Escalated" (judges dislike "Matched/Mismatched"; the API still returns the problem statement's "No mismatch detected."). Compare samples are obvious buttons with a "Load this pair →" footer and a three-step strip above them. Run-table emphasis, chip capitalisation and the case page's type hierarchy: session 8's list. |
+| Design is better and more distinctive than most of the ten. **But**: font sizes too uniform; capitalisation inconsistent (`all` vs `All`); the Compare page's samples don't look clickable; discrepancies should be visible from the list without opening a row. | Status labels are now "No discrepancy / Discrepancy / Escalated" (judges dislike "Matched/Mismatched"; the API still returns the problem statement's "No mismatch detected."). Compare samples are obvious buttons (icon, title, tagline, "Loaded" once picked) with a three-step strip above them. Run-table emphasis, chip capitalisation and the case page's type hierarchy: session 8's list. |
 | Nav: "Pitch" says nothing; Runs could come after Compare. | Home · Compare · Runs · How it works. |
 | A judge asked another team whether **20,000 KG against 20 MT** is caught as a unit mismatch. | It is handled, and re-checked on 24 Sep: `20 MT` → 20,000 kg, `21 MT` → 21,000 kg, so 20,000 KG vs 20 MT compares equal and 20,000 KG vs 21 MT is a discrepancy. Answer below. |
 
@@ -170,14 +172,14 @@ spreadsheet cell.
 **"And pounds?"**
 Our own test on real US bills of lading found it: 8,010 KG against 8,010
 LBS read as the same weight. Now Sentinel sees that one side is in pounds
-and the other in kilograms, and sends the field to a person instead of
-passing it. It does not convert pounds, on purpose. We tried four
+and the other in kilograms, and escalates the field to a person instead
+of passing it. It does not convert pounds, on purpose. We tried four
 conversions and our old-versus-new review rejected all four, because on a
 real form the unit printed next to a number can belong to the next box. So
 the pounds check works like our scan check: it can turn a pass into a
 review, and it can never clear or condemn a Bill of Lading by itself.
 Still open, and written down: the same weight printed in each unit shows as
-a mismatch, and European notation ("12.500,00 KG") is not read.
+a discrepancy, and European notation ("12.500,00 KG") is not read.
 
 **"Have you tried it on real documents, not the organisers' data?"**
 Yes, on 25 Sep: blank forms from six carriers and industry bodies, 30 real
@@ -186,7 +188,7 @@ and 14,000 real emails. Two honest results. It cannot read most real form
 layouts yet: boxed forms with the label above the value never appear in the
 organisers' data, and on the filled carrier forms it read 0 of 42 fields.
 And it never cleared or condemned a real document it could not read: every
-one went to a person with the reason. The test also found ways a real
+one was escalated to a person with the reason. The test also found ways a real
 document could fool the rules; we fixed only what survived three rounds of
 old-versus-new review and wrote the rest down (`EXTERNAL_VALIDATION.md`).
 

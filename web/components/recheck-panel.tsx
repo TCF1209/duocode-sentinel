@@ -239,12 +239,24 @@ export function RecheckPanel({
 /** "Discrepancy: Port of Discharge — confirmed by reviewer": what stood for a
  *  superseded version, review included, the same way the live case is
  *  reported (store.py's effective outcome), so "Previous result" and
- *  "Current result" compare like with like. */
+ *  "Current result" compare like with like. The review is named by the
+ *  outcome it left, as the metrics count it (store.py's review_summary):
+ *  still escalated is Unresolved, Sentinel's own outcome is Confirmed,
+ *  anything else is Overridden. */
 function whatStood(v: CaseVersion): string {
   const outcome = describeOutcome(v.effective.status, v.effective.defect_fields);
   if (!v.review) return outcome;
-  if (v.review.decision === "confirm") return `${outcome} — confirmed by reviewer`;
-  return `${outcome} — overridden by reviewer; Sentinel result: ${describeOutcome(v.report.status, v.report.defect_fields)}`;
+  const sentinel = `Sentinel result: ${describeOutcome(v.report.status, v.report.defect_fields)}`;
+  if (v.effective.status === "NEEDS_REVIEW") {
+    // "Escalated -- ...; Sentinel result: Escalated" would contradict itself.
+    return `${outcome} — left unresolved by reviewer${v.report.status === "NEEDS_REVIEW" ? "" : `; ${sentinel}`}`;
+  }
+  const sameAsSentinel =
+    v.effective.status === v.report.status &&
+    v.effective.defect_fields.length === v.report.defect_fields.length &&
+    v.effective.defect_fields.every((f) => v.report.defect_fields.includes(f));
+  if (sameAsSentinel) return `${outcome} — confirmed by reviewer`;
+  return `${outcome} — overridden by reviewer; ${sentinel}`;
 }
 
 function VersionRow({ v, caseId }: { v: CaseVersion; caseId?: string }) {

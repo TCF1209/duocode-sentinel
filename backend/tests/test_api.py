@@ -706,7 +706,8 @@ class TestReviewInPlace:
     ) -> None:
         """The metrics page's "Reviewer decisions": a reviewer who could not
         decide leaves the case escalated, which is not an override of the
-        Sentinel result and is not counted as one."""
+        Sentinel result and is not counted as one. A review is counted by the
+        outcome it left, whichever button was pressed."""
         run_id = _finished_run(client, synthetic_inbox, monkeypatch)
 
         # Could not decide on email_002 (MISMATCH on consignee): no per-field
@@ -728,4 +729,19 @@ class TestReviewInPlace:
 
         assert client.get("/metrics", params={"run_id": run_id}).json()["review"] == {
             "reviewed": 2, "confirmed": 0, "corrected": 1, "unresolved": 1,
+        }
+
+        # email_002 re-reviewed, "corrected" to exactly Sentinel's answer: this
+        # replaces the undecided review and counts as Confirmed.
+        same = client.post(
+            f"/cases/{run_id}:email_002/review",
+            json={"decision": "correct", "status": "MISMATCH", "defect_fields": ["consignee"]},
+        )
+        assert same.status_code == 200, same.text
+        # email_003 (NEEDS_REVIEW) confirmed as it stands: still escalated.
+        still_escalated = client.post(f"/cases/{run_id}:email_003/review", json={"decision": "confirm"})
+        assert still_escalated.status_code == 200, still_escalated.text
+
+        assert client.get("/metrics", params={"run_id": run_id}).json()["review"] == {
+            "reviewed": 3, "confirmed": 1, "corrected": 1, "unresolved": 1,
         }

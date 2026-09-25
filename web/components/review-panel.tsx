@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, Sparkles, Undo2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, Sparkles, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, VerdictBadge } from "@/components/status-badges";
-import { FIELD_LABELS, STATUS_LABELS, reviewReasonClause } from "@/lib/labels";
+import { FIELD_LABELS, REVIEW_REASON_TEXT, STATUS_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import type { CaseReport, CaseStatus, FieldComparisonReport, FieldCorrection, FieldDecision, ReviewBody } from "@/lib/api";
 
@@ -17,6 +17,18 @@ export function describeOutcome(status: CaseStatus, defectFields: string[]): str
   const label = STATUS_LABELS[status];
   if (status !== "MISMATCH" || defectFields.length === 0) return label;
   return `${label} (${defectFields.map((f) => FIELD_LABELS[f] ?? f).join(", ")})`;
+}
+
+/** Why Sentinel escalated a case, as a sentence. The gate files a pound
+ *  figure and an OCR-confusable value under "unreadable" (the organisers'
+ *  four reasons are fixed), and with both documents read "A document could
+ *  not be read." would be false -- so there it says what is actually left. */
+export function escalationText(report: CaseReport): string | null {
+  if (!report.review_reason) return null;
+  const bothRead = Boolean(report.documents.si?.readable && report.documents.bl?.readable);
+  const valueToCheck = report.fields.some((f) => f.reason === "unit_differs" || f.reason === "ocr_confusable");
+  if (report.review_reason === "unreadable" && bothRead && valueToCheck) return "A value needs a manual check.";
+  return REVIEW_REASON_TEXT[report.review_reason];
 }
 
 /**
@@ -123,6 +135,9 @@ const TONE: Record<CaseStatus, { container: string; icon: string }> = {
   MISMATCH: { container: "border-danger/40 bg-danger-bg", icon: "text-danger" },
   NEEDS_REVIEW: { container: "border-warn/40 bg-warn-bg", icon: "text-warn" },
 };
+// Grey, for a case with nothing to compare yet: green there would claim a
+// check that never ran.
+const NEUTRAL_TONE = { container: "bg-muted/40", icon: "text-foreground" };
 
 /**
  * The box a reviewer decides a case in: what Sentinel found, as a heading
@@ -139,6 +154,8 @@ export function ReviewBox({
   heading,
   line,
   saving,
+  neutral,
+  record,
   children,
   below,
 }: {
@@ -148,21 +165,36 @@ export function ReviewBox({
    *  an escalated case why it stopped and what to do about it. */
   line: ReactNode;
   saving?: boolean;
+  /** Grey instead of the status colour (NEUTRAL_TONE). */
+  neutral?: boolean;
+  /** Once a review is saved, its record (ReviewSummary) in place of the
+   *  heading and the line, in the record's grey. The box itself stays --
+   *  one component in both states -- so whatever is open in its row (a
+   *  reply draft being edited, files chosen for a re-check) survives a
+   *  confirm or a withdraw; swapping in another component remounted them. */
+  record?: ReactNode;
   /** The row of findings. Absent on /compare, which has no review: the box
    *  is then the heading and the line alone. */
   children?: ReactNode;
   below?: ReactNode;
 }) {
-  const tone = TONE[status];
-  const Icon = status === "OK" ? CheckCircle2 : AlertTriangle;
+  const tone = neutral ? NEUTRAL_TONE : TONE[status];
+  const Icon = neutral ? Info : status === "OK" ? CheckCircle2 : AlertTriangle;
   return (
-    <div className={cn("rounded-lg border p-4", tone.container)} data-testid="review-actions">
-      <div className="flex flex-wrap items-center gap-2">
-        <Icon className={cn("size-4", tone.icon)} strokeWidth={2} />
-        <div className={cn("text-sm font-semibold", tone.icon)}>{heading}</div>
-        {saving && <span className="text-xs text-muted-foreground">Saving…</span>}
-      </div>
-      <p className="mt-1.5 text-xs text-muted-foreground">{line}</p>
+    <div
+      className={cn("rounded-lg border p-4", record ? "bg-muted/40 text-sm" : tone.container)}
+      data-testid={record ? "review-summary" : "review-actions"}
+    >
+      {record ?? (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <Icon className={cn("size-4", tone.icon)} strokeWidth={2} />
+            <div className={cn("text-sm font-semibold", tone.icon)}>{heading}</div>
+            {saving && <span className="text-xs text-muted-foreground">Saving…</span>}
+          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">{line}</p>
+        </>
+      )}
       {children && <div className="mt-3 flex flex-wrap items-center gap-2">{children}</div>}
       {below && <div className="mt-3">{below}</div>}
     </div>
@@ -211,20 +243,11 @@ function NoteField({ value, onSave, onDone }: { value: string; onSave: (note: st
  * said -- both kept, because "the system said X, a person said Y, here is
  * what both were looking at" is the whole point of the page; hiding X would
  * turn an audit trail into a silent overwrite. The field cards below show
- * the same thing one field at a time. `children` end the row (the amended
- * documents button, the reply draft); `below` is what a button opened.
+ * the same thing one field at a time. Rendered as ReviewBox's `record`: the
+ * box keeps the row (the findings, the amended documents button, the reply
+ * draft) and what a button opened under it.
  */
-export function ReviewSummary({
-  report,
-  control,
-  children,
-  below,
-}: {
-  report: CaseReport;
-  control: ReviewController;
-  children?: ReactNode;
-  below?: ReactNode;
-}) {
+export function ReviewSummary({ report, control }: { report: CaseReport; control: ReviewController }) {
   const [noteOpen, setNoteOpen] = useState(false);
   const { draft } = control;
   const review = report.review;
@@ -232,13 +255,25 @@ export function ReviewSummary({
   const saving = control.busy !== null;
   const savedCase = control.flash === "case";
   const after = report.effective ?? { status: review.status, defect_fields: review.defect_fields };
-  const agreed = review.decision === "confirm";
+  // One rule for the review state, whichever button made the review:
+  // still escalated after it is Unresolved; otherwise Confirmed when the
+  // outcome is Sentinel's own (same status, same fields), Overridden when not.
+  const sameFields = [...after.defect_fields].sort().join() === [...report.defect_fields].sort().join();
+  const state =
+    after.status === "NEEDS_REVIEW"
+      ? "Unresolved"
+      : after.status === report.status && sameFields
+        ? "Confirmed"
+        : "Overridden";
   const fieldNames = (fields: string[]) => fields.map((f) => FIELD_LABELS[f] ?? f).join(", ");
+  const reason = escalationText(report);
   const sentinelSaid = (
     <>
       <StatusBadge status={report.status} />
       {report.status === "MISMATCH" && report.defect_fields.length > 0 && <span>{fieldNames(report.defect_fields)}</span>}
-      {report.status === "NEEDS_REVIEW" && report.review_reason && <span>— {reviewReasonClause(report.review_reason)}</span>}
+      {report.status === "NEEDS_REVIEW" && reason && (
+        <span>— {reason.charAt(0).toLowerCase() + reason.slice(1).replace(/\.$/, "")}</span>
+      )}
     </>
   );
   // What the reviewer changed, one line per field -- a corrected value with
@@ -295,7 +330,7 @@ export function ReviewSummary({
   const label = "text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:pt-1";
   const cell = "flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1";
   return (
-    <div className="rounded-lg border bg-muted/40 p-4 text-sm" data-testid="review-summary">
+    <>
       <div className="flex flex-wrap items-center gap-2 font-medium">
         Review record
         {saving ? (
@@ -313,22 +348,9 @@ export function ReviewSummary({
         <span className={cell}>{sentinelSaid}</span>
         <span className={label}>Reviewer decision</span>
         <span className={cell}>
-          {agreed ? (
-            <>
-              <StatusBadge status={report.status} />
-              <span>Confirmed</span>
-            </>
-          ) : draft.cantTell ? (
-            <>
-              <StatusBadge status="NEEDS_REVIEW" />
-              <span>Unresolved</span>
-            </>
-          ) : (
-            <>
-              <StatusBadge status={after.status} />
-              {after.status === "MISMATCH" && after.defect_fields.length > 0 && <span>{fieldNames(after.defect_fields)}</span>}
-            </>
-          )}
+          <StatusBadge status={after.status} />
+          {after.status === "MISMATCH" && after.defect_fields.length > 0 && <span>{fieldNames(after.defect_fields)}</span>}
+          <span>· {state}</span>
         </span>
         {changes.length > 0 && (
           <>
@@ -382,10 +404,8 @@ export function ReviewSummary({
             {draft.note ? "Edit note" : "Add note"}
           </button>
         )}
-        {children}
       </div>
-      {below && <div className="mt-3">{below}</div>}
-    </div>
+    </>
   );
 }
 

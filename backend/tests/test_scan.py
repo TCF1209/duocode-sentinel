@@ -211,6 +211,21 @@ def test_stubbed_client_produces_a_transcript(tmp_path):
     assert scan.transcript_of(doc) is transcript
     assert transcript.note in doc.notes
 
+    # A printed caption the model copied in front of a value is not part of
+    # it (seen live on email_512's BL: "Shipper: APRIL FAR EAST (M) SDN BHD").
+    # A colon that is not a caption for this field stays.
+    captioned = {**FULL_ANSWER, "fields": [
+        {"field": "shipper", "value": "Shipper: APRIL FAR EAST (M) SDN BHD", "legible": True},
+        {"field": "notify_party", "value": "Notify: AL GURG STATIONERY LLC", "legible": True},
+        {"field": "port_of_loading", "value": "Port of Loading: NHAVA SHEVA, INDIA", "legible": True},
+        {"field": "consignee", "value": "ATTN: AL GURG STATIONERY LLC", "legible": True},
+    ]}
+    by_field = {f.field: f.value for f in scan.transcribe(doc, data, client=StubClient(captioned)).fields}
+    assert by_field["shipper"] == "APRIL FAR EAST (M) SDN BHD"
+    assert by_field["notify_party"] == "AL GURG STATIONERY LLC"
+    assert by_field["port_of_loading"] == "NHAVA SHEVA, INDIA"
+    assert by_field["consignee"] == "ATTN: AL GURG STATIONERY LLC"
+
 
 def test_the_call_is_cheap_and_carries_the_page(tmp_path):
     doc, data = scan_doc(tmp_path)

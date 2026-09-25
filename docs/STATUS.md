@@ -4,6 +4,58 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-25 (evening, latest) — Claude session · the final-round branch reviewed, fixed and tested end to end
+
+**Done**
+- The branch tip (terms pass + pounds merge) was reviewed by five reviewers
+  with an adversarial check on every finding: 23 confirmed, 0 refuted, and
+  none of the nine earlier findings fixed yet. All were fixed in four file
+  groups, each group reviewed again and repaired:
+  - **Case page:** an OK case with no documents (91 of 220, e.g.
+    `email_003`) reads "Nothing to compare yet" with the sender's request
+    and only Confirm / Escalate, not "All 0 fields are consistent" with an
+    empty picker; "Flag fields" saved unchanged records a confirm; the
+    reply draft survives Confirm and Withdraw (one ReviewBox for both
+    states); `?spotlight=history` scrolls once the history exists; a saved
+    review can be changed ("Change decision"); an edit or an accepted scan
+    transcription drops the earlier call on that field; the "Sentinel
+    result" view switches off on Withdraw; a pounds/OCR escalation says "A
+    value needs a manual check", not "A document could not be read".
+  - **Reply drafts:** reviewed values are quoted after a scan transcription
+    (it quoted "?"); the pattern email no longer claims "the same
+    discrepancy"; replies that ask for nothing are not subjected "action
+    required".
+  - **Run page / home:** the manual estimate counts the 124 SI/BL pairs, not
+    220 comparisons (≈ 11.2 h, PITCH_DAY step 2 follows); the Review filter
+    applies only to reviewable cases and clears on other categories;
+    `attachments ?? []`; one rule for review states everywhere (Unresolved
+    while still escalated, else Confirmed when Sentinel's outcome stands,
+    else Overridden), with `system_defect_fields` added to the case list so
+    the run page and `store.review_summary` agree.
+  - **Metrics / labels:** Unresolved tile only when the backend sends it;
+    "Sentinel result at run end" on the pie; "Units differ:" on the pounds
+    field; re-check history no longer calls an Unresolved review
+    "overridden".
+- Found during the end-to-end test: on a model-tier run the BL scan
+  transcript can carry the printed caption ("Shipper: APRIL FAR EAST (M)
+  SDN BHD"), and accepting it turned five agreeing fields into
+  discrepancies. `readers/scan.py` now drops a leading caption only when the
+  label table resolves it to the same field. Re-run live: Accept gives
+  No discrepancy.
+- End to end on a local API + dashboard (autorun and a model-tier run):
+  run page (Before view, filters), `email_003`, `email_004` (confirm, flag
+  unchanged, mark no discrepancy, edit, withdraw, reply draft kept),
+  `email_512` (transcription → accept → reply), `email_506` (sample pair →
+  re-check → v1), history spotlight, Compare (unfamiliar labels, a pounds
+  upload), metrics, patterns. 757 tests; six datasets field-by-field
+  identical; `submission.json` byte-identical (`1c08cd2…`), score 1.0000.
+
+**Careful**
+- Render and Vercel must serve the same commit before the demo: the metrics
+  tiles and the run page's review tags read fields this commit adds.
+
+---
+
 ## 2026-09-25 (evening, later) — Claude session · `origin/main` (pounds) merged into the final-round branch
 
 **Done**

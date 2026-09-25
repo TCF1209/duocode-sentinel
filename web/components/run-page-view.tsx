@@ -22,6 +22,7 @@ import { ViewModeSwitch } from "@/components/view-mode-switch";
 import {
   formatHours,
   formatSeconds,
+  hasPair,
   manualWorkload,
   MINUTES_TO_CHECK_ONE_PAIR,
   SECONDS_TO_READ_ONE_EMAIL,
@@ -48,9 +49,9 @@ const STATUSES: CaseStatus[] = ["OK", "MISMATCH", "NEEDS_REVIEW"];
 // the row. The labels are the review record's own (case page): a reviewer
 // *confirms* the Sentinel result, *overrides* it, or leaves it
 // *unresolved*; the keys stay as they were, since they are the ?review=
-// values in saved links. Only a document check (BL_COMPARISON) is ever
-// reviewed; the other categories have nothing to compare, so they never
-// carry a state here.
+// values in saved links. Only a comparison with something to review carries
+// a state here (`reviewable` below); every other email is left out of the
+// filter and the count, never listed as "Not reviewed".
 type ReviewFilter = "pending" | "agreed" | "corrected" | "cant_tell";
 const REVIEW_FILTERS: ReviewFilter[] = ["pending", "agreed", "corrected", "cant_tell"];
 const REVIEW_FILTER_LABELS: Record<ReviewFilter, string> = {
@@ -62,7 +63,7 @@ const REVIEW_FILTER_LABELS: Record<ReviewFilter, string> = {
 const REVIEW_TAG_TITLE: Record<Exclude<ReviewFilter, "pending">, string> = {
   agreed: "The reviewer confirmed the Sentinel result",
   corrected: "The reviewer overrode the Sentinel result; both are kept on the case",
-  cant_tell: "The reviewer could not decide; the case stays escalated",
+  cant_tell: "The case is still escalated after the review",
 };
 type ListOrder = "attention" | "inbox";
 const LIST_ORDERS: ListOrder[] = ["attention", "inbox"];
@@ -81,12 +82,37 @@ const STATUS_DOT: Record<CaseStatus, string> = { OK: "bg-ok", MISMATCH: "bg-dang
 // left-aligned badges as "not lined up"). `text-center` here overrides the
 // `text-left` that TableHead carries by default.
 const TH = "text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground";
-const reviewable = (c: CaseSummary) => c.category === "BL_COMPARISON";
+// The comparisons a reviewer has something to decide on: a pair that
+// arrived with the email (lib/manual-estimate.ts), an escalation (a document
+// missing or unreadable), or a case that has moved on since the run --
+// re-checked on amended documents, or already reviewed. A request that
+// arrived with nothing attached and was cleared has nothing to review.
+const reviewable = (c: CaseSummary) =>
+  c.category === "BL_COMPARISON" &&
+  (hasPair(c) || c.system_status === "NEEDS_REVIEW" || c.recheck_count > 0 || c.reviewed);
+// The one rule for a saved review, the same as the metrics page's tiles
+// (backend/api/store.py's review_summary), judged by the outcome it left
+// rather than the button pressed: Unresolved while the case is still
+// escalated, else Confirmed when the outcome is Sentinel's own, else
+// Overridden.
 function reviewStateOf(c: CaseSummary): ReviewFilter {
-  // A reviewer only ever moves a case *to* Escalated by leaving it Unresolved.
-  if (c.outcome_source === "review") return c.status === "NEEDS_REVIEW" ? "cant_tell" : "corrected";
-  return c.reviewed ? "agreed" : "pending";
+  if (!c.reviewed) return "pending";
+  if (c.status === "NEEDS_REVIEW") return "cant_tell";
+  // A confirmation leaves Sentinel's outcome standing; so does a correction
+  // that lands on Sentinel's own status and, for a Discrepancy, on the same
+  // fields. An API without system_defect_fields cannot show that, so such a
+  // Discrepancy reads Overridden, as before.
+  if (c.outcome_source !== "review" || (c.status === c.system_status && sameOutcomeFields(c))) return "agreed";
+  return "corrected";
 }
+function sameOutcomeFields(c: CaseSummary): boolean {
+  if (c.status !== "MISMATCH") return true;
+  if (!c.system_defect_fields) return false;
+  return [...c.defect_fields].sort().join() === [...c.system_defect_fields].sort().join();
+}
+// The email's attachment names; `?? []`: an API from before the field
+// existed leaves it out, and the Before table must not throw on that.
+const attachmentsOf = (c: CaseSummary): string[] => c.attachments ?? [];
 
 /** The "classify five yourself" exercise (Before Sentinel): the visitor's
  *  own calls and the wall-clock times of their first and last pick. Kept in
@@ -246,20 +272,28 @@ export function RunPageView({ runId }: { runId: string }) {
   // five-email exercise can measure. The two are kept apart on screen.
   const perEmailSeconds = guessDone && firstFive.length > 0 ? guessSeconds / firstFive.length : 0;
   const classifyAllSeconds = perEmailSeconds * allCases.length;
-  const pairCheckHours = (workload.comparisons * MINUTES_TO_CHECK_ONE_PAIR) / 60;
+  const pairCheckHours = (workload.pairs * MINUTES_TO_CHECK_ONE_PAIR) / 60;
+
+  // A category with nothing to compare has no review state to filter by: the
+  // Review select is disabled there, and a review filter from a saved
+  // ?review= link is not applied under it.
+  const reviewFilterOff = categoryFilter !== null && categoryFilter !== "BL_COMPARISON";
+  const activeReview = reviewFilterOff ? null : reviewFilter;
 
   // The one place a filter actually narrows what's shown. Everything that
   // used to read the old server-filtered `cases` for a *count of the whole
   // run* (the pattern alerts, the stat strip, "how many cases total") reads
   // allCases instead now: computing those from a filtered fetch meant they
   // silently meant "of the filtered subset" the moment a filter was active,
-  // which nothing on screen said out loud.
+  // which nothing on screen said out loud. The Review filter only ever
+  // matches a reviewable comparison, so "Not reviewed" is never every email
+  // that has no review.
   const visibleCases = useMemo(() => {
     const filtered = allCases.filter(
       (c) =>
         (!categoryFilter || c.category === categoryFilter) &&
         (!statusFilter || c.status === statusFilter) &&
-        (!reviewFilter || reviewStateOf(c) === reviewFilter),
+        (!activeReview || (reviewable(c) && reviewStateOf(c) === activeReview)),
     );
     if (order === "inbox") return filtered;
     // Mismatches first, the ones with more fields wrong ahead of the rest,
@@ -268,7 +302,7 @@ export function RunPageView({ runId }: { runId: string }) {
     return [...filtered].sort(
       (a, b) => ATTENTION_RANK[a.status] - ATTENTION_RANK[b.status] || b.defect_fields.length - a.defect_fields.length,
     );
-  }, [allCases, categoryFilter, statusFilter, reviewFilter, order]);
+  }, [allCases, categoryFilter, statusFilter, activeReview, order]);
 
   // Keys the two row lists below, so a filter change swaps the whole list at
   // once instead of exit-animating every row that just left it. Measured
@@ -277,7 +311,7 @@ export function RunPageView({ runId }: { runId: string }) {
   // after 5s, each exiting row forcing a reflow of the whole table. Within
   // one filter the key is stable, so rows appended by a live run still
   // animate in one by one exactly as before.
-  const filterKey = `${categoryFilter ?? ""}|${statusFilter ?? ""}|${reviewFilter ?? ""}|${order}`;
+  const filterKey = `${categoryFilter ?? ""}|${statusFilter ?? ""}|${activeReview ?? ""}|${order}`;
 
   // Feeds the stat strip below. Counted from allCases (effective status,
   // always the whole run) rather than trusted from run.metrics.by_status --
@@ -312,8 +346,6 @@ export function RunPageView({ runId }: { runId: string }) {
     }
     return counts;
   }, [allCases]);
-  // A category with nothing to compare has no review state to filter by.
-  const reviewFilterOff = categoryFilter !== null && categoryFilter !== "BL_COMPARISON";
 
   // Not wrapped in useCallback: the React Compiler in this project memoizes
   // call sites automatically, and a manual dependency array here previously
@@ -328,11 +360,14 @@ export function RunPageView({ runId }: { runId: string }) {
   }) {
     const category = next.category !== undefined ? next.category : categoryFilter;
     const status = next.status !== undefined ? next.status : statusFilter;
-    const review = next.review !== undefined ? next.review : reviewFilter;
+    // A category with nothing to review clears the Review filter, so it
+    // neither stays in the URL nor comes back unseen on "All".
+    const reviewOff = category !== null && category !== "BL_COMPARISON";
+    const review = reviewOff ? null : next.review !== undefined ? next.review : reviewFilter;
     const nextOrder = next.order !== undefined ? next.order : order;
     if (next.category !== undefined) setCategoryFilter(next.category);
     if (next.status !== undefined) setStatusFilter(next.status);
-    if (next.review !== undefined) setReviewFilter(next.review);
+    if (next.review !== undefined || reviewOff) setReviewFilter(review);
     if (next.order !== undefined) setOrder(next.order);
 
     const params = new URLSearchParams();
@@ -585,8 +620,8 @@ export function RunPageView({ runId }: { runId: string }) {
               <span className="font-medium tabular-nums">{workload.emails.toLocaleString()}</span> emails to read
             </span>
             <span>
-              <span className="font-medium tabular-nums">{workload.comparisons.toLocaleString()}</span> comparison requests to
-              find among them
+              <span className="font-medium tabular-nums">{workload.pairs.toLocaleString()}</span> SI/BL pairs to find among
+              them
             </span>
             <span>
               <span className="font-medium tabular-nums">{workload.fields.toLocaleString()}</span> fields to check manually
@@ -633,13 +668,13 @@ export function RunPageView({ runId }: { runId: string }) {
                   select below does, so the number and the control can never
                   mean different things. */}
               <span
-                title={`${reviewCounts.agreed} confirmed · ${reviewCounts.corrected} overridden · ${reviewCounts.cant_tell} unresolved · ${reviewCounts.pending} not reviewed — of the ${reviewCounts.checks} comparisons; other categories have no SI/BL pair to review`}
+                title={`${reviewCounts.agreed} confirmed · ${reviewCounts.corrected} overridden · ${reviewCounts.cant_tell} unresolved · ${reviewCounts.pending} not reviewed — of the ${reviewCounts.checks} comparisons with an SI/BL pair or an escalation to review; a request with nothing attached, and every other category, has nothing to review`}
               >
                 Reviewed{" "}
                 <span className="font-medium tabular-nums text-foreground">
                   {reviewCounts.agreed + reviewCounts.corrected + reviewCounts.cant_tell}
                 </span>{" "}
-                / {reviewCounts.checks} comparisons
+                / {reviewCounts.checks} comparisons to review
               </span>
               {run?.metrics && (
                 <span>
@@ -653,7 +688,7 @@ export function RunPageView({ runId }: { runId: string }) {
             <label className="flex items-center gap-1.5 text-muted-foreground">
               <span className="w-24 shrink-0">Review</span>
               <select
-                value={reviewFilterOff ? "" : (reviewFilter ?? "")}
+                value={activeReview ?? ""}
                 disabled={reviewFilterOff}
                 title={reviewFilterOff ? "Only comparison requests are reviewed; this category has no SI/BL pair" : undefined}
                 onChange={(e) => setFilters({ review: (e.target.value || null) as ReviewFilter | null })}
@@ -689,7 +724,7 @@ export function RunPageView({ runId }: { runId: string }) {
                   ? `${allCases.length} cases`
                   : `Showing ${visibleCases.length} of ${allCases.length}`}
               </span>
-              {(categoryFilter || statusFilter || reviewFilter) && (
+              {(categoryFilter || statusFilter || activeReview) && (
                 <button
                   type="button"
                   onClick={() => setFilters({ category: null, status: null, review: null })}
@@ -774,7 +809,7 @@ export function RunPageView({ runId }: { runId: string }) {
           <div className="pl-6">
             All {allCases.length.toLocaleString()} at that pace:{" "}
             <span className="font-medium tabular-nums">≈ {formatSeconds(classifyAllSeconds)}</span>. Plus{" "}
-            {workload.comparisons.toLocaleString()} pair checks at {MINUTES_TO_CHECK_ONE_PAIR} min each:{" "}
+            {workload.pairs.toLocaleString()} pair checks at {MINUTES_TO_CHECK_ONE_PAIR} min each:{" "}
             <span className="font-medium tabular-nums">+ {formatHours(pairCheckHours)}</span>{" "}
             <span className="text-muted-foreground">(estimate)</span>.
           </div>
@@ -904,9 +939,9 @@ export function RunPageView({ runId }: { runId: string }) {
                         </TableCell>
                         <TableCell
                           className="max-w-[16rem] truncate text-xs text-muted-foreground"
-                          title={c.attachments.join(", ")}
+                          title={attachmentsOf(c).join(", ")}
                         >
-                          {c.attachments.length > 0 ? c.attachments.join(", ") : "—"}
+                          {attachmentsOf(c).length > 0 ? attachmentsOf(c).join(", ") : "—"}
                         </TableCell>
                         <TableCell>
                           {firstFive.some((f) => f.email_id === c.email_id) ? (
@@ -1095,8 +1130,8 @@ function BeforeRowCard({
           </div>
           <div className="truncate text-sm">{c.subject || "(no subject)"}</div>
           <div className="truncate text-xs text-muted-foreground">{c.sender || "—"}</div>
-          {c.attachments.length > 0 && (
-            <div className="truncate text-xs text-muted-foreground">{c.attachments.join(", ")}</div>
+          {attachmentsOf(c).length > 0 && (
+            <div className="truncate text-xs text-muted-foreground">{attachmentsOf(c).join(", ")}</div>
           )}
         </motion.div>
       </Link>

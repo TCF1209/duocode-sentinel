@@ -199,7 +199,7 @@ const REASON_TEXT: Record<string, string> = {
   ocr_confusable:
     "Possible OCR error: the values differ only in look-alike characters (O/0, I/1, S/5, B/8). Verify both against the documents.",
   unit_differs:
-    "Unit discrepancy: the same figure is in pounds on one side and in kilograms or tonnes on the other; Sentinel does not convert pounds. Convert (1 lb = 0.4536 kg) and verify.",
+    "Units differ: the same figure is in pounds on one side and in kilograms or tonnes on the other; Sentinel does not convert pounds. Convert (1 lb = 0.4536 kg) and verify.",
 };
 
 // Any other code: "si_x_y" -> "SI x y", not "Si x y" -- si/bl are the

@@ -178,9 +178,12 @@ function questionLine(f: FieldComparisonReport): string {
         `value; ${otherSide(f, "si")}.`
       );
     case "unit_differs":
+      // Named without the "(kg)" of the column heading: which unit is right
+      // is the very thing this line asks.
       return (
-        `  - ${name}: the Shipping Instruction shows "${f.si.raw ?? ""}" and the draft Bill of Lading ` +
-        `shows "${f.bl.raw ?? ""}"; the figures are the same but the units are not, so one of them needs correcting.`
+        `  - ${name.replace(/\s*\(kg\)$/, "")}: the Shipping Instruction shows "${f.si.raw ?? ""}" and the ` +
+        `draft Bill of Lading shows "${f.bl.raw ?? ""}"; the figures are the same but the units differ, so ` +
+        "one of the two documents needs amending."
       );
     default: // ocr_confusable
       return (
@@ -188,6 +191,27 @@ function questionLine(f: FieldComparisonReport): string {
         `shows "${f.bl.raw ?? ""}"; they differ only in characters that are easy to misread on a scan.`
       );
   }
+}
+
+/**
+ * One side of a discrepancy as the reply quotes it. When the outcome is the
+ * reviewer's, it is the value that outcome was compared on: after "Use scan
+ * transcription" on email_512 the run read nothing off either scan, and the
+ * accepted transcription is the only reading there is. null, never a guess,
+ * when no side value exists.
+ */
+function quotedValue(report: CaseReport, f: FieldComparisonReport, side: Side): string | null {
+  const reviewed =
+    report.effective?.source === "review" ? report.review?.field_verdicts?.[f.field]?.[side].raw : null;
+  return (reviewed ?? f[side].raw ?? "").trim() || null;
+}
+
+function discrepancyLine(report: CaseReport, f: FieldComparisonReport): string {
+  const says = (side: Side, name: string) => {
+    const value = quotedValue(report, f, side);
+    return value ? `${name} says "${value}"` : `${name} has no value we could read`;
+  };
+  return `  - ${label(f.field)}: ${says("si", "SI")}, ${says("bl", "draft BL")}`;
 }
 
 function mismatchLine(f: FieldComparisonReport): string {
@@ -397,6 +421,9 @@ export function replyDraftKey(report: CaseReport): string {
     e.review_reason ?? "",
     [...e.defect_fields].sort().join(","),
     report.recheck?.count ?? 0,
+    // The discrepancy lines quote corrected values, which can change while
+    // the status and fields stay the same.
+    report.effective?.source === "review" ? JSON.stringify(report.review?.corrections ?? {}) : "",
   ].join("|");
 }
 
@@ -444,17 +471,18 @@ export function buildReplyDraft(report: CaseReport, reference = report.email_id)
       closing: "Thank you.",
     };
   } else if (status === "NEEDS_REVIEW") {
-    fallbackSubject = "SI/BL check on hold: action required";
     parts = reviewParts(report, reviewReason);
+    // These two ask the recipient for nothing, so the subject must not either.
+    fallbackSubject = ["scanned_copies", "review_generic"].includes(parts.situation)
+      ? "SI/BL check: manual review in progress"
+      : "SI/BL check on hold: action required";
   } else {
     fallbackSubject = "discrepancy found between SI and draft BL";
     parts = {
       situation: "discrepancy",
       greeting: GREETING,
       context: "We compared the draft Bill of Lading against the Shipping Instruction and found discrepancies in the following fields.",
-      facts: report.fields
-        .filter((f) => defectFields.includes(f.field))
-        .map((f) => `  - ${label(f.field)}: SI says "${f.si.raw ?? "?"}", draft BL says "${f.bl.raw ?? "?"}"`),
+      facts: report.fields.filter((f) => defectFields.includes(f.field)).map((f) => discrepancyLine(report, f)),
       action: "Could you please confirm which value is correct so we can finalise the Bill of Lading?",
       closing: "Thank you.",
     };
@@ -514,7 +542,9 @@ export function buildPatternDraft(shipper: string, fieldLabel: string, emailIds:
     body: [
       "Hello,",
       "",
-      `Across ${emailIds.length} recent shipments from ${shipper}, we've found the same discrepancy on this ` +
+      // The pattern groups on shipper and field only, never on the values, so
+      // the field is what is shared; each shipment's discrepancy can differ.
+      `Across ${emailIds.length} recent shipments from ${shipper}, we've found a discrepancy on the same ` +
         `field between the Shipping Instruction and the draft Bill of Lading: ${fieldLabel}.`,
       "",
       "Affected bookings:",

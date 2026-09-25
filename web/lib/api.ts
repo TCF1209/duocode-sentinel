@@ -212,6 +212,9 @@ export interface CaseSummary {
   /** What Sentinel itself said, kept beside the effective status so a row a
    *  person overrode does not look like a row we got right. */
   system_status: CaseStatus;
+  /** Sentinel's own discrepant fields. Optional: an API from before the
+   *  field leaves it out. */
+  system_defect_fields?: string[];
   /** How many times this case was re-checked on re-sent documents; 0 for
    *  almost every row. See CaseReport.recheck. */
   recheck_count: number;
