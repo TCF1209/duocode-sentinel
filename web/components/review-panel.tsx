@@ -85,6 +85,18 @@ export function draftFromReview(report: CaseReport): CorrectionDraft {
   return { decisions, corrections: {}, cantTell: r.decision === "correct" && r.status === "NEEDS_REVIEW", note: r.note ?? "" };
 }
 
+/** The saved review is corrected values and nothing else: no call on any
+ *  field, not Escalate / Keep escalated. The outcome then follows from the
+ *  values alone, so the page says "After corrections" and offers "Record a
+ *  decision" instead of "Reviewer decision" / "Change decision" (a first-time
+ *  reviewer read those as a decision they had not made). One rule, read from
+ *  the saved review, for the record, the header toggle and the button alike.
+ *  A record from before per-field choices existed never counts. */
+export function isValuesOnly(report: CaseReport): boolean {
+  const saved = draftFromReview(report);
+  return Object.keys(saved.corrections).length > 0 && Object.keys(saved.decisions).length === 0 && !saved.cantTell;
+}
+
 /** The request that saves a draft: a whole-case agreement when it changes
  *  nothing, a correction otherwise -- the choices and corrected values
  *  themselves, so the backend derives the outcome and the review reads back
@@ -265,6 +277,18 @@ export function ReviewSummary({ report, control }: { report: CaseReport; control
       : after.status === report.status && sameFields
         ? "Confirmed"
         : "Overridden";
+  const stateTitle = {
+    Confirmed: "The outcome is the Sentinel result",
+    Overridden: "The outcome differs from the Sentinel result",
+    Unresolved: "The case is still escalated",
+  }[state];
+  const valuesOnly = isValuesOnly(report);
+  // Corrected values alone and still escalated: say what is left, so
+  // "Unresolved" is not read as nothing having happened.
+  const stillOpen = report.fields.filter(
+    (f) => (review.field_verdicts?.[f.field]?.stands ?? f.verdict) === "UNCOMPARABLE",
+  ).length;
+  const hasCorrections = Object.keys(draft.corrections).length > 0;
   const fieldNames = (fields: string[]) => fields.map((f) => FIELD_LABELS[f] ?? f).join(", ");
   const reason = escalationText(report);
   const sentinelSaid = (
@@ -346,11 +370,27 @@ export function ReviewSummary({ report, control }: { report: CaseReport; control
       <div className="mt-2 grid gap-x-4 gap-y-1.5 sm:grid-cols-[10rem_minmax(0,1fr)]">
         <span className={label}>Sentinel result</span>
         <span className={cell}>{sentinelSaid}</span>
-        <span className={label}>Reviewer decision</span>
+        {/* Values only: no decision was made, so the row names what the
+            outcome came from instead of calling it a decision. */}
+        {valuesOnly ? (
+          <span
+            className={label}
+            title="The corrected values were compared again with the run's own rules; this result follows from them"
+          >
+            After corrections
+          </span>
+        ) : (
+          <span className={label}>Reviewer decision</span>
+        )}
         <span className={cell}>
           <StatusBadge status={after.status} />
           {after.status === "MISMATCH" && after.defect_fields.length > 0 && <span>{fieldNames(after.defect_fields)}</span>}
-          <span>· {state}</span>
+          <span title={stateTitle}>· {state}</span>
+          {valuesOnly && state === "Unresolved" && stillOpen > 0 && (
+            <span className="text-muted-foreground">
+              — {stillOpen} field{stillOpen === 1 ? "" : "s"} still not compared
+            </span>
+          )}
         </span>
         {changes.length > 0 && (
           <>
@@ -390,7 +430,11 @@ export function ReviewSummary({ report, control }: { report: CaseReport; control
           size="sm"
           variant="ghost"
           onClick={control.withdraw}
-          title="Remove the reviewer decision; the Sentinel result stands and the case returns to Not reviewed"
+          title={
+            hasCorrections
+              ? "Remove the review, corrected values included; the Sentinel result stands and the case returns to Not reviewed"
+              : "Remove the reviewer decision; the Sentinel result stands and the case returns to Not reviewed"
+          }
         >
           <Undo2 className="size-3.5" />
           Withdraw review

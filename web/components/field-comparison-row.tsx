@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Pencil, Undo2 } from "lucide-react";
 import type { FieldComparisonReport, FieldDecision, FieldValueReport, Verdict } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { VerdictBadge } from "@/components/status-badges";
 import { FIELD_LABELS } from "@/lib/labels";
 
@@ -60,8 +61,14 @@ function Side({
       <div className="flex items-center justify-between gap-2">
         <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
         {onCorrect && !editing && (
-          <button
+          // A bordered button in the text colour: as small grey text a
+          // first-time reviewer could not find it. `text-foreground` beats
+          // the grey the dashed not-extracted box puts on its contents.
+          <Button
             type="button"
+            size="xs"
+            variant="outline"
+            className="text-foreground"
             onClick={() => setEditing(true)}
             disabled={busy}
             title={
@@ -69,13 +76,12 @@ function Side({
                 ? "Change the corrected value"
                 : `Correct the extracted ${label} value`
             }
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <Pencil className="size-3" strokeWidth={2} />
             {/* "Edit", not "Correct": beside a value, "Correct" read as a
                 verdict ("this one is correct") rather than as the action. */}
             {correction !== undefined || value.present ? "Edit" : "Enter value"}
-          </button>
+          </Button>
         )}
       </div>
       {editing ? (
@@ -341,11 +347,18 @@ export function QuietFieldRow({
   comparison,
   open,
   onToggle,
+  editCue,
   children,
 }: {
   comparison: FieldComparisonReport;
   open: boolean;
   onToggle: () => void;
+  /** "Enter value" / "Edit": a value can be entered on this field's card,
+   *  and the closed row says so -- a first-time reviewer read the one-line
+   *  rows as closed. Only a label on the row, never a button of its own: a
+   *  click anywhere on the row opens the card, whose own button is then
+   *  directly underneath. Absent where nothing can be entered. */
+  editCue?: "Enter value" | "Edit";
   children?: ReactNode;
 }) {
   const label = FIELD_LABELS[comparison.field] ?? comparison.field;
@@ -368,13 +381,33 @@ export function QuietFieldRow({
       ? `BL: ${bl}`
       : null;
   const Chevron = open ? ChevronDown : ChevronRight;
+  const cue = editCue && !open ? editCue : null;
+  // Drawn like the card's own outline button, but a plain label: the row
+  // itself is the button.
+  const cueTag = (className: string) => (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-xs font-medium text-foreground dark:border-input dark:bg-input/30",
+        className,
+      )}
+    >
+      <Pencil className="size-3" strokeWidth={2} />
+      {cue}
+    </span>
+  );
   return (
     <div className="flex flex-col gap-1.5">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        title={open ? "Fold this field back to one line" : "Open this field: both values and the lines they were read from"}
+        title={
+          open
+            ? "Fold this field back to one line"
+            : cue
+              ? "Open this field to enter or edit its values"
+              : "Open this field: both values and the lines they were read from"
+        }
         className={cn(
           "flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2 text-left transition-colors",
           ROW_STYLE[comparison.verdict],
@@ -385,8 +418,11 @@ export function QuietFieldRow({
         {/* On a phone the badge closes the first line and the value takes a
             line of its own under the label (a long label left the value a
             few characters wide); from `sm` up all four sit on one line and
-            the value is truncated, the title holding all of it. */}
-        <span className="ml-auto sm:order-last sm:ml-0">
+            the value is truncated, the title holding all of it. The edit
+            cue sits just before the badge from `sm` up; on a phone the first
+            line has no room left, so it closes the value line instead. */}
+        <span className="ml-auto flex items-center gap-2 sm:order-last sm:ml-0">
+          {cue && cueTag("hidden sm:inline-flex")}
           <VerdictBadge verdict={comparison.verdict} />
         </span>
         <span
@@ -395,6 +431,7 @@ export function QuietFieldRow({
         >
           {value}
           {tail && <span className="font-normal text-muted-foreground"> · {tail}</span>}
+          {cue && cueTag("ml-2 align-middle sm:hidden")}
         </span>
       </button>
       {open && children}

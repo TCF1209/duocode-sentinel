@@ -10,6 +10,7 @@ import {
   escalationText,
   FieldPicker,
   isEmptyDraft,
+  isValuesOnly,
   ReviewBox,
   ReviewSummary,
   RowEnd,
@@ -152,7 +153,7 @@ function DocumentStatus({
 }
 
 /** What the review box says and offers on a case not reviewed yet (and,
- *  behind "Change decision", on one that is). */
+ *  behind "Change decision" / "Record a decision", on one that is). */
 type Finding = { heading: string; line: ReactNode; buttons: ReactNode; neutral?: boolean };
 
 /**
@@ -375,12 +376,21 @@ export function CaseReportView({
   // first so agreeing is one click. Each finding is one of the draft's own
   // operations (the same choices the field cards make, for several fields
   // at once); the backend derives the outcome, never the page.
-  const [panel, setPanel] = useState<"picker" | "adopt" | null>(null);
+  // What opened under the row: the field picker, the scan transcription, or
+  // the strip that asks before a confirmation throws corrected values away.
+  const [panel, setPanel] = useState<"picker" | "adopt" | "confirm" | null>(null);
   // Once a review is saved the box shows its record, and the findings come
   // back behind "Change decision" -- for the review as it stands: any save
-  // replaces `report.review`, which closes them again.
+  // replaces `report.review`, which closes them again. A review that is
+  // corrected values only (isValuesOnly) calls that button "Record a
+  // decision" instead, drawn quieter: no decision has been made yet, and
+  // none is required -- the outcome already follows from the values.
   const [changingOf, setChangingOf] = useState<object | null>(null);
   const changing = Boolean(report.review) && changingOf === report.review;
+  const valuesOnly = isValuesOnly(report);
+  // Values only, and the corrected pairs all agree: "Mark no discrepancy"
+  // would save the very same review again, so it is not offered.
+  const settledOk = valuesOnly && (report.effective ?? report.review)?.status === "OK";
   // A finding was recorded: whatever it opened closes, and the page goes
   // back to the live view to show what it did.
   function closePanels() {
@@ -535,9 +545,17 @@ export function CaseReportView({
         <span className="block">
           The model transcribed the scans ({legibleSummary})
           {review
-            ? " — accept the values you have verified against the scan; the rules then compare the pair."
+            ? " — accept the values you have verified against the scan, or enter one on its field below; the rules then compare the pair."
             : " — verify each value against the scan."}
         </span>
+      )}
+      {/* Where the values can be typed in: the field rows below carry an
+          "Enter value" tag, but a first-time reviewer read them as closed
+          lines. Only where a value can be entered (the live view of a
+          reviewable case with a field left uncompared), and not beside the
+          transcription sentence, which already says so. */}
+      {decideOn && !hasReadOut && report.fields.some((f) => f.verdict === "UNCOMPARABLE") && (
+        <span className="block">If you have the correct values, enter them on the fields below.</span>
       )}
     </>
   );
@@ -555,22 +573,34 @@ export function CaseReportView({
     </Button>
   );
   // Confirming is Sentinel's answer as read: a value corrected since is
-  // taken back with it, and the button says so.
-  const confirmDrops = Object.keys(draft.corrections).length > 0 ? "; the corrected values are removed" : "";
+  // taken back with it. With corrected values on the case the button is not
+  // the filled one, and a click asks first (the strip under the row) -- one
+  // click used to throw away every value the reviewer had typed.
+  const correctedCount = Object.values(draft.corrections).reduce(
+    (n, sides) => n + (sides.si !== undefined ? 1 : 0) + (sides.bl !== undefined ? 1 : 0),
+    0,
+  );
+  const confirmDrops = correctedCount > 0 ? "; the corrected values are removed" : "";
+  const confirmClick = correctedCount > 0 ? () => setPanel("confirm") : confirmSentinel;
+  // Only beside the Confirm button it answers: with the findings row shown
+  // and values still corrected (a Revert on a card can take the last one).
+  const confirmOpen = panel === "confirm" && correctedCount > 0 && (!report.review || changing);
+  const confirmExpanded = correctedCount > 0 ? confirmOpen : undefined;
   const caseFinding: Finding | null =
     !review || !comparison
       ? null
       : report.status === "MISMATCH"
         ? {
             heading: "Discrepancy found",
-            line: `${listNames(defectNames)} differ${defectNames.length === 1 ? "s" : ""} between the SI and the draft BL. Each value below shows the line it was read from.`,
+            line: `${listNames(defectNames)} differ${defectNames.length === 1 ? "s" : ""} between the SI and the draft BL. Use Edit on a value to correct it; the pair is then compared again.`,
             buttons: (
               <>
                 {findingButton(
                   "Confirm discrepancy",
-                  confirmSentinel,
+                  confirmClick,
                   `Records Confirmed: the SI and the draft BL differ on these fields${confirmDrops}`,
-                  true,
+                  !confirmDrops,
+                  confirmExpanded,
                 )}
                 {findingButton(
                   "Flag fields",
@@ -579,11 +609,12 @@ export function CaseReportView({
                   false,
                   panel === "picker",
                 )}
-                {findingButton(
-                  "Mark no discrepancy",
-                  noMismatch,
-                  "The flagged values are the same value in a different format; clears every flag, Sentinel's result stays on record",
-                )}
+                {!settledOk &&
+                  findingButton(
+                    "Mark no discrepancy",
+                    noMismatch,
+                    "The flagged values are the same value in a different format; clears every flag, Sentinel's result stays on record",
+                  )}
                 {findingButton("Escalate", cantTell, "Records Unresolved; the case becomes Escalated")}
               </>
             ),
@@ -596,9 +627,10 @@ export function CaseReportView({
                 <>
                   {findingButton(
                     "Confirm no discrepancy",
-                    confirmSentinel,
+                    confirmClick,
                     `Records Confirmed: no discrepancy on any field${confirmDrops}`,
-                    true,
+                    !confirmDrops,
+                    confirmExpanded,
                   )}
                   {findingButton(
                     "Flag fields",
@@ -630,7 +662,12 @@ export function CaseReportView({
                         Use scan transcription
                       </Button>
                     )}
-                    {findingButton("Mark no discrepancy", noMismatch, "Checked against both documents: the fields Sentinel could not compare are consistent")}
+                    {!settledOk &&
+                      findingButton(
+                        "Mark no discrepancy",
+                        noMismatch,
+                        "Checked against both documents: the fields Sentinel could not compare are consistent",
+                      )}
                     {findingButton(
                       "Flag fields",
                       () => togglePanel("picker"),
@@ -686,13 +723,33 @@ export function CaseReportView({
       </div>
     ) : null;
   const belowRow =
-    review && (panel !== null || recheckArea) ? (
+    review && (panel === "picker" || panel === "adopt" || confirmOpen || recheckArea) ? (
       <div className="flex flex-col gap-3">
         {panel === "picker" && (
           <FieldPicker fields={report.fields} initial={standingDefects} busy={saving} onSave={mismatchOn} onCancel={() => setPanel(null)} />
         )}
         {panel === "adopt" && (
           <ScanAdoptPanel rows={readOutRows} model={readOutModel} busy={saving} onSave={adoptReadOut} onCancel={() => setPanel(null)} />
+        )}
+        {/* Confirm with corrected values on the case: said once, in plain
+            words, before anything is saved. Cancel saves nothing. */}
+        {confirmOpen && (
+          <div
+            className="flex flex-wrap items-center gap-2 rounded-md border bg-background p-3 text-sm"
+            role="group"
+            aria-label="Confirm the Sentinel result"
+            data-testid="confirm-drops"
+          >
+            <span className="mr-auto">
+              Confirming the Sentinel result removes the {correctedCount} corrected value{correctedCount === 1 ? "" : "s"}.
+            </span>
+            <Button size="sm" variant="destructive" disabled={saving} onClick={confirmSentinel}>
+              Remove values and confirm
+            </Button>
+            <Button size="sm" variant="ghost" disabled={saving} onClick={() => setPanel(null)}>
+              Cancel
+            </Button>
+          </div>
         )}
         {recheckArea}
       </div>
@@ -749,7 +806,7 @@ export function CaseReportView({
                 !showOriginal ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              Reviewer decision
+              {valuesOnly ? "After corrections" : "Reviewer decision"}
             </button>
             <button
               type="button"
@@ -803,7 +860,8 @@ export function CaseReportView({
           confirming is one click), the amended SI/BL (the area opens under
           the row) and the reply draft at the row's end. Reviewed, the box
           holds the record instead, and the findings come back behind
-          "Change decision" in the same row. */}
+          "Change decision" ("Record a decision" when only values were
+          corrected) in the same row. */}
       {review && comparison && finding && (
         <motion.div variants={fadeUp} data-spotlight="review">
           <ReviewBox
@@ -848,12 +906,21 @@ export function CaseReportView({
             ) : (
               <Button
                 size="sm"
-                variant="outline"
+                variant={valuesOnly ? "ghost" : "outline"}
                 disabled={saving}
-                onClick={() => setChangingOf(report.review ?? null)}
-                title="Record a different finding on this case; corrected values stay unless you confirm Sentinel's result"
+                onClick={() => {
+                  // The strip asks about one Confirm click; it never comes
+                  // back on its own when the findings are reopened.
+                  if (panel === "confirm") setPanel(null);
+                  setChangingOf(report.review ?? null);
+                }}
+                title={
+                  valuesOnly
+                    ? "Record a decision on the case as a whole; corrected values stay unless you confirm Sentinel's result"
+                    : "Record a different finding on this case; corrected values stay unless you confirm Sentinel's result"
+                }
               >
-                Change decision
+                {valuesOnly ? "Record a decision" : "Change decision"}
               </Button>
             )}
             {recheckButton}
@@ -944,6 +1011,15 @@ export function CaseReportView({
                     comparison={f}
                     open={open}
                     onToggle={() => setOpenQuiet((s) => ({ ...s, [f.field]: !s[f.field] }))}
+                    // The same word the card's own button shows once the row
+                    // is open: only where a value can be entered at all.
+                    editCue={
+                      decideOn && f.verdict === "UNCOMPARABLE"
+                        ? f.si.present && f.bl.present
+                          ? "Edit"
+                          : "Enter value"
+                        : undefined
+                    }
                   >
                     {open && renderCard(f)}
                   </QuietFieldRow>
