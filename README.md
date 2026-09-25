@@ -280,11 +280,11 @@ the 520-email one, below.
 
 On a fresh clone at `4c852a7`: **431 passed, 142 skipped, 1 xfailed, 0
 errors**. Re-run on 25 Sep on a checkout holding no `data/bundle` — the same
-condition as a clone — the suite is **732 tests: 590 passed, 142 skipped, 0
+condition as a clone — the suite is **756 tests: 614 passed, 142 skipped, 0
 failed, 0 xfailed**, read off pytest's own summary line rather than
-remembered: 158 tests added since `4c852a7` (136 of them on 25 Sep: 45 for
+remembered: 182 tests added since `4c852a7` (160 of them on 25 Sep: 45 for
 the reply drafts' wording pass, 5 for in-place review, value corrections and
-scan state, 86 from testing on real external documents), and the former
+scan state, 110 from testing on real external documents), and the former
 `xfail` now a plain pass.
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs this same command
 on every push, on a machine nobody on the team configured — the fresh-clone
@@ -583,7 +583,7 @@ kept apart on purpose.
 backend/sdoc/          the pipeline — no web, no database, no network imports
 backend/api/           FastAPI surface over it (13 routes, incl. POST /compare)
 backend/tools/         adversarial.py, the perturbation harness; smoke_readers.py
-backend/tests/         732 tests over the traps in docs/DATA_NOTES.md
+backend/tests/         756 tests over the traps in docs/DATA_NOTES.md
 backend/run.py         an inbox -> submission.json + report.json + metrics.json
 web/                   Next.js 16 dashboard (App Router, shadcn/ui, Recharts)
 demo_data/             30-email demo inbox — what a clone can run without the bundle

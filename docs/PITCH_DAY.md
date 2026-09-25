@@ -27,7 +27,7 @@ add for eight. Read the portal first, then cut.
         Review with "No label for … could be recognised"; toggle on → Mismatch
         on consignee and notify party, badge **model answered**.
   - [ ] `/compare`, the *scanned* sample, toggle on: transcript card.
-  - [ ] `/pitch` slide 3 chip reads **732 tests · 0 failing**; slide 4's
+  - [ ] `/pitch` slide 3 chip reads **756 tests · 0 failing**; slide 4's
         card is about `email_145`.
   - [ ] GitHub: the CI badge on the README is green (first run after the
         push). If it is red, read the log before the pitch — a red badge on
@@ -157,6 +157,37 @@ Both are normalised to kilograms before the comparison — 20 MT reads as
 as a mismatch. Same for thousands separators and bare numbers in a
 spreadsheet cell.
 
+**"And pounds?"**
+Our own test on real US bills of lading found it: 8,010 KG against 8,010
+LBS read as the same weight. Now Sentinel sees that one side is in pounds
+and the other in kilograms, and sends the field to a person instead of
+passing it. It does not convert pounds, on purpose. We tried four
+conversions and our old-versus-new review rejected all four, because on a
+real form the unit printed next to a number can belong to the next box. So
+the pounds check works like our scan check: it can turn a pass into a
+review, and it can never clear or condemn a Bill of Lading by itself.
+Still open, and written down: the same weight printed in each unit shows as
+a mismatch, and European notation ("12.500,00 KG") is not read.
+
+**"Have you tried it on real documents, not the organisers' data?"**
+Yes, on 25 Sep: blank forms from six carriers and industry bodies, 30 real
+scanned and archived shipping documents, 2,000 real bill-of-lading records
+and 14,000 real emails. Two honest results. It cannot read most real form
+layouts yet: boxed forms with the label above the value never appear in the
+organisers' data, and on the filled carrier forms it read 0 of 42 fields.
+And it never cleared or condemned a real document it could not read: every
+one went to a person with the reason. The test also found ways a real
+document could fool the rules; we fixed only what survived three rounds of
+old-versus-new review and wrote the rest down (`EXTERNAL_VALIDATION.md`).
+
+**"How is the organisers' data different from the real thing?"**
+It tests *checking*: clean digital files, one label per line, kilograms and
+tonnes only, a container count always written "3 x 40'HC". Real documents
+add *reading*: boxed layouts, scans, OCR noise, pounds, "40HC x 3". Our
+checking is proven, 1.0000 on their data and zero wrong calls on real
+documents. Reading real layouts is the next step, and the plan is the model
+does the reading while the rules do the checking and a person signs.
+
 **"A perfect score — is it overfitting?"**
 Four datasets, three from seeds we never developed against: 1.0000 on all
 four. That proves we did not memorise the draw. It does not prove real
@@ -229,9 +260,14 @@ changes only what survives a restart.
 
 - **"Our pipeline is 89% AI."** It is not; the model does no work on the
   graded inbox. The 168 → 2 is what happens on wording we invented.
-- **"574 tests"**, **"596 tests"**, **"one test pinned to fail"**, **"45
-  mismatches, 21 refused"** — all stale. It is **732 tests, 0 failing** and
+- **"574 tests"**, **"596 tests"**, **"732 tests"**, **"one test pinned to fail"**, **"45
+  mismatches, 21 refused"** — all stale. It is **756 tests, 0 failing** and
   **46 / 20**.
 - **"Thirteen seconds"** is a warm container. A cold one takes 40. Wake it.
+- **"It reads any bill of lading."** It does not yet: on real boxed carrier
+  forms it reads almost nothing and escalates. Say it never guesses on them.
+- **Do not upload a real carrier form in the live demo.** It will escalate
+  every field, which is correct but looks like it does not work. Use the
+  samples on the Compare page.
 - **"Eleven hours of desk work"** only with *"at a conservative estimate"*
   in front of it. It is arithmetic on an assumed pace, not a measurement.

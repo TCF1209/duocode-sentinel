@@ -181,6 +181,8 @@ const CARD_STYLE: Record<Verdict, string> = {
 const REASON_TEXT: Record<string, string> = {
   ocr_confusable:
     "Same length, differing only in characters OCR confuses (O/0, I/1, S/5, B/8) -- likely one value read two ways. Check both against the pages.",
+  unit_differs:
+    "Same figure, but one side is in pounds and the other in kilograms or tonnes -- Sentinel does not convert pounds. Convert (1 lb = 0.4536 kg) and compare.",
 };
 
 // "bl_missing" -> "BL missing", not "Bl missing" -- si/bl are the document

@@ -4,6 +4,39 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-25 (afternoon) — Claude session · pounds: noticed and escalated, not converted
+
+**Done**
+- Pounds were converted in `compare._weight_equal`, on the pair, only when
+  one side stated a single pound figure and the other kg or tonnes. The
+  old-against-new review (13.6M pairs) confirmed six regression families:
+  a unit printed beside a figure can belong to the next box, and one layout
+  let a wrong BL clear. Withdrawn, like the three `normalize` attempts.
+- What shipped converts nothing: `compare.units_differ` + reason
+  `unit_differs`. When the weights agree only because one side is in pounds
+  and the other in kg/t, the field is UNCOMPARABLE, the gate (5c, status
+  `unit_differs`, review reason `unreadable`) sends the case to a person, and
+  the reply draft asks the customer which unit is right. It only ever turns
+  a MATCH into a review (the `ocr_confusable` guarantee). Swept old against
+  new over the round 1-4 pair families (10,568,385 pairs): 0 other changes;
+  28,482 false clears caught, 99,600 extra reviews where a pound unit sits
+  beside a kilogram figure.
+- Six datasets + adversarial harness field-by-field identical, score 1.0000,
+  `1c08cd2…` unchanged. 756 tests (614 passed / 142 skipped with no
+  `data/bundle`). PITCH_DAY Q&A: pounds, real documents, organisers' data vs
+  real; counts updated everywhere (the local .pptx needs a rebuild via
+  `scripts/build_pitch_deck.ps1` if it is used).
+
+**Next**
+- The same weight in each unit ("12,000 KG" vs "26,455 LBS") is still a
+  false MISMATCH; European notation still open (`EXTERNAL_VALIDATION.md`).
+
+**Careful**
+- Do not convert pounds anywhere without the review corpus: four versions
+  broke real layouts.
+
+---
+
 ## 2026-09-25 (morning, later) — Claude session · the case page as the user wanted it: all seven fields on the page, one row of actions, "Edit"
 
 The user, awake, looked at the case page and asked whether it was user

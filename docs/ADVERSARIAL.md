@@ -2,7 +2,7 @@
 
 > Regenerated 2026-09-19 against the working tree of that day, and re-run on
 > 2026-09-24 after the fixes in §4.3, §4.4 and §5.4 landed: every count in §2
-> and §3 reproduces byte for byte. The suite is now (25 Sep) **732 tests,
+> and §3 reproduces byte for byte. The suite is now (25 Sep) **756 tests,
 > 0 failed, 0 xfailed**. Two strict `xfail`s have lived in it, and both did what a
 > strict xfail is for: the one that recorded the address-line hole in §4.3
 > went red when that fix landed, and the one that pinned §5.4 did the same on

@@ -89,13 +89,14 @@ const UNREADABLE_TEXT: Record<string, string> = {
   unsupported: "the file is in a format or size we cannot open",
 };
 
-// A field the reply asks the customer about: blank, unreadable as a value, or
-// differing only in characters a scan confuses. Not "si_missing"/"bl_missing":
+// A field the reply asks the customer about: blank, unreadable as a value,
+// differing only in characters a scan confuses, or the same weight figure in
+// pounds on one document and kilograms on the other. Not "si_missing"/"bl_missing":
 // those mean no label in the document was recognised as the field, and the
 // gate says the value may well be there under a wording the label table has
 // never seen. That is ours to read off the document, not the customer's to
 // supply, so it never reaches the reply.
-const ASK_REASONS = new Set(["si_blank", "bl_blank", "si_unparseable", "bl_unparseable", "ocr_confusable"]);
+const ASK_REASONS = new Set(["si_blank", "bl_blank", "si_unparseable", "bl_unparseable", "ocr_confusable", "unit_differs"]);
 
 const fileName = (doc: DocumentReport) => doc.path.split(/[\\/]/).pop() || doc.path;
 const phrase = (field: string) => FIELD_PHRASES[field] ?? field.replace(/_/g, " ");
@@ -175,6 +176,11 @@ function questionLine(f: FieldComparisonReport): string {
       return (
         `  - ${name}: the draft Bill of Lading shows "${f.bl.raw ?? ""}", which we could not read as a ` +
         `value; ${otherSide(f, "si")}.`
+      );
+    case "unit_differs":
+      return (
+        `  - ${name}: the Shipping Instruction shows "${f.si.raw ?? ""}" and the draft Bill of Lading ` +
+        `shows "${f.bl.raw ?? ""}"; the figures are the same but the units are not, so one of them needs correcting.`
       );
     default: // ocr_confusable
       return (
