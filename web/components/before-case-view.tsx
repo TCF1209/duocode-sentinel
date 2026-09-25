@@ -52,7 +52,7 @@ function DocumentPane({ caseId, side, report, view }: { caseId: string; side: Do
     <div className="flex min-w-0 flex-col gap-2 rounded-lg border bg-card p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{SIDE_TITLE[side]}</span>
-        {doc && <span className="truncate font-mono text-[11px] text-muted-foreground">{doc.path.split("/").pop()}</span>}
+        {doc && <span className="truncate text-xs text-muted-foreground">{doc.path.split("/").pop()}</span>}
       </div>
       {!doc ? (
         <p className="text-sm text-muted-foreground">Not attached to this email.</p>
@@ -116,7 +116,7 @@ export function BeforeCaseView({ report, caseId }: { report: CaseReport; caseId:
     <motion.div className="flex flex-col gap-4" initial="hidden" animate="show" variants={stagger()}>
       <motion.div className="flex flex-col gap-1" variants={fadeUp}>
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="font-mono text-lg font-semibold">{report.email_id}</h2>
+          <h2 className="text-lg font-semibold">{report.email_id}</h2>
           <span className="text-xs text-muted-foreground">as it arrived</span>
         </div>
         {report.inbox?.subject && <div className="text-sm font-medium">{report.inbox.subject}</div>}
@@ -126,7 +126,7 @@ export function BeforeCaseView({ report, caseId }: { report: CaseReport; caseId:
             <>
               {" · "}
               {report.inbox.attachments.length} attachment{report.inbox.attachments.length === 1 ? "" : "s"}:{" "}
-              <span className="font-mono">{report.inbox.attachments.join(", ")}</span>
+              <span>{report.inbox.attachments.join(", ")}</span>
             </>
           )}
         </div>

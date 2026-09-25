@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { AlertTriangle, CheckCircle2, Sparkles, Upload, XCircle } from "lucide-react";
-import type { CaseReport, DocumentReport, FieldComparisonReport, FieldDecision, Verdict } from "@/lib/api";
+import type { CaseReport, DocumentReport, FieldComparisonReport, Verdict } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { CategoryBadge, DecidedByBadge, StatusBadge } from "@/components/status-badges";
-import { FieldComparisonRow, QuietFieldRow, type DocSideKey, type ReviewerView } from "@/components/field-comparison-row";
+import { FieldComparisonRow, QuietFieldRow, type DocSideKey } from "@/components/field-comparison-row";
 import {
   EMPTY_DRAFT,
   FieldPicker,
@@ -259,17 +259,6 @@ export function CaseReportView({
   const [showOriginal, setShowOriginal] = useState(false);
   const correction = showOriginal ? null : liveCorrection;
 
-  // Per field. NEEDS_REVIEW as a corrected status is "couldn't tell", which
-  // is not a claim about any one field in either direction, so it gets no
-  // per-field overlay -- only the header badge changes for it.
-  function reviewerViewFor(f: FieldComparisonReport): ReviewerView | null {
-    if (!correction || correction.status === "NEEDS_REVIEW") return null;
-    const flagged = correction.defect_fields.includes(f.field);
-    if (f.verdict === "MISMATCH" && !flagged) return "cleared";
-    if (f.verdict !== "MISMATCH" && flagged) return "flagged";
-    return null;
-  }
-
   // Sentinel's review-reason banner, once a reviewer has moved the case off
   // NEEDS_REVIEW (effective_outcome nulls the reason for any other status).
   const reasonResolved = Boolean(report.review_reason && correction && correction.review_reason === null);
@@ -318,8 +307,8 @@ export function CaseReportView({
       </Button>
     ) : null;
 
-  // A "See it live" tile on the home page (or a "Worth opening" chip on the
-  // run page) lands on the panel it promised, not on the top of a long
+  // A "See it live" tile on the home page lands on the panel it promised,
+  // not on the top of a long
   // report: the tagged panel is scrolled to the middle of the screen. No
   // highlight on top of that -- decided directly: the attention cue belongs
   // to the Compare page's first sample only; here the panel's own heading
@@ -361,14 +350,6 @@ export function CaseReportView({
   const comparison = report.category === "BL_COMPARISON";
   const inPlace = Boolean(review) && comparison && report.fields.length > 0;
   const draft = review?.draft ?? EMPTY_DRAFT;
-  function decide(field: string, d: FieldDecision | null) {
-    if (!review) return;
-    if (d === null && !(field in draft.decisions)) return;
-    const decisions = { ...draft.decisions };
-    if (d === null) delete decisions[field];
-    else decisions[field] = d;
-    review.commit({ ...draft, decisions }, field);
-  }
   // A corrected value on one side of a field, saved with the field's other
   // corrections; `null` puts that side back to Sentinel's reading. The
   // backend compares the corrected pair again and the outcome follows.
@@ -407,13 +388,8 @@ export function CaseReportView({
   const renderCard = (f: FieldComparisonReport) => (
     <FieldComparisonRow
       comparison={f}
-      // With live controls the active choice says what the reviewer did;
-      // the badge is for the views without them.
-      reviewerView={decideOn ? null : reviewerViewFor(f)}
-      reviewerNote={report.review?.note}
       priorCount={priorDefectCounts?.[f.field] ?? 0}
       decision={decideOn ? (draft.decisions[f.field] ?? null) : undefined}
-      onDecide={decideOn ? (d) => decide(f.field, d) : undefined}
       corrections={decideOn ? draft.corrections[f.field] : undefined}
       onCorrect={decideOn ? (side, v) => correct(f.field, side, v) : undefined}
       verdict={decideOn && draft.corrections[f.field] ? report.review?.field_verdicts?.[f.field]?.verdict : undefined}
@@ -531,6 +507,13 @@ export function CaseReportView({
                   true,
                 )}
                 {findingButton(
+                  "Change the fields…",
+                  () => togglePanel("picker"),
+                  "Adjust which fields differ: untick one Sentinel flagged, tick one it missed",
+                  false,
+                  panel === "picker",
+                )}
+                {findingButton(
                   "No mismatch",
                   noMismatch,
                   "The flagged values are the same thing written two ways: take them all off the list; Sentinel's reading stays on the record",
@@ -630,7 +613,7 @@ export function CaseReportView({
       <motion.div className="flex flex-wrap items-center gap-2" variants={fadeUp}>
         {/* An identifier, so monospace -- the same face the run page's own
             title and every id in the tables use. */}
-        <h2 className="font-mono text-lg font-semibold">{report.email_id}</h2>
+        <h2 className="text-lg font-semibold">{report.email_id}</h2>
         <CategoryBadge category={report.category} />
         {/* The outcome that currently stands leads; Sentinel's own is kept
             beside it in words when the two differ. Same status corrected
@@ -811,7 +794,7 @@ export function CaseReportView({
             </ul>
           )}
           {signalNotes.length > 0 && (
-            <ul className="mt-1 list-inside list-disc font-mono">
+            <ul className="mt-1 list-inside list-disc">
               {signalNotes.map((n, i) => (
                 <li key={i}>{n}</li>
               ))}

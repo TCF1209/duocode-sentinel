@@ -126,7 +126,7 @@ function Side({
           {correction !== undefined && (
             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
               <span>
-                was <span className="line-through decoration-muted-foreground/60">{sentinelText}</span> · corrected by reviewer
+                was <span className="line-through decoration-muted-foreground/60">{sentinelText}</span> · changed by you
               </span>
               {onCorrect && (
                 <button
@@ -194,99 +194,22 @@ export function formatReason(reason: string) {
   return joined.charAt(0).toUpperCase() + joined.slice(1);
 }
 
-/** How a reviewer's correction bears on this one field, when it does at all.
- *  "cleared": Sentinel called it a mismatch, the reviewer took it off the
- *  defect list. "flagged": Sentinel passed it (or couldn't compare it), the
- *  reviewer added it. Absent for every field a correction didn't touch, for
- *  every field of an unreviewed or merely-confirmed case, and on /compare,
- *  where nothing can be reviewed at all -- so this row renders exactly as it
- *  always has unless a person actually changed something about this field. */
-export type ReviewerView = "cleared" | "flagged";
+// For the badge's hover when a person overrode Sentinel on this field.
+const VERDICT_WORD: Record<Verdict, string> = { MATCH: "a match", MISMATCH: "a mismatch", UNCOMPARABLE: "uncomparable" };
 
-const REVIEWER_BADGE: Record<ReviewerView, { label: string; className: string; fallbackTitle: string }> = {
-  cleared: {
-    label: "Cleared by reviewer",
-    className: "border-ok/40 bg-ok-bg text-ok",
-    fallbackTitle: "Sentinel flagged this field as a mismatch; a reviewer took it off the defect list.",
-  },
-  flagged: {
-    label: "Flagged by reviewer",
-    className: "border-danger/40 bg-danger-bg text-danger",
-    fallbackTitle: "Sentinel did not flag this field; a reviewer added it to the defect list.",
-  },
-};
-
-// The reviewer's note is written once per case, not per field, so it is
-// surfaced as a hover on every reviewer badge rather than pretended to
-// belong to one of them -- "why was this cleared when the two values are
-// visibly different" is exactly the question a reader has at this spot.
-function ReviewerBadge({ view, note }: { view: ReviewerView; note?: string | null }) {
-  const spec = REVIEWER_BADGE[view];
-  return (
-    <span
-      className={cn("whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium", spec.className)}
-      title={note ? `Reviewer's note: ${note}` : spec.fallbackTitle}
-    >
-      {spec.label}
-    </span>
-  );
-}
-
-/** The one-click choices for one field, given what stands on it. A
- *  mismatch can be taken off the list without touching the values ("the
- *  two are the same party"); a match can be flagged; an uncomparable field
- *  can be called fine or flagged. Correcting a value is the other, more
- *  precise way and lives on the value boxes below. The active choice is
- *  toggled off by clicking it again. */
-function DecisionControls({
-  verdict,
-  decision,
-  onDecide,
-}: {
-  verdict: Verdict;
-  decision: FieldDecision | null;
-  onDecide: (d: FieldDecision | null) => void;
-}) {
-  const options: { d: FieldDecision; label: string; title: string }[] =
-    verdict === "MISMATCH"
-      ? [{ d: "cleared", label: "Not a mismatch", title: "The two values are the same thing: take this field off the list" }]
-      : verdict === "MATCH"
-        ? [{ d: "flagged", label: "Flag as mismatch", title: "Sentinel missed it: these values do not agree" }]
-        : [
-            { d: "fine", label: "It's fine", title: "You read both documents: nothing wrong here" },
-            { d: "flagged", label: "Flag as mismatch", title: "You read both documents: the values differ" },
-          ];
-  return (
-    <div className="flex items-center rounded-full border bg-background p-0.5 text-xs" role="group" aria-label="Your decision on this field">
-      {options.map((o) => {
-        const active = decision === o.d;
-        return (
-          <button
-            key={o.d}
-            type="button"
-            aria-pressed={active}
-            title={active ? "Take this choice back" : o.title}
-            onClick={() => onDecide(active ? null : o.d)}
-            className={cn(
-              "rounded-full px-2 py-0.5 transition-colors",
-              active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
+/**
+ * One field as a card: the name, one badge for what stands, both values
+ * with the lines they were read from, and -- only where there is something
+ * to correct -- Edit on a value. Decisions are not made here any more:
+ * the review box above holds them (No mismatch, the field picker), and
+ * the card only shows their effect. The user's reading of the old header
+ * ("1 other case from this shipper · Flag as mismatch · Match · Mismatch"):
+ * four things where one would do.
+ */
 export function FieldComparisonRow({
   comparison,
-  reviewerView = null,
-  reviewerNote,
   priorCount = 0,
   decision,
-  onDecide,
   corrections,
   onCorrect,
   verdict,
@@ -295,20 +218,19 @@ export function FieldComparisonRow({
   justSaved,
 }: {
   comparison: FieldComparisonReport;
-  reviewerView?: ReviewerView | null;
-  reviewerNote?: string | null;
   /** Other cases from this case's shipper, in this run, already flagged on
-   *  this same field. Shown on the card itself when this field is a
-   *  mismatch -- "same shipper, same field, again". */
+   *  this same field. Named beside the field when it is a mismatch --
+   *  "same shipper, same field, again". */
   priorCount?: number;
-  /** In-place review (review-panel.tsx): the reviewer's one-click choice on
-   *  this field -- saved, or being saved -- and the handler to change it.
-   *  Each change is saved as it is made. Absent under "Sentinel's original"
-   *  and on /compare. */
+  /** The reviewer's call on this field, made in the review box: saved, or
+   *  being saved. Absent under "Sentinel's original" and on /compare. */
   decision?: FieldDecision | null;
-  onDecide?: (d: FieldDecision | null) => void;
   /** The reviewer's corrected values on this field, per side. */
   corrections?: { si?: string; bl?: string };
+  /** Save a corrected value on a side. Offered only where there is
+   *  something to correct: a field that differs or could not be read, or
+   *  one already corrected (so it can be undone) -- a pair that agrees has
+   *  nothing to edit. */
   onCorrect?: (side: DocSideKey, value: string | null) => void;
   /** The verdict and reason the corrected pair got from the backend
    *  (review.field_verdicts); Sentinel's own when absent. */
@@ -321,68 +243,43 @@ export function FieldComparisonRow({
   const corrected = Boolean(corrections?.si !== undefined || corrections?.bl !== undefined);
   const effectiveVerdict = verdict ?? comparison.verdict;
   const effectiveReason = corrected ? (reason ?? null) : comparison.reason;
+  // What stands on this field: the reviewer's call, else the corrected
+  // pair's verdict, else Sentinel's own. One badge says it; where a person
+  // overrode Sentinel, the badge's hover says what Sentinel read -- the
+  // review box keeps both answers in full, so the card stays quiet.
+  const standing: Verdict =
+    decision === "cleared" || decision === "fine" ? "MATCH" : decision === "flagged" ? "MISMATCH" : effectiveVerdict;
+  const overridden = standing !== comparison.verdict;
+  const editable = Boolean(onCorrect) && (comparison.verdict !== "MATCH" || corrected);
   const showHistory = comparison.verdict === "MISMATCH" && priorCount > 0;
-  const historyBadge = showHistory ? (
-    <span
-      className="whitespace-nowrap rounded-full border border-warn/40 bg-warn-bg px-2 py-0.5 text-xs font-medium text-warn"
-      title="Other cases from this shipper in this run with a mismatch on this same field -- this is not a one-off"
-    >
-      {priorCount} other case{priorCount === 1 ? "" : "s"} from this shipper
-    </span>
-  ) : null;
-  // The card's colour follows whichever judgement currently stands --
-  // a corrected pair's new verdict, or the reviewer's one-click choice --
-  // but Sentinel's own badge is never removed: dimmed, still legible,
-  // still titled. "The system said X, a person said Y, here is what both
-  // were looking at" is the whole point; hiding X would turn an audit
-  // trail into a silent overwrite.
-  const pendingView: ReviewerView | null =
-    decision === "cleared" || decision === "fine" ? "cleared" : decision === "flagged" ? "flagged" : null;
-  const effectiveView = reviewerView ?? pendingView;
-  const cardStyle =
-    effectiveView === "cleared"
-      ? CARD_STYLE.MATCH
-      : effectiveView === "flagged"
-        ? CARD_STYLE.MISMATCH
-        : CARD_STYLE[effectiveVerdict];
-  const touched = Boolean(decision) || corrected;
-  const overridden = Boolean(pendingView) || (corrected && effectiveVerdict !== comparison.verdict);
   return (
-    <div className={cn("rounded-lg border p-3 transition-colors", cardStyle, touched && "ring-1 ring-primary/50")}>
+    <div className={cn("rounded-lg border p-3 transition-colors", CARD_STYLE[standing])}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        {/* A label, styled like the other section labels on this page
-            ("What to do", "Re-sent documents"), so the values under it are
-            what the eye lands on. */}
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {FIELD_LABELS[comparison.field] ?? comparison.field}
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          {/* A label, styled like the other section labels on this page,
+              so the values under it are what the eye lands on. */}
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {FIELD_LABELS[comparison.field] ?? comparison.field}
+          </div>
+          {showHistory && (
+            <span
+              className="text-xs text-warn"
+              title="Other cases from this shipper in this run with a mismatch on this same field -- this is not a one-off"
+            >
+              same shipper, same field: {priorCount} other case{priorCount === 1 ? "" : "s"} in this run
+            </span>
+          )}
         </div>
-        {reviewerView ? (
-          <div className="flex flex-wrap items-center justify-end gap-1.5">
-            {historyBadge}
-            <span className="opacity-40" title="What Sentinel itself said">
-              <VerdictBadge verdict={comparison.verdict} />
-            </span>
-            <ReviewerBadge view={reviewerView} note={reviewerNote} />
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center justify-end gap-1.5">
-            {historyBadge}
-            {/* Where the click happened is where the answer shows: saving,
-                then saved, beside the control itself. */}
-            {onDecide && busy ? (
-              <span className="text-xs text-muted-foreground">Saving…</span>
-            ) : onDecide && justSaved ? (
-              <span className="text-xs font-medium text-ok">Saved</span>
-            ) : null}
-            {onDecide && <DecisionControls verdict={effectiveVerdict} decision={decision ?? null} onDecide={onDecide} />}
-            {/* After a correction the pair's new verdict leads and Sentinel's
-                own reading stays beside it, dimmed. */}
-            {corrected && effectiveVerdict !== comparison.verdict && <VerdictBadge verdict={effectiveVerdict} />}
-            <span className={cn(overridden && "opacity-40")} title={overridden ? "What Sentinel itself read" : undefined}>
-              <VerdictBadge verdict={comparison.verdict} />
-            </span>
-          </div>
-        )}
+        <div className="flex items-center gap-1.5">
+          {busy ? (
+            <span className="text-xs text-muted-foreground">Saving…</span>
+          ) : justSaved ? (
+            <span className="text-xs font-medium text-ok">Saved</span>
+          ) : null}
+          <span title={overridden ? `Sentinel read this as ${VERDICT_WORD[comparison.verdict]}; what stands is your call` : undefined}>
+            <VerdictBadge verdict={standing} />
+          </span>
+        </div>
       </div>
       {effectiveReason && <p className="mb-2 text-xs text-muted-foreground">{formatReason(effectiveReason)}</p>}
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -390,14 +287,14 @@ export function FieldComparisonRow({
           value={comparison.si}
           side="si"
           correction={corrections?.si}
-          onCorrect={onCorrect ? (v) => onCorrect("si", v) : undefined}
+          onCorrect={editable && onCorrect ? (v) => onCorrect("si", v) : undefined}
           busy={busy}
         />
         <Side
           value={comparison.bl}
           side="bl"
           correction={corrections?.bl}
-          onCorrect={onCorrect ? (v) => onCorrect("bl", v) : undefined}
+          onCorrect={editable && onCorrect ? (v) => onCorrect("bl", v) : undefined}
           busy={busy}
         />
       </div>

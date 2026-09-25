@@ -2,9 +2,9 @@ import type { CaseSummary } from "@/lib/api";
 
 /**
  * Which real cases of a run show which feature -- chosen by what each case
- * *is*, never by a hard-coded email id. Shared by the home page's "See it
- * live" tiles and the run page's "Worth opening" strip, so the two always
- * point at the same cases.
+ * *is*, never by a hard-coded email id. Feeds the home page's "See it live"
+ * tiles (the run page's "Worth opening" strip that used the same picks was
+ * removed at the user's ask: it repeated the tiles one screen later).
  *
  * - recheck: the first escalated comparison request that arrived with
  *   nothing attached (re-upload is the whole answer to that, and the

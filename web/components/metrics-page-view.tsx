@@ -80,7 +80,7 @@ export function MetricsPageView({ runId }: { runId: string }) {
             <h1 className="font-heading text-2xl font-semibold tracking-tight">Metrics</h1>
             {run && <RunStatusPill status={run.status} />}
           </div>
-          <p className="font-mono text-sm text-muted-foreground">{runId}</p>
+          <p className="text-sm text-muted-foreground">{runId}</p>
         </div>
       </motion.div>
 

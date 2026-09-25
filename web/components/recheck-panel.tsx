@@ -251,7 +251,7 @@ function VersionRow({ v, caseId }: { v: CaseVersion; caseId?: string }) {
   return (
     <li className="flex flex-col gap-1 rounded-md border bg-background p-2">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="font-mono text-muted-foreground">v{v.version}</span>
+        <span className="text-muted-foreground">v{v.version}</span>
         <StatusBadge status={v.effective.status} />
         <span>{whatStood(v)}</span>
       </div>

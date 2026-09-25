@@ -187,7 +187,7 @@ function PatternRow({ runId, pattern }: { runId: string; pattern: Pattern }) {
                 key={id}
                 href={`/runs/${runId}/cases/${id}`}
                 className={cn(
-                  "rounded-md border bg-background px-2 py-1 font-mono text-xs text-muted-foreground",
+                  "rounded-md border bg-background px-2 py-1 text-xs font-medium text-muted-foreground",
                   "hover:border-primary/40 hover:text-foreground",
                 )}
               >

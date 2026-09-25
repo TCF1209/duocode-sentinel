@@ -492,7 +492,7 @@ function FilePicker({
         <div className="min-w-0 flex-1">
           {file ? (
             <>
-              <div className="truncate font-mono text-xs text-foreground">{file.name}</div>
+              <div className="truncate text-xs font-medium text-foreground">{file.name}</div>
               <div className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(0)} KB · click to replace</div>
             </>
           ) : (

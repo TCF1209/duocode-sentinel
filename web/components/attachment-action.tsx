@@ -127,7 +127,7 @@ function AttachmentDialog({ url, filename, kind, label }: { url: string; filenam
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="font-mono text-sm font-normal">{filename}</DialogTitle>
+            <DialogTitle className="text-sm font-normal">{filename}</DialogTitle>
           </DialogHeader>
           {kind === "pdf" ? (
             // The iframe paints nothing until the PDF is ready, and an empty

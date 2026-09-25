@@ -4,6 +4,58 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-25 (afternoon) — Claude session · one typeface, one badge per card, a summary you can read at a glance
+
+Four more things the user saw on the live page, each put to them with a
+recommendation and taken on the recommended option.
+
+**Done**
+- **One typeface.** Run ids, email ids, attachment names, "v1" and the
+  progress figures were in Geist Mono under a rule of "identifiers in
+  mono"; the user read two typefaces as two designs. They are now the body
+  serif, semibold where they lead and `tabular-nums` where they line up.
+  Only file *content* stays mono (the Raw view, the attachment preview,
+  the reply draft's text). The teammate's Patterns page keeps its own.
+- **"Worth opening" is gone from the run page** (`run-page-view.tsx`): the
+  same four picks as the home page's "See it live" tiles, one screen later.
+  `lib/showcases.ts` still feeds the tiles; nothing else used the strip.
+- **The review summary is three lines** (`ReviewSummary`): *Sentinel said*
+  / *You said* / *Changed*, in the same label column the filter card uses,
+  with badges; each change is one line ("Consignee · BL: ~~UAB NOVAKOPA~~ →
+  EAST BRIGHT FZ-LLC → now Match", "Consignee · not a mismatch — the two
+  are the same thing (Sentinel: Mismatch)"); *By* and *Note* as rows when
+  present. The user's reading of the old block: "you have to read it
+  carefully to know what you changed".
+- **One badge per field card** (`FieldComparisonRow`): what stands on the
+  field, with "Sentinel read this as a mismatch; what stands is your call"
+  on hover when a person overrode it. The per-card pills (Not a mismatch /
+  Flag as mismatch / It's fine) and the dimmed second badge are gone; every
+  decision is made in the review box, where *Change the fields…* now opens
+  the picker on a mismatch case too (Sentinel's fields pre-ticked, untick
+  one to clear it). The shipper history is a line beside the field name
+  ("same shipper, same field: 1 other case in this run"), still inside the
+  `data-spotlight="history"` card. **Edit is offered only where there is
+  something to correct** -- a field that differs, could not be read, or was
+  already corrected (so Undo stays); a pair that agrees has no Edit.
+  "corrected by reviewer" under a corrected value reads "changed by you".
+- Verified: the run page with no strip and serif ids; email_004 -- one
+  badge per card, no Edit on the Shipper card, Edit on the mismatch cards,
+  a BL correction giving the three-line summary and the "→ now Match"
+  line, *Change the fields…* with Consignee unticked giving "not a mismatch
+  … (Sentinel: Mismatch)" and a Match badge on the card, each undone; light
+  and dark; 1280 and 375 px (the summary goes to one column). tsc /
+  eslint / `next build` clean; deck captures re-taken (run page without the
+  strip, the scan case with the serif id) and the deck rebuilt.
+
+**Next**
+- Nothing on this; the teammate merges.
+
+**Careful**
+- `data-spotlight="history"` still lands on the first mismatched card with
+  prior defects; the history text moved inside that card, not out of it.
+
+---
+
 ## 2026-09-25 (midday) — Claude session · the review box asks one question: do the SI and the BL match?
 
 Discussed with the user first, then four decisions taken on the recommended

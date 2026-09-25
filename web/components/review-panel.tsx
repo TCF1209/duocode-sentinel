@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { AlertTriangle, Sparkles, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { StatusBadge } from "@/components/status-badges";
+import { StatusBadge, VerdictBadge } from "@/components/status-badges";
 import { FIELD_LABELS, STATUS_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import type { CaseReport, CaseStatus, FieldComparisonReport, FieldCorrection, FieldDecision, ReviewBody } from "@/lib/api";
@@ -226,73 +226,123 @@ export function ReviewSummary({
   const savedCase = control.flash === "case";
   const after = report.effective ?? { status: review.status, defect_fields: review.defect_fields };
   const agreed = review.decision === "confirm";
-  // "Sentinel said …" is worth a line only where the two answers differ;
-  // "you couldn't tell: Needs review · Sentinel said Needs review" says one
-  // thing twice.
-  const changed =
-    after.status !== report.status || after.defect_fields.join(",") !== report.defect_fields.join(",");
-  // Each corrected value, with what Sentinel read: the audit line.
-  const corrections = Object.entries(draft.corrections).flatMap(([f, sides]) =>
-    (["si", "bl"] as const)
-      .filter((side) => sides[side] !== undefined)
-      .map((side) => {
-        const original = report.fields.find((x) => x.field === f)?.[side];
-        return {
-          key: `${f}:${side}`,
-          field: FIELD_LABELS[f] ?? f,
-          side: side.toUpperCase(),
-          was: original?.present ? (original.raw ?? "") : "not read",
-          now: sides[side]!,
-        };
-      }),
+  const fieldNames = (fields: string[]) => fields.map((f) => FIELD_LABELS[f] ?? f).join(", ");
+  const sentinelSaid = (
+    <>
+      <StatusBadge status={report.status} />
+      {report.status === "MISMATCH" && report.defect_fields.length > 0 && <span>on {fieldNames(report.defect_fields)}</span>}
+    </>
   );
+  // What the reviewer changed, one line per field -- a corrected value with
+  // what the pair now gets, or a call made in the box without touching the
+  // values -- so "what did I change?" is read off a list, not worked out
+  // from two outcomes.
+  const changes: { key: string; body: ReactNode }[] = [];
+  for (const [f, sides] of Object.entries(draft.corrections)) {
+    const name = FIELD_LABELS[f] ?? f;
+    const now = review.field_verdicts?.[f]?.verdict;
+    for (const side of ["si", "bl"] as const) {
+      if (sides[side] === undefined) continue;
+      const original = report.fields.find((x) => x.field === f)?.[side];
+      changes.push({
+        key: `${f}:${side}`,
+        body: (
+          <>
+            <span className="font-medium">{name}</span> · {side.toUpperCase()}:{" "}
+            <span className="text-muted-foreground line-through">{original?.present ? (original.raw ?? "") : "not read"}</span> →{" "}
+            <span className="font-medium">{sides[side]}</span>
+            {now && (
+              <>
+                {" "}
+                → now <VerdictBadge verdict={now} />
+              </>
+            )}
+          </>
+        ),
+      });
+    }
+  }
+  for (const [f, d] of Object.entries(draft.decisions)) {
+    const sentinel = report.fields.find((x) => x.field === f)?.verdict;
+    changes.push({
+      key: `${f}:call`,
+      body: (
+        <>
+          <span className="font-medium">{FIELD_LABELS[f] ?? f}</span> ·{" "}
+          {d === "cleared" ? "not a mismatch — the two are the same thing" : d === "flagged" ? "flagged as a mismatch" : "fine — you read both documents"}
+          {sentinel && (
+            <span className="text-muted-foreground">
+              {" "}
+              (Sentinel: <VerdictBadge verdict={sentinel} />)
+            </span>
+          )}
+        </>
+      ),
+    });
+  }
+  const label = "text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:pt-1";
+  const cell = "flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1";
   return (
     <div className="rounded-lg border bg-muted/40 p-4 text-sm" data-testid="review-summary">
       <div className="flex flex-wrap items-center gap-2 font-medium">
-        {agreed ? (
-          <>
-            Reviewed — you agreed with Sentinel: <StatusBadge status={report.status} />
-            {report.status === "MISMATCH" && report.defect_fields.length > 0 && (
-              <span className="font-normal">on {report.defect_fields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}</span>
-            )}
-          </>
-        ) : draft.cantTell ? (
-          <>
-            Reviewed — you couldn&apos;t tell: <StatusBadge status="NEEDS_REVIEW" />
-          </>
-        ) : (
-          <>
-            Reviewed — you said: <StatusBadge status={after.status} />
-            {after.status === "MISMATCH" && after.defect_fields.length > 0 && (
-              <span className="font-normal">on {after.defect_fields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}</span>
-            )}
-          </>
-        )}
+        Reviewed
         {saving ? (
           <span className="text-xs font-normal text-muted-foreground">Saving…</span>
         ) : savedCase ? (
           <span className="text-xs font-normal text-ok">Saved</span>
         ) : null}
       </div>
-      {!agreed && changed && (
-        <div className="mt-1 text-xs text-muted-foreground">
-          Sentinel said {describeOutcome(report.status, report.defect_fields)} — kept on the record with its evidence.
-        </div>
-      )}
-      {corrections.length > 0 && (
-        <ul className="mt-1 text-xs text-muted-foreground">
-          {corrections.map((c) => (
-            <li key={c.key}>
-              {c.field} · {c.side}: <span className="line-through">{c.was}</span> →{" "}
-              <span className="font-medium text-foreground">{c.now}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {review.reviewer && <div className="mt-1 text-muted-foreground">by {review.reviewer}</div>}
-      {draft.note && !noteOpen && (
-        <div className="mt-1 whitespace-pre-line text-xs text-muted-foreground">&ldquo;{draft.note}&rdquo;</div>
-      )}
+      {/* The same three-line shape every time -- what Sentinel said, what
+          you said, what changed -- in the label column the filter card and
+          the field cards use, so a reviewer reads their own review at a
+          glance instead of working it out from two sentences. */}
+      <div className="mt-2 grid gap-x-4 gap-y-1.5 sm:grid-cols-[7rem_minmax(0,1fr)]">
+        <span className={label}>Sentinel said</span>
+        <span className={cell}>{sentinelSaid}</span>
+        <span className={label}>You said</span>
+        <span className={cell}>
+          {agreed ? (
+            <>
+              <StatusBadge status={report.status} />
+              <span>the same — agreed</span>
+            </>
+          ) : draft.cantTell ? (
+            <>
+              <StatusBadge status="NEEDS_REVIEW" />
+              <span>couldn&apos;t tell</span>
+            </>
+          ) : (
+            <>
+              <StatusBadge status={after.status} />
+              {after.status === "MISMATCH" && after.defect_fields.length > 0 && <span>on {fieldNames(after.defect_fields)}</span>}
+            </>
+          )}
+        </span>
+        {changes.length > 0 && (
+          <>
+            <span className={label}>Changed</span>
+            <ul className="flex min-w-0 flex-col gap-1">
+              {changes.map((c) => (
+                <li key={c.key} className={cell}>
+                  {c.body}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {review.reviewer && (
+          <>
+            <span className={label}>By</span>
+            <span className={cell}>{review.reviewer}</span>
+          </>
+        )}
+        {draft.note && !noteOpen && (
+          <>
+            <span className={label}>Note</span>
+            <span className="whitespace-pre-line text-muted-foreground">{draft.note}</span>
+          </>
+        )}
+      </div>
       {noteOpen && (
         <NoteField
           key={draft.note}
@@ -301,7 +351,7 @@ export function ReviewSummary({
           onDone={() => setNoteOpen(false)}
         />
       )}
-      <div className="mt-2 flex flex-wrap items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button
           size="sm"
           variant="ghost"

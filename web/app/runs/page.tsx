@@ -332,7 +332,7 @@ function RunCard({ run }: { run: RunStatus }) {
               {/* `flex`, not the card header's default grid: the status pill
                   belongs on the run id's line, right-aligned, not under it. */}
               <CardHeader className={cn("flex flex-row items-center justify-between space-y-0 pb-2", !hasHover && "pr-9")}>
-                <CardTitle className="font-mono text-sm">{run.run_id}</CardTitle>
+                <CardTitle className="text-sm">{run.run_id}</CardTitle>
                 <RunStatusPill status={run.status} />
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">
@@ -347,7 +347,7 @@ function RunCard({ run }: { run: RunStatus }) {
         <div style={{ gridArea: "1 / 1", backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="font-mono text-sm">{run.run_id}</CardTitle>
+              <CardTitle className="text-sm">{run.run_id}</CardTitle>
               {!hasHover && (
                 <button
                   type="button"

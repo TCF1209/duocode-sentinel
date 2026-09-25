@@ -186,7 +186,7 @@ export function RunProgress({
           {!done && (
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-muted-foreground sm:justify-start">
               <span>
-                <span className="font-mono font-medium text-foreground">
+                <span className="font-medium text-foreground tabular-nums">
                   {rate > 0 ? Math.round(rate) : "—"}
                 </span>{" "}
                 emails / second
@@ -258,7 +258,7 @@ export function RunProgress({
                   aria-hidden
                   className={cn("size-1.5 shrink-0 rounded-full", OUTCOME_STYLE[c.status].dot)}
                 />
-                <span className="font-mono text-xs">{c.email_id}</span>
+                <span className="text-xs font-medium">{c.email_id}</span>
                 <span className="truncate text-xs text-muted-foreground">{CATEGORY_BADGE_LABELS[c.category]}</span>
                 <span className={cn("ml-auto shrink-0 text-xs", OUTCOME_STYLE[c.status].text)}>
                   {STATUS_LABELS[c.status]}
@@ -294,8 +294,8 @@ function ProgressRing({ pct, count, total }: { pct: number; count: number; total
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-mono text-2xl font-semibold tabular-nums">{count}</span>
-        <span className="font-mono text-xs text-muted-foreground">of {total}</span>
+        <span className="text-2xl font-semibold tabular-nums">{count}</span>
+        <span className="text-xs text-muted-foreground tabular-nums">of {total}</span>
       </div>
     </div>
   );
@@ -334,7 +334,7 @@ function CategoryBar({
           <span key={c} className="flex items-center gap-1">
             <span aria-hidden className={cn("size-1.5 rounded-full", CATEGORY_COLOURS[c])} />
             {CATEGORY_LABELS[c]}
-            <span className="font-mono tabular-nums">{byCategory[c] ?? 0}</span>
+            <span className="tabular-nums">{byCategory[c] ?? 0}</span>
           </span>
         ))}
       </div>
@@ -351,7 +351,7 @@ function OutcomeTile({ status, value }: { status: CaseStatus; value: number }) {
         <span aria-hidden className={cn("size-1.5 rounded-full", style.dot)} />
         {STATUS_LABELS[status]}
       </span>
-      <span className={cn("font-mono text-xl font-semibold tabular-nums", style.text)}>
+      <span className={cn("text-xl font-semibold tabular-nums", style.text)}>
         {shown}
       </span>
     </div>

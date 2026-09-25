@@ -103,8 +103,10 @@ The deck's beats and timings are in `PITCH_DECK.md`. On the product:
    BL value, type what the shipper confirmed,
    Enter — the pair is compared again with the run's own rules, the card
    turns to *Match* with Sentinel's reading kept underneath, the outcome
-   above follows; *Undo* puts Sentinel's reading back. *Not a mismatch* is
-   the one-click version when the two are the same party. Nothing to scroll
+   above follows; *Undo* puts Sentinel's reading back. *No mismatch* in the
+   box is the one-click version when the two are the same party, and
+   *Change the fields…* adjusts which fields differ. The summary then reads
+   as three lines: Sentinel said · You said · Changed. Nothing to scroll
    to, nothing to submit.
 6. A **NEEDS_REVIEW** case: `email_512` (a scan, needs the model run): "no
    text layer, so it did not decide — but the model read the page for the

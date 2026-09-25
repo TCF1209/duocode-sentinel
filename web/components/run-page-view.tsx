@@ -17,7 +17,6 @@ import { fadeUp, stagger, TAP, TAP_TRANSITION } from "@/lib/motion";
 import { CATEGORY_LABELS, FIELD_LABELS, STATUS_LABELS } from "@/lib/labels";
 import { getRun, listCases, type CaseSummary, type CaseStatus, type Category, type RunStatus } from "@/lib/api";
 import { useListMemory } from "@/lib/list-memory";
-import { pickShowcases, showcaseHref } from "@/lib/showcases";
 import { useViewMode } from "@/lib/view-mode";
 import { ViewModeSwitch } from "@/components/view-mode-switch";
 import {
@@ -475,7 +474,7 @@ export function RunPageView({ runId }: { runId: string }) {
           </span>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-mono text-base font-semibold">{runId}</h1>
+              <h1 className="text-base font-semibold">{runId}</h1>
               {run && <RunStatusPill status={run.status} />}
             </div>
             <p className="text-sm text-muted-foreground">
@@ -505,7 +504,7 @@ export function RunPageView({ runId }: { runId: string }) {
               ring, rate and live tallies are in <RunProgress> below. Two
               progress bars on one screen is one too many. */}
           {run?.status === "running" && (
-            <span className="font-mono text-sm tabular-nums text-muted-foreground">{progress}%</span>
+            <span className="text-sm tabular-nums text-muted-foreground">{progress}%</span>
           )}
           {run?.status === "done" && (
             <>
@@ -721,7 +720,7 @@ export function RunPageView({ runId }: { runId: string }) {
             <>
               <span>
                 {answeredCount} of {firstFive.length} ·{" "}
-                <span className="font-mono tabular-nums">{Math.round(guessSeconds)} s</span>
+                <span className="tabular-nums">{Math.round(guessSeconds)} s</span>
               </span>
               <Button size="sm" variant="ghost" onClick={startOver} title="Clear your calls and the clock">
                 Start over
@@ -795,7 +794,7 @@ export function RunPageView({ runId }: { runId: string }) {
                 ordered "needs attention first", so the first five emails of
                 the inbox are rarely its first five rows. Each is marked
                 beside its row as well. */}
-            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs">
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
               {firstFive.map((c) => {
                 const right = guesses[c.email_id] === c.category;
                 return (
@@ -812,8 +811,6 @@ export function RunPageView({ runId }: { runId: string }) {
           </div>
         </motion.div>
       )}
-
-      {!before && <WorthOpening runId={runId} cases={allCases} />}
 
       {!before && <PatternAlerts runId={runId} cases={allCases} openRequested={openPatterns} onOpened={consumeOpen} />}
 
@@ -896,7 +893,7 @@ export function RunPageView({ runId }: { runId: string }) {
                   >
                     {before ? (
                       <>
-                        <TableCell className="font-mono text-sm">{c.email_id}</TableCell>
+                        <TableCell className="text-sm font-medium">{c.email_id}</TableCell>
                         <TableCell className="max-w-[12rem] truncate text-sm text-muted-foreground" title={c.sender}>
                           {c.sender || "—"}
                         </TableCell>
@@ -904,7 +901,7 @@ export function RunPageView({ runId }: { runId: string }) {
                           {c.subject || "(no subject)"}
                         </TableCell>
                         <TableCell
-                          className="max-w-[16rem] truncate font-mono text-xs text-muted-foreground"
+                          className="max-w-[16rem] truncate text-xs text-muted-foreground"
                           title={c.attachments.join(", ")}
                         >
                           {c.attachments.length > 0 ? c.attachments.join(", ") : "—"}
@@ -928,7 +925,7 @@ export function RunPageView({ runId }: { runId: string }) {
                       </>
                     ) : (
                     <>
-                    <TableCell className="font-mono text-sm">{c.email_id}</TableCell>
+                    <TableCell className="text-sm font-medium">{c.email_id}</TableCell>
                     <TableCell>
                       <CategoryBadge category={c.category} />
                       {guesses[c.email_id] && (
@@ -1091,13 +1088,13 @@ function BeforeRowCard({
       <Link href={`/runs/${runId}/cases/${c.email_id}`}>
         <motion.div whileTap={TAP} transition={TAP_TRANSITION} className="flex flex-col gap-1 p-3 active:bg-muted/50">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-mono text-sm">{c.email_id}</span>
+            <span className="text-sm font-medium">{c.email_id}</span>
             <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
           </div>
           <div className="truncate text-sm">{c.subject || "(no subject)"}</div>
           <div className="truncate text-xs text-muted-foreground">{c.sender || "—"}</div>
           {c.attachments.length > 0 && (
-            <div className="truncate font-mono text-xs text-muted-foreground">{c.attachments.join(", ")}</div>
+            <div className="truncate text-xs text-muted-foreground">{c.attachments.join(", ")}</div>
           )}
         </motion.div>
       </Link>
@@ -1159,7 +1156,7 @@ function CaseRowCard({
       <Link href={`/runs/${runId}/cases/${c.email_id}`}>
         <motion.div whileTap={TAP} transition={TAP_TRANSITION} className="flex flex-col gap-1.5 p-3 active:bg-muted/50">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-mono text-sm">{c.email_id}</span>
+            <span className="text-sm font-medium">{c.email_id}</span>
             <div className="flex items-center gap-1.5">
               <StatusBadge status={c.status} />
               {c.status === "MISMATCH" && c.defect_fields.length > 0 && (
@@ -1201,53 +1198,6 @@ function CaseRowCard({
           )}
         </motion.div>
       </Link>
-    </motion.div>
-  );
-}
-
-/**
- * Three or four cases worth opening first, picked from this run by what
- * they are (lib/showcases.ts -- the same picks the home page's tiles use),
- * each landing on the panel that shows the thing. The mentor's point, one
- * screen earlier than the home page makes it: a judge who arrives straight
- * at a run should not have to open twenty rows to find the scanned pair or
- * the BL that never came.
- */
-function WorthOpening({ runId, cases }: { runId: string; cases: CaseSummary[] }) {
-  const picks = useMemo(() => pickShowcases(cases), [cases]);
-  const mismatchFields = cases.find((c) => c.email_id === picks.mismatch)?.defect_fields.length ?? 0;
-  const items = [
-    {
-      key: "mismatch",
-      label: `a mismatch on ${mismatchFields} field${mismatchFields === 1 ? "" : "s"}`,
-      emailId: picks.mismatch,
-      spotlight: "fields",
-    },
-    { key: "recheck", label: "a BL that never arrived — re-upload it", emailId: picks.recheck, spotlight: "recheck" },
-    // "read out" only when the model read it: a run made without the model
-    // has scans on it and no transcript on any of them.
-    {
-      key: "scan",
-      label: picks.scanReadOut ? "a scanned pair, read out" : "a scanned pair",
-      emailId: picks.scan,
-      spotlight: "documents",
-    },
-    { key: "history", label: "same shipper, same field, again", emailId: picks.history, spotlight: "history" },
-  ].filter((i): i is typeof i & { emailId: string } => Boolean(i.emailId));
-  if (items.length === 0) return null;
-
-  return (
-    <motion.div className="flex flex-wrap items-center gap-2 text-xs" variants={fadeUp}>
-      <span className="text-muted-foreground">Worth opening:</span>
-      {items.map((i) => (
-        <Link
-          key={i.key}
-          href={showcaseHref(runId, i.emailId, i.spotlight)}
-          className="rounded-full border bg-card px-2.5 py-1 transition-colors hover:border-primary/40 hover:bg-muted/40"
-        >
-          {i.label} <span className="font-mono text-muted-foreground">{i.emailId}</span>
-        </Link>
-      ))}
     </motion.div>
   );
 }

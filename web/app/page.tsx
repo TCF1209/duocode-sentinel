@@ -31,7 +31,7 @@ export default function HomePage() {
     <motion.div className="flex flex-col gap-10" initial="hidden" animate="show" variants={stagger()}>
       <motion.div className="flex flex-col gap-5" variants={fadeUp}>
         <div className="max-w-2xl">
-          <p className="font-mono text-xs tracking-[0.14em] text-primary uppercase">
+          <p className="text-xs font-semibold tracking-[0.14em] text-primary uppercase">
             Shipping document verification
           </p>
           <h1 className="font-heading text-3xl font-semibold tracking-tight text-balance">
