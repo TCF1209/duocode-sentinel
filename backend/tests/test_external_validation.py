@@ -15,6 +15,11 @@ container equipment, a container-count cap, general REF/PARTICULARS and
 UNLOADING rules, and "Destination"/"Quantity" as ignored labels. What is left
 survived all three rounds. The shapes that exposed the withdrawn parts are
 pinned below as "read as before" cases, so they cannot regress.
+
+Pounds were then tried once more, converted on the pair in `compare`, and a
+fourth review broke that too. What replaced it converts nothing: the same
+figure in pounds on one side and kilograms on the other is sent to a person,
+which can only turn a MATCH into a review.
 """
 from __future__ import annotations
 
@@ -27,7 +32,10 @@ BACKEND = Path(__file__).resolve().parents[1]
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
+from api.direct_compare import compare_uploads  # noqa: E402
 from sdoc import labels, normalize  # noqa: E402
+from sdoc.compare import _weight_equal, compare_field, units_differ  # noqa: E402
+from sdoc.schema import MATCH, MISMATCH, UNCOMPARABLE, Evidence, FieldValue  # noqa: E402
 from sdoc.readers import pdf as pdf_reader  # noqa: E402
 
 
@@ -51,6 +59,75 @@ from sdoc.readers import pdf as pdf_reader  # noqa: E402
 ])
 def test_weights_are_read_as_before(raw: str, kg: float) -> None:
     assert normalize.gross_weight_kg(raw) == pytest.approx(kg)
+
+
+# --------------------------------------------------------------------------
+# Pounds: never converted; the same figure in two units goes to a person
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("a, b, differ", [
+    # The defect this exists for: the same digits in pounds and kilograms is a
+    # 2.2x difference, and it used to compare equal.
+    ("8,010 KG", "8,010 LBS", True), ("12 MT", "12 LBS", True), ("8,010 KGS", "LBS 8,010", True),
+    ("8,010 KG", "8,010 POUNDS", True), ("8,010 KGS", "8,010 L.B.S.", True), ("8,010 KGR", "8010LBS", True),
+    # Nothing to question: one unit, no unit on one side, or a line that gives
+    # both units.
+    ("8,010 KG", "8,010 KGS", False), ("8,010 LBS", "8,010 LBS", False), ("8,010", "8,010 LBS", False),
+    ("12,000 KG", "KGS 12,000.000 LBS 26,455.000", False), ("12,000 KG", "12,000 / 26,455 LBS", False),
+    ("12,000 KG", "12,000 (26,455 LBS)", False), ("26,455 LBS", "LBS/KGS 26,455/12,000", False),
+    ("12,000 KG", "12,000 Gross Weight (LBS)", False),
+])
+def test_one_side_in_pounds_is_noticed(a: str, b: str, differ: bool) -> None:
+    assert units_differ(a, b) is differ
+    assert units_differ(b, a) is differ
+
+
+@pytest.mark.parametrize("si, bl", [
+    ("8,010 KG", "8,010 LBS"), ("12,000 KG", "26,455 LBS"), ("12,000 KG", "12,000 KG"),
+    ("12,000 KG", "12,001 KG"), ("12,000 KGS", "12,000 L.B.S."), ("12 MT", "12,000 KG"),
+    # Layouts the reviews of the withdrawn conversion found: a unit printed
+    # beside a figure that belongs to another box.
+    ("12,000 KG", "12,000 LBS"), ("26,455 LBS", "26,455 (12,000 KGS)"),
+])
+def test_pounds_can_only_take_a_match_away(si: str, bl: str) -> None:
+    # The same guarantee as ocr_confusable (CLAUDE.md rule 3): a verdict is
+    # either the one the weights always got, or a MATCH turned into a review.
+    old = MATCH if _weight_equal(si, bl) else MISMATCH
+    got = compare_field("gross_weight_kg", _fv(si), _fv(bl))
+    assert got.verdict == old or (old == MATCH and got.verdict == UNCOMPARABLE and got.reason == "unit_differs")
+
+
+def test_the_same_figure_in_two_units_goes_to_a_person_end_to_end() -> None:
+    si = _doc(gross="8,010 KG")
+    bl = _doc(gross="8,010 LBS")
+    report = compare_uploads("si.txt", si, "bl.txt", bl, llm=None).to_report()
+    assert report["status"] == "NEEDS_REVIEW"
+    (weight,) = [f for f in report["fields"] if f["field"] == "gross_weight_kg"]
+    assert weight["reason"] == "unit_differs"
+
+
+def test_a_weight_in_pounds_is_still_read_at_face_value_end_to_end() -> None:
+    # Not converted: the same weight in each unit is a false MISMATCH, exactly
+    # as before, and is written down as open in docs/EXTERNAL_VALIDATION.md.
+    si = _doc(gross="12,000 KG")
+    bl = _doc(gross="26,455 LBS")
+    report = compare_uploads("si.txt", si, "bl.txt", bl, llm=None).to_report()
+    assert report["status"] == "MISMATCH" and report["defect_fields"] == ["gross_weight_kg"]
+
+
+def _fv(raw: str) -> FieldValue:
+    canonical, number = normalize.normalise_field("gross_weight_kg", raw)
+    return FieldValue(field="gross_weight_kg", raw=raw, normalised=canonical, number=number,
+                      present=canonical is not None,
+                      evidence=Evidence(doc_role="SI", locator="line 1", label="Gross Weight", snippet=raw))
+
+
+def _doc(*, gross: str) -> bytes:
+    return (
+        "Shipper: TEST EXPORT COMPANY LTD\nConsignee: TEST IMPORT COMPANY LTD\n"
+        "Notify Party: TEST NOTIFY AGENT LTD\nPort of Loading: PORT KLANG\n"
+        "Port of Discharge: SINGAPORE\nContainer Count: 2\n"
+        f"Gross Weight: {gross}\n"
+    ).encode("utf-8")
 
 
 # --------------------------------------------------------------------------

@@ -68,6 +68,7 @@ UNCOMPARABLE_REASONS: tuple[str, ...] = (
     "si_unparseable",
     "bl_unparseable",
     "ocr_confusable",
+    "unit_differs",
 )
 
 # Absolute tolerance for gross weight, in kilograms.
@@ -186,6 +187,63 @@ def _weight_equal(a: object, b: object) -> bool:
     if na is None or nb is None:
         return False
     return abs(na - nb) < WEIGHT_TOLERANCE_KG
+
+
+# ---- pounds ---------------------------------------------------------------
+# `normalize.gross_weight_kg` knows kilograms and tonnes only, so it reads
+# "8,010 LBS" as 8,010 and a BL in pounds against an SI in kilograms with the
+# same digits compared EQUAL: a 2.2x error cleared (docs/EXTERNAL_VALIDATION.md).
+#
+# Converting pounds was tried four times, three times in `normalize` and once
+# here on the pair, and every version was reviewed old-against-new and broke
+# real layouts: a unit printed beside a figure can belong to the next box, and
+# a label can name one unit while the value names another. So pounds are not
+# converted at all. When the weights agree only because one side is in pounds
+# and the other in kilograms or tonnes, the field is not called clean; it goes
+# to a person with both readings. Like `ocr_confusable` (CLAUDE.md rule 3),
+# this can only take a MATCH away, never produce one or a MISMATCH, so a
+# misreading costs a review and cannot clear or condemn a BL.
+_LB_TOKEN = re.compile(r"(?<![A-Z])(LBS?|LBR|POUNDS?|L\.B\.S?\.?)(?![A-Z])", re.I)
+_KG_OR_T_TOKEN = re.compile(
+    r"(?<![A-Z])(KGS?|KGM|KGRS?|KILOS?|KILOGRAMS?|KILOGRAMMES?|KILOGRAMOS?|K\.G\.S?\.?"
+    r"|MTS?|TONS?|TONNES?)(?![A-Z])|㎏", re.I)
+_LB_AFTER = re.compile(r"\s*\(?\s*(LBS?|LBR|POUNDS?|L\.B\.S?\.?)(?![A-Z])", re.I)
+_LB_BEFORE = re.compile(r"(?<![A-Z])(LBS?|LBR|POUNDS?|L\.B\.S?\.?)\s*[:.]?\s*$", re.I)
+
+
+def _pounds_only(raw: object) -> bool:
+    """Does `raw` state one weight, in pounds, and no kilograms or tonnes?"""
+    if raw is None:
+        return False
+    s = normalize.first_segment(str(raw))
+    if not _LB_TOKEN.search(s) or _KG_OR_T_TOKEN.search(s):
+        return False
+    nums = list(re.finditer(r"\d[\d,]*(?:\.\d+)?", s))
+    if len(nums) != 1:
+        return False
+    m = nums[0]
+    return bool(_LB_AFTER.match(s, m.end()) or _LB_BEFORE.search(s[:m.start()]))
+
+
+def _metric_only(raw: object) -> bool:
+    """Does `raw` name kilograms or tonnes, and no pounds?"""
+    if raw is None:
+        return False
+    s = normalize.first_segment(str(raw))
+    return bool(_KG_OR_T_TOKEN.search(s)) and not _LB_TOKEN.search(s)
+
+
+def units_differ(a: object, b: object) -> bool:
+    """One side in pounds, the other in kilograms or tonnes.
+
+    >>> units_differ("8,010 KG", "8,010 LBS")
+    True
+    >>> units_differ("8,010 KG", "8,010 KGS")
+    False
+    >>> units_differ("KGS 12,000 LBS 26,455", "12,000 KG")
+    False
+    """
+    return (_pounds_only(a) and _metric_only(b)) or (_pounds_only(b) and _metric_only(a))
 
 
 _RULES: dict[str, _Rule] = {
@@ -378,6 +436,11 @@ def compare_field(field: str, si_value: FieldValue, bl_value: FieldValue) -> Fie
         # rather than calling it a discrepancy or calling it clean.
         return FieldComparison(field=field, verdict=UNCOMPARABLE,
                                si=si_out, bl=bl_out, reason="ocr_confusable")
+    if same and field == "gross_weight_kg" and units_differ(_source(si_value), _source(bl_value)):
+        # The digits agree but the units do not: "8,010 KG" against "8,010
+        # LBS" is a 2.2x difference that reads as equal. A person converts.
+        return FieldComparison(field=field, verdict=UNCOMPARABLE,
+                               si=si_out, bl=bl_out, reason="unit_differs")
     return FieldComparison(
         field=field,
         verdict=MATCH if same else MISMATCH,
@@ -580,6 +643,7 @@ def _display_value(field: str, fv: FieldValue) -> str:
 __all__ = [
     "compare_documents",
     "ocr_confusable",
+    "units_differ",
     "compare_field",
     "defect_fields",
     "uncomparable_fields",

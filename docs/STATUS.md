@@ -4,6 +4,19 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-25 (evening, later) — Claude session · `origin/main` (pounds) merged into the final-round branch
+
+**Done**
+- `f675d6d` (the pounds entry below) merged into `feat/final-round-differentiators`.
+  Conflicts were only test counts, this file, and `field-comparison-row.tsx`'s
+  reason texts: the new `unit_differs` text is written in the professional
+  vocabulary ("Unit discrepancy: …") beside the others, and the gate's
+  recovery says "treat this field as consistent" like its siblings. On the
+  merged tree: **757 tests** (615 passed / 142 skipped without `data/bundle`),
+  `submission.json` byte-identical, every quoted count 757, deck rebuilt.
+
+---
+
 ## 2026-09-25 (evening) — Claude session · one professional term per concept, everywhere
 
 The user asked whether "Needs review" was worded the same everywhere and
@@ -80,6 +93,39 @@ recommended option was taken each time.
   additive `unresolved` key carries them). The web reads both.
 - The backend was restarted for this; the runs in memory are
   `run_000001_*` (rules, startup) and `run_000002_1790314413` (model tier).
+
+---
+
+## 2026-09-25 (afternoon) — Claude session · pounds: noticed and escalated, not converted
+
+**Done**
+- Pounds were converted in `compare._weight_equal`, on the pair, only when
+  one side stated a single pound figure and the other kg or tonnes. The
+  old-against-new review (13.6M pairs) confirmed six regression families:
+  a unit printed beside a figure can belong to the next box, and one layout
+  let a wrong BL clear. Withdrawn, like the three `normalize` attempts.
+- What shipped converts nothing: `compare.units_differ` + reason
+  `unit_differs`. When the weights agree only because one side is in pounds
+  and the other in kg/t, the field is UNCOMPARABLE, the gate (5c, status
+  `unit_differs`, review reason `unreadable`) sends the case to a person, and
+  the reply draft asks the customer which unit is right. It only ever turns
+  a MATCH into a review (the `ocr_confusable` guarantee). Swept old against
+  new over the round 1-4 pair families (10,568,385 pairs): 0 other changes;
+  28,482 false clears caught, 99,600 extra reviews where a pound unit sits
+  beside a kilogram figure.
+- Six datasets + adversarial harness field-by-field identical, score 1.0000,
+  `1c08cd2…` unchanged. 756 tests (614 passed / 142 skipped with no
+  `data/bundle`). PITCH_DAY Q&A: pounds, real documents, organisers' data vs
+  real; counts updated everywhere (the local .pptx needs a rebuild via
+  `scripts/build_pitch_deck.ps1` if it is used).
+
+**Next**
+- The same weight in each unit ("12,000 KG" vs "26,455 LBS") is still a
+  false MISMATCH; European notation still open (`EXTERNAL_VALIDATION.md`).
+
+**Careful**
+- Do not convert pounds anywhere without the review corpus: four versions
+  broke real layouts.
 
 ---
 

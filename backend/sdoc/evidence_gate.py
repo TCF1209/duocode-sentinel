@@ -73,6 +73,7 @@ GATE_STATUSES: tuple[str, ...] = (
     "wrong_document",
     "blank_value",
     "ocr_confusable",
+    "unit_differs",
     "untraceable_value",
 )
 
@@ -563,6 +564,7 @@ def _evaluate(
     blank_fields: list[str] = []
     blank_signals: list[str] = []
     ocr_fields: list[str] = []
+    unit_fields: list[str] = []
     for c in comparisons:
         si_bad = _side_unusable(c.si)
         bl_bad = _side_unusable(c.bl)
@@ -574,6 +576,10 @@ def _evaluate(
             # here would tell the operator the value is missing while they
             # are looking straight at it.
             ocr_fields.append(c.field)
+            continue
+        if c.reason == "unit_differs" and not si_bad and not bl_bad:
+            # Same reasoning: both weights are on the page and legible.
+            unit_fields.append(c.field)
             continue
         blank_fields.append(c.field)
         for role, bad_side in (("SI", si_bad), ("BL", bl_bad)):
@@ -646,6 +652,23 @@ def _evaluate(
             ),
             blocked_signals=[f"ocr_confusable:{f}" for f in fields],
             recovery="Compare both values against the pages; if they are the same party or port, treat this field as consistent.",
+        )
+
+    # ---- 5c. the weights agree only because the units differ ---------------
+    # "8,010 KG" against "8,010 LBS" is a 2.2x difference that reads as equal.
+    # Pounds are not converted (compare.py says why), so the case is not
+    # decided either way: the operator does the conversion.
+    if unit_fields:
+        return GateDecision(
+            status="unit_differs",
+            review_reason="unreadable",
+            reason=(
+                "One document gives the gross weight in pounds and the other in"
+                " kilograms or tonnes, with the same figure — Sentinel does not"
+                " convert pounds, so it cannot call the weights equal."
+            ),
+            blocked_signals=[f"unit_differs:{f}" for f in _sorted_fields(unit_fields)],
+            recovery="Convert the pound figure (1 lb = 0.4536 kg) and compare; if the weights agree, treat this field as consistent.",
         )
 
     # ---- 6. can we actually find what we claim to have read? --------------

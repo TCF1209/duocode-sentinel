@@ -197,6 +197,28 @@ real shapes the old code read correctly, and each such part was taken out:
 
 The shapes that exposed these are pinned as "read as before" tests.
 
+**Pounds, a fourth attempt, and what shipped instead (25 Sep, afternoon).**
+Pounds were then converted in `compare._weight_equal`, where both documents
+are visible, and only when one side stated a single figure in pounds and the
+other named kilograms or tonnes. The same old-against-new review, over 13.6
+million pairs, confirmed six families of regression. All six came from one
+cause: on a real form a unit printed beside a figure can belong to the next
+box ("12,000 LBS" typed into the value of a "Gross Weight (KGS)" box with an
+empty LBS box beside it), and one of them let a wrong BL clear. So pounds are
+still not converted. What shipped instead converts nothing: when the two
+weights agree only because one side is in pounds and the other in kilograms
+or tonnes ("8,010 KG" against "8,010 LBS"), the field is `UNCOMPARABLE /
+unit_differs` and the case goes to a person, whose reply draft asks the
+customer which unit is right. Like `ocr_confusable`, it can only turn a MATCH
+into a review. It never produces a MATCH or a MISMATCH, so a misreading costs
+one review and cannot clear or condemn a BL. The review's pair families from
+all four rounds, rerun old against new over 10,568,385 pairs, confirm it: no
+pair changed except a MATCH turned into a review. 28,482 of those were false
+clears now caught; the other 99,600 are layouts where a pound unit is printed
+beside a kilogram figure, which a person should look at anyway. All six local datasets and the adversarial harness
+are field-by-field identical; `submission.json` is byte-identical; 24 more
+tests pin it.
+
 ### Found and deliberately left open
 
 Recorded so they are not rediscovered as surprises. None of them affects the
@@ -207,9 +229,11 @@ graded data.
   sentences resolve as labels, Word cells holding several labels, values kept
   only in fillable PDF form fields, and OCR noise that fuzzy-matches a label.
   This is reader work, not rule work, and it is the next thing on the roadmap.
-- **Weights:** pounds are read as kilograms ("26,455 LBS" is 26,455 kg, so a
-  BL in pounds against an SI in kilograms with the same digits compares equal:
-  the most serious open item); European notation ("12.500,00 KG" reads 12.5;
+- **Weights:** pounds are still read at face value ("26,455 LBS" is 26,455).
+  The same figure in pounds against kilograms is now caught and escalated
+  (above), but the same weight printed in each unit ("12,000 KG" against
+  "26,455 LBS") is a false MISMATCH, and a pound figure whose unit is not
+  printed next to it is compared as a bare number. European notation ("12.500,00 KG" reads 12.5;
   "12,5 MT" reads 125 t); "24.500 KGS" against "24.900 KGS" falls inside the
   0.5 kg tolerance; tonne codes TNE, M/T and a bare T are read as kilograms.
 - **Container counts:** mixed equipment ("1x40HC + 2x20GP") reads only the

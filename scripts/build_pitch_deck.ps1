@@ -234,7 +234,7 @@ $cards = @(
   @("Not memorised", "1.0000 on four datasets, three from seeds we never developed against - 225 planted discrepancies caught with the exact field set, 80/80 escalations correct."),
   @("Attacked ourselves", "16 kinds of damage, 3,008 perturbed documents, 20,496 field reads, no answer key. Thirteen modes at zero movement; silent wrong values 982 -> 0."),
   @("A real carrier's form", "CMA CGM's public SI template, from outside the generator: four fields held, one bug found and fixed the same day."),
-  @("Engineering", "733 tests, 0 failing; CI on every push; a container that runs as a non-root user with no secret baked in; every value carries its evidence.")
+  @("Engineering", "757 tests, 0 failing; CI on every push; a container that runs as a non-root user with no secret baked in; every value carries its evidence.")
 )
 $cw = 272; $ch = 150; $x = $M; $y = 100
 for ($i = 0; $i -lt 4; $i++) {
