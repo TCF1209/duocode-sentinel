@@ -65,7 +65,11 @@ const STATUS_DOT: Record<CaseStatus, string> = { OK: "bg-ok", MISMATCH: "bg-dang
 // Table headers in the same small-caps style as every other section label
 // on the site (the Before table, the case page's field cards), instead of
 // the component's default body-size, body-colour header.
-const TH = "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
+// Every column of the case table is centred, header and cells alike (the
+// user's ask: a row read left-aligned ids, right-aligned percentages and
+// left-aligned badges as "not lined up"). `text-center` here overrides the
+// `text-left` that TableHead carries by default.
+const TH = "text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground";
 function reviewStateOf(c: CaseSummary): ReviewFilter {
   if (c.outcome_source === "review") return "corrected";
   return c.reviewed ? "confirmed" : "pending";
@@ -800,7 +804,10 @@ export function RunPageView({ runId }: { runId: string }) {
           rows in the DOM, half of them display:none and so never laid out or
           painted; that is cheaper than a visible layout swap on first load. */}
       <motion.div className="hidden rounded-md border bg-card md:block" variants={fadeUp}>
-        <Table>
+        {/* `text-center` on the table is inherited by every cell below, so
+            each column -- ids, badges, percentages, the Open button -- sits
+            on the same centre line in both the Before and the With table. */}
+        <Table className="text-center">
           <TableHeader>
             <TableRow>
               {before ? (
@@ -816,7 +823,7 @@ export function RunPageView({ runId }: { runId: string }) {
                 <>
                   <TableHead className={TH}>Email</TableHead>
                   <TableHead className={TH}>Category</TableHead>
-                  <TableHead className={cn(TH, "text-right")}>Confidence</TableHead>
+                  <TableHead className={TH}>Confidence</TableHead>
                   <TableHead className={TH}>Status</TableHead>
                   <TableHead className={TH}>Mismatched fields</TableHead>
                   <TableHead className={TH}>Decided by</TableHead>
@@ -906,7 +913,7 @@ export function RunPageView({ runId }: { runId: string }) {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
+                    <TableCell className="text-sm text-muted-foreground tabular-nums">
                       {Math.round(c.category_confidence * 100)}%
                     </TableCell>
                     <TableCell>
