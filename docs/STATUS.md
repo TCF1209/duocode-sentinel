@@ -4,6 +4,52 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-25 (evening) — Claude session "演讲策略" · the ten-minute deck, ordered by the rubric
+
+Branch `docs/final-pitch-10min`, cut from origin/main 75c599f and
+fast-forwarded to 865931e (the final wording commit); docs, captures and
+`scripts/build_pitch_deck.ps1` only — no backend or web code.
+
+**Done**
+- The pitch is **10 minutes with the demo inside + 5 minutes of questions**,
+  two speakers (A Lim Yee Teng, B Tang Chye Fong; B drives throughout).
+  `PITCH_DECK.md` and `PITCH_DAY.md` rewritten for it: time follows the
+  rubric's weights, and each high-weight strength is said while the demo shows
+  it (architecture on one case walking the six stages; 168 → 2 at "Model
+  answered"). The order was picked from three designs scored by three judge
+  personas (86/100 predicted).
+- Deck rebuilt in the dashboard's colours and serif headings: 7 slides + 9
+  hidden demo-backup screenshots (in the PDF, skipped in the slide show). 13
+  new captures in `docs/img/pitch/` from a local model-tier run of 865931e
+  (46 / 20 / 454, 6 model calls, $0.0086; 36.6 s with an empty model cache,
+  4.9 s warm); `scan_case*.png` removed (only the old deck used them).
+- Re-measured on 865931e: 520 / 46 / 20 / 454, submission md5 `1c08cd21…`
+  unchanged, 757 tests (615 / 142 skipped), adversarial harness 16 modes /
+  3,008 docs identical to `ADVERSARIAL.md`, 114/124 and 328/530, 21 pattern
+  groups (largest 7), desk codes 35/30/29/22. 168 → 2 not re-run (≈ $0.25).
+- The other finalists' public repositories were read (list from the
+  organisers' results endpoint). The deck no longer implies "only us": re-check,
+  source lines, scan transcription and sent replies exist elsewhere.
+
+**Next**
+- **The repository returns 404 to a signed-out visitor (private).** The owner
+  must make it public or share it before 00:05; history scanned, no secrets.
+- Merge 865931e and this branch into `main` so Vercel/Render serve the final
+  wording; then the morning warm-up in `PITCH_DAY.md` (a model-tier run first —
+  a redeploy empties the model cache).
+
+**Careful**
+- Found while checking claims, not fixed (pipeline change the night before):
+  the OCR look-alike veto misses a damaged glyph inside a word normalisation
+  strips — "P0RT KLANG" vs "PORT KLANG" and "C0., LTD" vs "CO., LTD" report a
+  discrepancy instead of escalating. Written into the Q&A; do not demo it.
+- email_512's BL transcription read "AL GURG" as "ALGURG" (the scan says AL
+  GURG); `PITCH_DAY.md` has both stage branches.
+- The metrics page's worst-case cost multiplies emails by a per-document rate
+  ($1.30 per 1,000 emails); not quoted anywhere.
+
+---
+
 ## 2026-09-25 (evening, latest) — Claude session · the final-round branch reviewed, fixed and tested end to end
 
 **Done**
