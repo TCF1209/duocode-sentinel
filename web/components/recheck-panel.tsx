@@ -133,10 +133,15 @@ export function RecheckPanel({
   /** Start unfolded -- when the page was opened at this panel (the home
    *  page's "Correct by re-upload" tile). Folded otherwise: one line until
    *  a re-sent document is actually in hand, decided directly ("some
-   *  things can start collapsed"). */
+   *  things can start collapsed"). A case with nothing on file starts
+   *  unfolded regardless -- see below. */
   defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  // Also unfolded where neither side has a document: the sample pair below
+  // is then the only way to watch a re-check without files of your own, and
+  // a folded line would hide it from anyone arriving another way than the
+  // tile -- decided directly, alongside the fold itself.
+  const [open, setOpen] = useState(defaultOpen || (!report.documents.si && !report.documents.bl));
   const [files, setFiles] = useState<RecheckFiles>({});
   const [error, setError] = useState<string | null>(null);
   const [loadingSample, setLoadingSample] = useState(false);
