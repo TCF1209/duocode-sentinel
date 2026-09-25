@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Pencil, Undo2 } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { ChevronDown, ChevronRight, Pencil, Undo2 } from "lucide-react";
 import type { FieldComparisonReport, FieldDecision, FieldValueReport, Verdict } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { VerdictBadge } from "@/components/status-badges";
@@ -67,12 +67,14 @@ function Side({
             title={
               correction !== undefined
                 ? "Change the corrected value"
-                : `Correct the ${label} value — what the document should read`
+                : `Edit the ${label} value — what the document should read`
             }
             className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <Pencil className="size-3" strokeWidth={2} />
-            {correction !== undefined ? "Edit" : value.present ? "Correct" : "Enter value"}
+            {/* "Edit", not "Correct": beside a value, "Correct" read as a
+                verdict ("this one is correct") rather than as the action. */}
+            {correction !== undefined || value.present ? "Edit" : "Enter value"}
           </button>
         )}
       </div>
@@ -399,6 +401,64 @@ export function FieldComparisonRow({
           busy={busy}
         />
       </div>
+    </div>
+  );
+}
+
+/**
+ * A field that agrees and nobody has touched, as one line: the field, the
+ * value both documents carry, and the Match badge -- so all seven fields
+ * stay on the page, in order, without five clean cards pushing the ones
+ * that differ down (the user's ask: "I only saw the ones I had to
+ * change"). A click opens the full card, evidence and all, right under
+ * the line; `children` is that card.
+ */
+export function QuietFieldRow({
+  comparison,
+  open,
+  onToggle,
+  children,
+}: {
+  comparison: FieldComparisonReport;
+  open: boolean;
+  onToggle: () => void;
+  children?: ReactNode;
+}) {
+  const label = FIELD_LABELS[comparison.field] ?? comparison.field;
+  const si = (comparison.si.raw ?? "").trim();
+  const bl = (comparison.bl.raw ?? "").trim();
+  // The two readings agree once normalised; where they differ to the eye
+  // (case, spacing, a trailing "LTD.") both are shown, so the line never
+  // lets one stand in for the other.
+  const differs = si !== bl;
+  const Chevron = open ? ChevronDown : ChevronRight;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        title={open ? "Fold this field back to one line" : "Open this field: both readings and the lines they came from"}
+        className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-card px-3 py-2 text-left transition-colors hover:bg-muted/40"
+      >
+        <Chevron className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} />
+        <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:w-36">{label}</span>
+        {/* On a phone the badge closes the first line and the value takes a
+            line of its own under the label (a long label left the value a
+            few characters wide); from `sm` up all four sit on one line and
+            the value is truncated, the title holding all of it. */}
+        <span className="ml-auto sm:order-last sm:ml-0">
+          <VerdictBadge verdict="MATCH" />
+        </span>
+        <span
+          className="basis-full pl-7 text-sm font-medium break-words sm:min-w-0 sm:flex-1 sm:basis-auto sm:truncate sm:pl-0"
+          title={differs ? `SI: ${si} · BL: ${bl}` : si}
+        >
+          {si || bl}
+          {differs && <span className="font-normal text-muted-foreground"> · BL: {bl}</span>}
+        </span>
+      </button>
+      {open && children}
     </div>
   );
 }

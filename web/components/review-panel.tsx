@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { AlertTriangle, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -127,14 +127,22 @@ export interface ReviewController {
 // only the MISMATCH/NEEDS_REVIEW copy is actually about a score not being
 // trustworthy enough to skip a person.
 //
-// One line each, and two versions of it: `description` for the case with
-// field cards (the choices are made there), `whole` for a case with nothing
-// comparable, where the outcome is picked in this panel. Decided directly:
-// a first-time visitor should see what to do here at a glance, not read a
-// paragraph about what confirming means.
+// One sentence each, naming the buttons on the row under it, in two
+// versions: `description` for the case with field cards (values are edited
+// there), `whole` for a case with nothing comparable, where the outcome is
+// picked in this panel. `recheck` says whether "Attach re-sent SI/BL" is on
+// the row, so the sentence never promises a button that is not there.
+// Decided directly: a first-time visitor should see what to do here at a
+// glance, not read a paragraph about what confirming means.
 const URGENCY: Record<
   CaseStatus,
-  { container: string; icon: string; heading: string; description: string; whole: string }
+  {
+    container: string;
+    icon: string;
+    heading: string;
+    description: (recheck: boolean) => string;
+    whole: (recheck: boolean) => string;
+  }
 > = {
   OK: {
     container: "bg-card",
@@ -142,18 +150,19 @@ const URGENCY: Record<
     heading: "Confirm this outcome",
     // "No mismatch", not "matched": the same wording rule as STATUS_LABELS
     // (lib/labels.ts) -- judges read "matched" as a claim about the tool.
-    description: "Nothing to fix. Confirm to sign off, or correct a value on its card.",
-    whole: "Nothing to fix. Confirm to sign off, or correct it.",
+    description: () => "Nothing to fix. Confirm to sign off, or edit a value on its card below.",
+    whole: () => "Nothing to fix. Confirm to sign off, or correct it.",
   },
   MISMATCH: {
     container: "border-danger/40 bg-danger-bg",
     icon: "text-danger",
     heading: "Review this mismatch",
-    // "Agree?" rather than "Confirm outcome" explained: confirming here
-    // means agreeing a real discrepancy is there, and the question form
-    // says so in one word.
-    description: "Agree? Confirm. Know what a value should read? Correct it on its card — it saves as you go.",
-    whole: "Agree? Confirm. Sentinel got it wrong? Correct it.",
+    description: (recheck) =>
+      recheck
+        ? "Confirm it, say you can't tell, or attach the re-sent documents. To fix a value, edit it on its card below."
+        : "Confirm it, or say you can't tell. To fix a value, edit it on its card below.",
+    whole: (recheck) =>
+      recheck ? "Confirm it, correct the outcome, or attach the re-sent documents." : "Confirm it, or correct the outcome.",
   },
   NEEDS_REVIEW: {
     container: "border-warn/40 bg-warn-bg",
@@ -162,8 +171,14 @@ const URGENCY: Record<
     // after "why this needs a person" and "what to do": the fallback for
     // a reviewer who has looked at the documents themselves.
     heading: "Decide it yourself",
-    description: "Enter or correct the values on the cards, or confirm it couldn't be checked.",
-    whole: "Can tell what the documents say? Correct it. Or confirm it couldn't be checked.",
+    description: (recheck) =>
+      recheck
+        ? "Enter or edit the values on the cards, attach the re-sent documents, or confirm it couldn't be checked."
+        : "Enter or edit the values on the cards, or confirm it couldn't be checked.",
+    whole: (recheck) =>
+      recheck
+        ? "Can tell what the documents say? Correct it. Or attach the re-sent documents, or confirm it couldn't be checked."
+        : "Can tell what the documents say? Correct it. Or confirm it couldn't be checked.",
   },
 };
 
@@ -191,6 +206,10 @@ export function ReviewPanel({
   report,
   control,
   inPlace,
+  canRecheck = false,
+  actions,
+  trailing,
+  children,
 }: {
   report: CaseReport;
   control: ReviewController;
@@ -199,6 +218,18 @@ export function ReviewPanel({
    *  of what stands. False for a case with nothing comparable (a missing
    *  or unreadable document), where the outcome is picked here directly. */
   inPlace: boolean;
+  /** "Attach re-sent SI/BL" is among `actions`, so the sentence can say so. */
+  canRecheck?: boolean;
+  /** More buttons for the row of whole-case actions (case-report-view.tsx
+   *  puts the re-sent documents button here). */
+  actions?: ReactNode;
+  /** What ends that row: the reply draft, whose trigger is a button and
+   *  whose open panel is a card -- the wrapper gives the card a full line
+   *  of its own. */
+  trailing?: ReactNode;
+  /** Rendered under the row, inside the box: the re-sent documents area
+   *  while it is open. */
+  children?: ReactNode;
 }) {
   const [legacyMode, setLegacyMode] = useState<"confirm" | "correct" | null>(null);
   const [legacyStatus, setLegacyStatus] = useState<CaseStatus>(report.status);
@@ -208,6 +239,24 @@ export function ReviewPanel({
   const { draft } = control;
   const saving = control.busy !== null;
   const savedCase = control.flash === "case";
+
+  // The end of the actions row and what goes under it, the same on every
+  // state of the panel. `data-spotlight="reply"` is the home tile's target
+  // for the reply draft; an escalated case carries it in the workspace
+  // instead, and the two are never both on the page. The `:has(>div)`
+  // variant is the draft panel's open state (its trigger is a button, its
+  // panel a div): open, it drops onto a full line under the buttons.
+  const tail = (
+    <>
+      {actions}
+      {trailing && (
+        <div data-spotlight="reply" className="ml-auto max-w-full [&:has(>div)]:mt-1 [&:has(>div)]:basis-full">
+          {trailing}
+        </div>
+      )}
+    </>
+  );
+  const below = children ? <div className="mt-3">{children}</div> : null;
 
   if (report.review) {
     // What changed, in one glance, for a correction: Sentinel's own answer
@@ -292,14 +341,16 @@ export function ReviewPanel({
                 <Undo2 className="size-3.5" />
                 Undo review
               </Button>
+              {tail}
             </div>
+            {below}
           </>
         ) : (
           <>
             {report.review.note && (
               <div className="mt-1 whitespace-pre-line text-muted-foreground">&ldquo;{report.review.note}&rdquo;</div>
             )}
-            <div className="mt-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
                 variant="ghost"
@@ -309,7 +360,9 @@ export function ReviewPanel({
                 <Undo2 className="size-3.5" />
                 Undo review
               </Button>
+              {tail}
             </div>
+            {below}
           </>
         )}
       </div>
@@ -338,7 +391,7 @@ export function ReviewPanel({
           {report.status !== "OK" && <AlertTriangle className={cn("size-4", urgency.icon)} strokeWidth={2} />}
           <div className={cn("text-sm font-semibold", urgency.icon)}>{urgency.heading}</div>
         </div>
-        <p className="mb-3 text-xs text-muted-foreground">{urgency.whole}</p>
+        <p className="mb-3 text-xs text-muted-foreground">{urgency.whole(canRecheck)}</p>
         {legacyMode === "correct" ? (
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap gap-2">
@@ -372,15 +425,17 @@ export function ReviewPanel({
             </div>
           </div>
         ) : (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" disabled={busy} onClick={() => submit({ decision: "confirm", note: note || undefined })}>
               {busy ? "Saving…" : "Confirm outcome"}
             </Button>
             <Button size="sm" variant="outline" onClick={() => setLegacyMode("correct")}>
               Correct it
             </Button>
+            {tail}
           </div>
         )}
+        {below}
         {error && <p className="mt-2 text-xs text-danger">{error}</p>}
       </div>
     );
@@ -397,8 +452,8 @@ export function ReviewPanel({
         <div className={cn("text-sm font-semibold", urgency.icon)}>{urgency.heading}</div>
         {saving && <span className="text-xs text-muted-foreground">Saving…</span>}
       </div>
-      <p className="mt-1.5 text-xs text-muted-foreground">{urgency.description}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <p className="mt-1.5 text-xs text-muted-foreground">{urgency.description(canRecheck)}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button size="sm" disabled={saving} onClick={control.confirm} title="Record that you looked and agree with Sentinel's answer as it stands">
           Confirm outcome
         </Button>
@@ -411,7 +466,9 @@ export function ReviewPanel({
         >
           I can&apos;t tell
         </Button>
+        {tail}
       </div>
+      {below}
     </div>
   );
 }

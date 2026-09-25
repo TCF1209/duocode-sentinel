@@ -93,10 +93,12 @@ The deck's beats and timings are in `PITCH_DECK.md`. On the product:
 4. **Patterns worth a second look** — it starts collapsed; open it, say what
    the top group is (seven cases from one shipper wrong on the same field),
    click into one.
-5. A **MISMATCH** case: the two documents on top (*View original*), only
-   the fields that disagree open (the rest fold under "5 fields agree"),
-   and under every value **the line it was read from**. Then correct it
-   where it is: *Correct* on the BL value, type what the shipper confirmed,
+5. A **MISMATCH** case: the two documents on top (*View original*), all
+   seven fields in order — the two that disagree as full cards, the five
+   that agree as one line each (click one to open it) — and under every
+   value **the line it was read from**. The review box is one row: *Confirm
+   outcome · I can't tell · Attach re-sent SI/BL · Draft reply*. Then fix
+   it where it is: *Edit* on the BL value, type what the shipper confirmed,
    Enter — the pair is compared again with the run's own rules, the card
    turns to *Match* with Sentinel's reading kept underneath, the outcome
    above follows; *Undo* puts Sentinel's reading back. *Not a mismatch* is
@@ -105,8 +107,9 @@ The deck's beats and timings are in `PITCH_DECK.md`. On the product:
 6. A **NEEDS_REVIEW** case: `email_512` (a scan, needs the model run): "no
    text layer, so it did not decide — but the model read the page for the
    reviewer" — the transcript card. Or `email_506` (the BL never arrived):
-   *Re-sent documents* → *No files? Load a sample pair* → *Re-check* → it
-   comes back OK, and the old answer stays on the case as v1.
+   the review box already shows *Re-sent documents* (nothing on file) →
+   *No files? Load a sample pair* → *Re-check* → it comes back OK, and the
+   old answer stays on the case as v1.
 7. `/compare`, unfamiliar labels, **toggle off**: "wording our table has
    never seen — the honest answer is *can't read it*, and it says which
    labels." **Toggle on**: "the model reads them, every value is re-located

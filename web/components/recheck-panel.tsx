@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { ChevronDown, ChevronRight, FileCheck2, History, Play, RotateCw, Upload, X } from "lucide-react";
+import { ChevronDown, FileCheck2, History, Play, RotateCw, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badges";
 import { AttachmentAction } from "@/components/attachment-action";
@@ -119,29 +119,29 @@ function FilePick({
   );
 }
 
+/**
+ * The re-sent documents area itself. Whether it is on screen is the
+ * caller's (case-report-view.tsx): it opens from the "Attach re-sent SI/BL"
+ * button on the review box's row of actions, and starts open when the page
+ * was opened at it (?spotlight=recheck, the home tile) or when the case has
+ * nothing on file -- there the sample pair below is the only way to watch a
+ * re-check, and a folded area would hide it. The grey one-line bar this
+ * used to fold into is gone: the user did not read it as something to click.
+ */
 export function RecheckPanel({
   report,
   onRecheck,
   rechecking,
   className,
-  defaultOpen = false,
+  onClose,
 }: {
   report: CaseReport;
   onRecheck: (files: RecheckFiles) => Promise<void>;
   rechecking?: boolean;
   className?: string;
-  /** Start unfolded -- when the page was opened at this panel (the home
-   *  page's "Correct by re-upload" tile). Folded otherwise: one line until
-   *  a re-sent document is actually in hand, decided directly ("some
-   *  things can start collapsed"). A case with nothing on file starts
-   *  unfolded regardless -- see below. */
-  defaultOpen?: boolean;
+  /** Fold the area away again (the Hide control). */
+  onClose?: () => void;
 }) {
-  // Also unfolded where neither side has a document: the sample pair below
-  // is then the only way to watch a re-check without files of your own, and
-  // a folded line would hide it from anyone arriving another way than the
-  // tile -- decided directly, alongside the fold itself.
-  const [open, setOpen] = useState(defaultOpen || (!report.documents.si && !report.documents.bl));
   const [files, setFiles] = useState<RecheckFiles>({});
   const [error, setError] = useState<string | null>(null);
   const [loadingSample, setLoadingSample] = useState(false);
@@ -177,41 +177,21 @@ export function RecheckPanel({
     }
   }
 
-  if (!open) {
-    return (
-      <div className={cn("rounded-md border bg-background", className)}>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-expanded={false}
-          className="flex w-full items-center gap-3 p-3 text-left"
-        >
-          <Upload className="size-4 shrink-0 text-muted-foreground" />
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Re-sent documents</span>
-          <span className="text-sm text-muted-foreground">Got a corrected SI or BL back? Attach it here.</span>
-          <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
-            Open
-            <ChevronRight className="size-4" />
-          </span>
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className={cn("rounded-md border bg-background p-3", className)}>
       <div className="flex items-center justify-between gap-2">
         <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Re-sent documents</div>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          aria-expanded={true}
-          disabled={rechecking}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          Hide
-          <ChevronDown className="size-4" />
-        </button>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={rechecking}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Hide
+            <ChevronDown className="size-4" />
+          </button>
+        )}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
         Attach the re-sent SI or BL; the same check runs again. The previous answer stays on the case.

@@ -4,6 +4,51 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-25 (morning, later) — Claude session · the case page as the user wanted it: all seven fields on the page, one row of actions, "Edit"
+
+The user, awake, looked at the case page and asked whether it was user
+friendly: the five agreeing fields were hidden behind a "show them" line,
+the re-sent documents were a grey bar with a small "Open ›", "Correct"
+beside a value read as a verdict, and the review box was two sentences with
+the reply button hanging under it. Four options were put to them and the
+recommended one taken each time.
+
+**Done**
+- **All seven fields, in the documents' order** (`case-report-view.tsx`,
+  `QuietFieldRow` in `field-comparison-row.tsx`): a field that differs, or
+  that the reviewer touched, is the full card; a field that agrees is one
+  line -- name, the value both documents carry (both shown when they differ
+  to the eye), the Match badge -- and opens into its card on a click. The
+  "N fields agree — show them" fold is gone.
+- **One row of actions in the review box** (`review-panel.tsx`): *Confirm
+  outcome · I can't tell · Attach re-sent SI/BL*, and on a case that is not
+  escalated the reply draft at the row's end (its open panel drops onto a
+  full line under the buttons). One sentence above the row, naming those
+  buttons. The re-sent documents area (`recheck-panel.tsx`, now controlled
+  by the page) opens under the row; it starts open on `?spotlight=recheck`
+  and on a case with nothing on file, as before, so the sample pair is
+  still on screen for `email_506` without a click. The grey bar is gone.
+- **"Correct" is "Edit"** on every value box; "Enter value" stays for a
+  side Sentinel could not read. PITCH_DAY steps 5 and 6 follow the new
+  screen.
+- Verified on `email_004` (mismatch), `email_001` (no mismatch: seven
+  rows), `email_506` (nothing on file: area open with the sample button),
+  `email_512` (scan: reply in the workspace, not in the row),
+  `?spotlight=recheck`; light and dark, 1280 and 375 px; tsc / eslint /
+  `next build` clean.
+
+**Next**
+- Nothing on this; the teammate merges.
+
+**Careful**
+- The reply draft's trigger is a button and its open panel a div; the row
+  tells them apart with a `:has(>div)` variant on the wrapper rather than
+  by touching the teammate's component.
+- `data-spotlight="reply"` is on that wrapper for a non-escalated case and
+  in the workspace's "what to do" for an escalated one -- never both.
+
+---
+
 ## 2026-09-25 (morning) — Claude session · `origin/main` merged into the final-round branch
 
 **Done**

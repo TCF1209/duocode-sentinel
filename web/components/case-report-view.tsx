@@ -1,9 +1,16 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Upload, XCircle } from "lucide-react";
 import type { CaseReport, DocumentReport, FieldComparisonReport, FieldDecision, Verdict } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 import { CategoryBadge, DecidedByBadge, StatusBadge } from "@/components/status-badges";
-import { FieldComparisonRow, formatReason, type DocSideKey, type ReviewerView } from "@/components/field-comparison-row";
+import {
+  FieldComparisonRow,
+  QuietFieldRow,
+  formatReason,
+  type DocSideKey,
+  type ReviewerView,
+} from "@/components/field-comparison-row";
 import { EMPTY_DRAFT, ReviewPanel, type ReviewController } from "@/components/review-panel";
 import { ReplyDraftPanel } from "@/components/reply-draft-panel";
 import { replyDraftKey } from "@/lib/reply-draft";
@@ -283,6 +290,29 @@ export function CaseReportView({
   const recheckable = Boolean(onRecheck) && report.category === "BL_COMPARISON";
   const offerRecheck = recheckable && (standingStatus === "MISMATCH" || standingStatus === "NEEDS_REVIEW");
 
+  // The re-sent documents area lives inside the review box, under its row
+  // of actions, behind the "Attach re-sent SI/BL" button there. It starts
+  // open in two cases, both the user's rule: a page opened at it
+  // (?spotlight=recheck, the home tile) and a case with nothing on file --
+  // there the sample pair is the only way to watch a re-check, and a folded
+  // area would hide it. The grey one-line bar it used to fold into is gone.
+  const [recheckOpen, setRecheckOpen] = useState(
+    spotlight === "recheck" || (!report.documents.si && !report.documents.bl),
+  );
+  const recheckButton =
+    offerRecheck && onRecheck ? (
+      <Button
+        size="sm"
+        variant="outline"
+        aria-expanded={recheckOpen}
+        onClick={() => setRecheckOpen((o) => !o)}
+        title="Got a corrected SI or BL back from the sender? Attach it and the same check runs again"
+      >
+        <Upload className="size-4" />
+        Attach re-sent SI/BL
+      </Button>
+    ) : null;
+
   // A "See it live" tile on the home page (or a "Worth opening" chip on the
   // run page) lands on the panel it promised, not on the top of a long
   // report: the tagged panel is scrolled to the middle of the screen. No
@@ -358,9 +388,11 @@ export function CaseReportView({
 
   // What stands on each field for the reviewer's eye: the corrected pair's
   // verdict when there is one, the one-click choice on top of that -- or
-  // Sentinel's own under "Sentinel's original". The fields that agree and
-  // nobody has touched fold away under one line, so a mismatch case opens
-  // on the fields that differ instead of five clean cards above them.
+  // Sentinel's own under "Sentinel's original". All seven fields stay on
+  // the page in the documents' order (the user's ask: "I only saw the ones
+  // I had to change"): a field that differs, or that the reviewer touched,
+  // is a full card; a field that agrees and nobody touched is one line
+  // (QuietFieldRow) that opens into its card on a click.
   function standsOn(f: FieldComparisonReport): Verdict {
     if (showOriginal) return f.verdict;
     const d = draft.decisions[f.field];
@@ -370,8 +402,7 @@ export function CaseReportView({
   }
   const isQuiet = (f: FieldComparisonReport) =>
     standsOn(f) === "MATCH" && (showOriginal || !(draft.decisions[f.field] || draft.corrections[f.field]));
-  const loudFields = report.fields.filter((f) => !isQuiet(f));
-  const quietFields = report.fields.filter(isQuiet);
+  const [openQuiet, setOpenQuiet] = useState<Record<string, boolean>>({});
   const renderCard = (f: FieldComparisonReport) => (
     <FieldComparisonRow
       comparison={f}
@@ -512,43 +543,43 @@ export function CaseReportView({
         </motion.div>
       )}
 
-      {/* Re-sent documents straight after "what to do" when the case is
-          escalated: for a missing or unreadable document that *is* the
-          action, and it comes before deciding the case by hand. Its own
-          block, not nested inside the workspace -- one border fewer. */}
-      {showWorkspace && offerRecheck && onRecheck && (
-        <motion.div variants={fadeUp} data-spotlight="recheck">
-          <RecheckPanel report={report} onRecheck={onRecheck} rechecking={rechecking} defaultOpen={spotlight === "recheck"} />
-        </motion.div>
-      )}
-
       {/* Right under the "why", not after every field — a reviewer landing
           here should see what to do before they see the evidence, not after
-          scrolling past all of it. The reply draft is the same kind of
-          thing for the same reason: on a real case with several fields,
-          each carrying an SI card and a BL card, "draft a reply" used to
-          sit below a long scroll of evidence a reviewer had often already
-          decided not to read line by line -- easy to never notice it was
-          there at all, not just easy to reach late. */}
+          scrolling past all of it. Everything a reviewer can do with the
+          whole case is one row here: confirm, "I can't tell", attach the
+          re-sent SI/BL (the area opens under the row) and, on a case that
+          is not escalated, the reply draft at the row's end. The draft used
+          to hang under the box on its own and the re-sent documents were a
+          grey bar of their own; the user read neither as an action. On an
+          escalated case the draft sits in the workspace's "what to do"
+          above -- never in both places. */}
       {review && (
         <motion.div variants={fadeUp} data-spotlight="review">
-          <ReviewPanel report={report} control={review} inPlace={inPlace} />
+          <ReviewPanel
+            report={report}
+            control={review}
+            inPlace={inPlace}
+            canRecheck={recheckButton !== null}
+            actions={recheckButton}
+            trailing={!showWorkspace ? <ReplyDraftPanel key={replyDraftKey(report)} report={report} /> : undefined}
+          >
+            {recheckOpen && offerRecheck && onRecheck && (
+              <div data-spotlight="recheck">
+                <RecheckPanel
+                  report={report}
+                  onRecheck={onRecheck}
+                  rechecking={rechecking}
+                  onClose={() => setRecheckOpen(false)}
+                />
+              </div>
+            )}
+          </ReviewPanel>
         </motion.div>
       )}
 
-      {/* On a mismatch the same panel sits under the review: "the shipper
-          sent a corrected BL" is the other way a mismatch gets resolved,
-          beside a reviewer deciding it. Inside the workspace's "what to do"
-          when the case is escalated instead -- never both. */}
-      {!showWorkspace && offerRecheck && onRecheck && (
-        <motion.div variants={fadeUp} data-spotlight="recheck">
-          <RecheckPanel report={report} onRecheck={onRecheck} rechecking={rechecking} defaultOpen={spotlight === "recheck"} />
-        </motion.div>
-      )}
-
-      {/* Inside the workspace's "what to do" when the case is escalated;
-          on its own here otherwise. Never both. */}
-      {!showWorkspace && (
+      {/* /compare has no review box to hold it, so there the reply draft
+          stands on its own. */}
+      {!review && !showWorkspace && (
         <motion.div variants={fadeUp} data-spotlight="reply">
           <ReplyDraftPanel key={replyDraftKey(report)} report={report} />
         </motion.div>
@@ -628,28 +659,25 @@ export function CaseReportView({
           </motion.details>
         ) : (
           <motion.div className="flex flex-col gap-2" variants={stagger(0, 0.05)} data-spotlight="fields">
-            {loudFields.map((f) => (
-              <motion.div key={f.field} variants={fadeUp} data-spotlight={f.field === historyField ? "history" : undefined}>
-                {renderCard(f)}
-              </motion.div>
-            ))}
-            {quietFields.length > 0 && (
-              <motion.details className="rounded-lg border bg-card text-sm" variants={fadeUp}>
-                <summary className="cursor-pointer select-none p-3 text-muted-foreground">
-                  {quietFields.length === report.fields.length
-                    ? `All ${report.fields.length} fields agree`
-                    : `${quietFields.length} field${quietFields.length === 1 ? "" : "s"} agree`}{" "}
-                  — show {quietFields.length === 1 ? "it" : "them"}
-                </summary>
-                <div className="flex flex-col gap-2 border-t p-3">
-                  {quietFields.map((f) => (
-                    <div key={f.field} data-spotlight={f.field === historyField ? "history" : undefined}>
-                      {renderCard(f)}
-                    </div>
-                  ))}
-                </div>
-              </motion.details>
-            )}
+            {report.fields.map((f) => {
+              const quiet = isQuiet(f);
+              const open = quiet && Boolean(openQuiet[f.field]);
+              return (
+                <motion.div key={f.field} variants={fadeUp} data-spotlight={f.field === historyField ? "history" : undefined}>
+                  {quiet ? (
+                    <QuietFieldRow
+                      comparison={f}
+                      open={open}
+                      onToggle={() => setOpenQuiet((s) => ({ ...s, [f.field]: !s[f.field] }))}
+                    >
+                      {open && renderCard(f)}
+                    </QuietFieldRow>
+                  ) : (
+                    renderCard(f)
+                  )}
+                </motion.div>
+              );
+            })}
           </motion.div>
         ))}
 
