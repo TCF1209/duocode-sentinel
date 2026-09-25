@@ -166,12 +166,19 @@ function Side({
 
 // Mirrors the ok/warn/danger language used everywhere else: a mismatch is
 // danger, an uncomparable field is a warn (it's *why* a case needs review,
-// not a dead end), and a clean match stays plain so problem fields are the
-// ones that visually jump out while scanning down the list.
+// not a dead end), and a match is ok -- every field carries its status
+// colour, the same three the badges use, so a list of rows reads at a
+// glance (the user's ask: "not white; the colour that goes with it").
 const CARD_STYLE: Record<Verdict, string> = {
-  MATCH: "bg-card",
+  MATCH: "border-ok/30 bg-ok-bg/60",
   MISMATCH: "border-danger/30 bg-danger-bg/60",
   UNCOMPARABLE: "border-warn/30 bg-warn-bg/60",
+};
+// The one-line rows, a shade lighter than the cards they open into.
+const ROW_STYLE: Record<Verdict, string> = {
+  MATCH: "border-ok/30 bg-ok-bg/40 hover:bg-ok-bg/70",
+  MISMATCH: "border-danger/30 bg-danger-bg/40 hover:bg-danger-bg/70",
+  UNCOMPARABLE: "border-warn/30 bg-warn-bg/40 hover:bg-warn-bg/70",
 };
 
 // Most uncomparable reasons are a state ("BL missing") and read fine as a
@@ -352,7 +359,7 @@ export function QuietFieldRow({
         title={open ? "Fold this field back to one line" : "Open this field: both readings, the lines they came from, and your choices"}
         className={cn(
           "flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2 text-left transition-colors",
-          uncomparable ? "border-warn/30 bg-warn-bg/40 hover:bg-warn-bg/70" : "bg-card hover:bg-muted/40",
+          ROW_STYLE[comparison.verdict],
         )}
       >
         <Chevron className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} />

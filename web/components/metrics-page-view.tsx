@@ -331,7 +331,9 @@ function Stat({
   const display = useCountUp(value, decimals);
   return (
     <motion.div variants={fadeUp}>
-      <Card>
+      {/* py-0: the card's own padding stacked on the content's left a tall
+          empty band around each figure. */}
+      <Card className="py-0">
         <CardContent className="p-4">
           <div className="text-xs text-muted-foreground">{label}</div>
           <div className={cn("font-heading text-2xl font-semibold tabular-nums", accent && ACCENT_STYLE[accent])}>

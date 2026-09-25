@@ -207,8 +207,8 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
     return (
       <div className="flex flex-col gap-4">
         <Skeleton className="h-8 w-36 rounded-full" />
-        <Card>
-          <CardContent className="flex flex-col gap-4 p-6">
+        <Card className="py-0">
+          <CardContent className="flex flex-col gap-4 p-5">
             <Skeleton className="h-6 w-48" />
             <Skeleton className="h-20 w-full" />
             <div className="flex flex-col gap-2">
@@ -296,8 +296,11 @@ export function CaseDetailPageView({ runId, emailId }: { runId: string; emailId:
           </Button>
         )}
       </div>
-      <Card>
-        <CardContent className="p-6">
+      {/* py-0 on the card: its own vertical padding stacked on the
+          content's and put ~45 px of empty band above the email id (the
+          user's ask). The content's p-5 is the whole inset now. */}
+      <Card className="py-0">
+        <CardContent className="p-5">
           {before ? (
             <BeforeCaseView report={report} caseId={`${runId}:${emailId}`} />
           ) : (

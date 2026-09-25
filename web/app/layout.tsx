@@ -38,7 +38,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <CursorGlow />
           <Nav />
-          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
+          {/* pt-2, not py-6: with the sticky nav above it, a 24 px top margin
+              read as an empty band on every page (the user's ask). */}
+          <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-2 pb-6">{children}</main>
           <Toaster />
         </ThemeProvider>
       </body>

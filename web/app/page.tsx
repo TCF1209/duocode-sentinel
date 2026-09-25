@@ -28,7 +28,9 @@ import { CATEGORY_LABELS } from "@/lib/labels";
 /** The landing page — what this is and how it works, nothing operational on it. */
 export default function HomePage() {
   return (
-    <motion.div className="flex flex-col gap-10" initial="hidden" animate="show" variants={stagger()}>
+    // pt-4: the layout's top padding was cut to tighten the working pages
+    // (runs, cases); the landing hero keeps the room it had above it.
+    <motion.div className="flex flex-col gap-10 pt-4" initial="hidden" animate="show" variants={stagger()}>
       <motion.div className="flex flex-col gap-5" variants={fadeUp}>
         <div className="max-w-2xl">
           <p className="text-xs font-semibold tracking-[0.14em] text-primary uppercase">

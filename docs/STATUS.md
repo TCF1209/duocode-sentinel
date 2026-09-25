@@ -4,6 +4,54 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-25 (afternoon, later) — Claude session · every status in its colour, one box on a needs-review case, less empty band at the top
+
+Three things the user saw on the live page; the two with a design choice
+were put to them and taken on the recommended option.
+
+**Done**
+- **Every status carries its colour** (`field-comparison-row.tsx`
+  `CARD_STYLE` / `ROW_STYLE`, `review-panel.tsx` `TONE`): a field that
+  matches is green now, not white, as a row and as a card; mismatch red and
+  uncomparable amber as before. The review box follows the same three: a
+  clean case's "No mismatch found" box is green with a check icon.
+- **A needs-review case is one box, like a mismatch case**
+  (`case-report-view.tsx`): the separate "Why this needs a person" panel
+  with its nested "What to do" box is gone. Its content is the review box's
+  line -- the reason and the pipeline's suggested action as one sentence
+  ("An attachment is not the document it claims to be. Ask the sender for
+  the draft BL; the attached document is something else."), "Unread on the
+  BL: …" only when it is some of the fields rather than all of them, and on
+  a scan the read-out line -- under the heading "Sentinel couldn't check
+  this one", with the same row of buttons and the reply draft at the row's
+  end, as on every other status. The muted "Sentinel had flagged: …"
+  banner after a review is gone too: the summary's *Sentinel said* line
+  now carries the reason ("Needs review — an attachment is not …"). On
+  /compare, which has no review, an escalated result gets the box's
+  heading and line without a row.
+- **Less empty band at the top** (`app/layout.tsx` `pt-2` instead of
+  `py-6`; `Card className="py-0"` on the case report, the Compare result
+  and upload cards, and the metrics figures): the card's own padding was
+  stacking on its content's and put ~45 px above the email id. The home
+  page's hero keeps the room it had (`pt-4` on its own wrapper).
+- `data-spotlight="reply"` now sits on the review box's row end on every
+  status (it was in the workspace on an escalated case); still exactly one
+  on the page. The other spotlights are unchanged.
+- Verified: email_001 (green box, green rows), email_004, email_501 (one
+  amber box, one row), email_512 (reason + read-out lines, adopt button),
+  /compare, metrics, runs, home, `/pitch`; light and dark; 1280 and 375
+  px. tsc / eslint / `next build` clean; the deck's three captures re-taken
+  and the deck rebuilt.
+
+**Next**
+- Nothing on this; the teammate merges.
+
+**Careful**
+- `/pitch` sits 18 px higher under the nav (layout padding); its
+  `min-h-[calc(100vh-10rem)]` still fills the screen, checked at 1440×900.
+
+---
+
 ## 2026-09-25 (afternoon) — Claude session · one typeface, one badge per card, a summary you can read at a glance
 
 Four more things the user saw on the live page, each put to them with a

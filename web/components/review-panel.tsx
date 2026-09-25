@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { AlertTriangle, Sparkles, Undo2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Sparkles, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, VerdictBadge } from "@/components/status-badges";
-import { FIELD_LABELS, STATUS_LABELS } from "@/lib/labels";
+import { FIELD_LABELS, STATUS_LABELS, reviewReasonClause } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import type { CaseReport, CaseStatus, FieldComparisonReport, FieldCorrection, FieldDecision, ReviewBody } from "@/lib/api";
 
@@ -113,10 +113,12 @@ export interface ReviewController {
 }
 
 // The box follows the status the case stands at, in the same three tones
-// the rest of the app colours by -- a clean case can still be reviewed, but
-// it has not earned a warn/danger-tinted card the way an actual problem has.
+// the rest of the app colours by: green for a clean pair, red for a
+// mismatch, amber for a case that needs a person -- the same colour its
+// badge and its field cards carry (the user's ask: every status with its
+// own colour, none left white).
 const TONE: Record<CaseStatus, { container: string; icon: string }> = {
-  OK: { container: "bg-card", icon: "" },
+  OK: { container: "border-ok/40 bg-ok-bg", icon: "text-ok" },
   MISMATCH: { container: "border-danger/40 bg-danger-bg", icon: "text-danger" },
   NEEDS_REVIEW: { container: "border-warn/40 bg-warn-bg", icon: "text-warn" },
 };
@@ -141,21 +143,26 @@ export function ReviewBox({
 }: {
   status: CaseStatus;
   heading: string;
-  line: string;
+  /** One or two short lines under the heading: what Sentinel found, and on
+   *  an escalated case why it stopped and what to do about it. */
+  line: ReactNode;
   saving?: boolean;
-  children: ReactNode;
+  /** The row of findings. Absent on /compare, which has no review: the box
+   *  is then the heading and the line alone. */
+  children?: ReactNode;
   below?: ReactNode;
 }) {
   const tone = TONE[status];
+  const Icon = status === "OK" ? CheckCircle2 : AlertTriangle;
   return (
     <div className={cn("rounded-lg border p-4", tone.container)} data-testid="review-actions">
       <div className="flex flex-wrap items-center gap-2">
-        {status !== "OK" && <AlertTriangle className={cn("size-4", tone.icon)} strokeWidth={2} />}
+        <Icon className={cn("size-4", tone.icon)} strokeWidth={2} />
         <div className={cn("text-sm font-semibold", tone.icon)}>{heading}</div>
         {saving && <span className="text-xs text-muted-foreground">Saving…</span>}
       </div>
       <p className="mt-1.5 text-xs text-muted-foreground">{line}</p>
-      <div className="mt-3 flex flex-wrap items-center gap-2">{children}</div>
+      {children && <div className="mt-3 flex flex-wrap items-center gap-2">{children}</div>}
       {below && <div className="mt-3">{below}</div>}
     </div>
   );
@@ -165,8 +172,7 @@ export function ReviewBox({
  * The end of a row of actions: the reply draft, whose trigger is a button
  * and whose open panel is a div -- the `:has(>div)` variant tells them
  * apart, so the open panel drops onto a full line under the buttons.
- * `data-spotlight="reply"` is the home tile's target; an escalated case
- * carries it in the workspace instead, and the two are never both rendered.
+ * `data-spotlight="reply"` is the home tile's target, on every status.
  */
 export function RowEnd({ children }: { children: ReactNode }) {
   return (
@@ -231,6 +237,7 @@ export function ReviewSummary({
     <>
       <StatusBadge status={report.status} />
       {report.status === "MISMATCH" && report.defect_fields.length > 0 && <span>on {fieldNames(report.defect_fields)}</span>}
+      {report.status === "NEEDS_REVIEW" && report.review_reason && <span>— {reviewReasonClause(report.review_reason)}</span>}
     </>
   );
   // What the reviewer changed, one line per field -- a corrected value with

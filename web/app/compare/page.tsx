@@ -272,7 +272,7 @@ export default function ComparePage() {
       </motion.section>
 
       <motion.div variants={fadeUp}>
-        <Card>
+        <Card className="py-0">
           <CardContent className="flex flex-col gap-4 p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -346,8 +346,10 @@ export default function ComparePage() {
             {loadedSample && reportLlm !== null && (
               <NextStep sample={loadedSample} reportLlm={reportLlm} ranWith={ranWith} busy={busy} onRun={run} />
             )}
-            <Card>
-              <CardContent className="p-6">
+            {/* The same inset as the case page's report card: py-0 on the
+                card, p-5 on the content, no stacked band above the id. */}
+            <Card className="py-0">
+              <CardContent className="p-5">
                 <CaseReportView report={report} />
               </CardContent>
             </Card>

@@ -130,76 +130,6 @@ function DocumentStatus({ side, doc, caseId }: { side: "si" | "bl"; doc: Documen
 }
 
 /**
- * The NEEDS_REVIEW case page as a place to work, not a mismatch page with a
- * different colour. Raised directly: "human review isn't a simple thing,
- * and this page looked bare and nearly identical to a mismatch" -- a
- * mismatch is a few clicks, a needs-review case means Sentinel could not
- * read or find what it needed, and the person picking it up has to find
- * out what, and what to do about it. Why it is here, which fields could
- * not be read, what to do (the pipeline's own suggested action, with the
- * reply draft) -- then, as their own blocks after it, re-sent documents
- * and deciding it yourself. The two document cards sit above this box,
- * on every case (CaseReportView).
- *
- * Nothing here is new data: review_reason, the "Suggested action:" note
- * and the per-field present/blank flags were all already on the page, as
- * one banner, a bullet among bullets, and a footer line.
- */
-function NeedsReviewWorkspace({ report, suggestedAction }: { report: CaseReport; suggestedAction: string | null }) {
-  // Only meaningful when both documents were actually read: a blank field
-  // on a document that could not be read at all is the unreadability, not
-  // a separate finding. Grouped by document -- "Unread on the SI: Shipper,
-  // Consignee" -- so the line names the page to open and the fields to
-  // look for, and nothing else.
-  const bothReadable = Boolean(report.documents.si?.readable && report.documents.bl?.readable);
-  const unread = bothReadable
-    ? (["si", "bl"] as const)
-        .map((side) => ({
-          side,
-          fields: report.fields.filter((f) => !f[side].present).map((f) => FIELD_LABELS[f.field] ?? f.field),
-        }))
-        .filter((g) => g.fields.length > 0)
-    : [];
-
-  return (
-    <div className="flex flex-col gap-3 rounded-lg border border-warn/40 bg-warn-bg/40 p-4">
-      <div>
-        <div className="flex items-center gap-2 text-sm font-semibold text-warn">
-          <AlertTriangle className="size-4" strokeWidth={2} />
-          Why this needs a person
-        </div>
-        <p className="mt-1 text-sm">
-          {report.review_reason ? REVIEW_REASON_TEXT[report.review_reason] : "Sentinel could not decide this one automatically."}
-        </p>
-      </div>
-
-      {unread.length > 0 && (
-        <p className="text-sm">
-          {unread.map((g, i) => (
-            <span key={g.side}>
-              {i > 0 && " · "}
-              Unread on the {g.side.toUpperCase()}: <span className="font-medium">{g.fields.join(", ")}</span>
-            </span>
-          ))}
-        </p>
-      )}
-
-      <div className="rounded-md border bg-background p-3">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What to do</div>
-        <p className="mt-1 text-sm">{suggestedAction ?? "Ask the sender, or decide it below."}</p>
-        {/* "Retry this case" used to sit here beside Re-check and read as
-            the same thing twice; decided directly: only Re-check stays. A
-            retry (re-reading the inbox files) is offered in the page header
-            solely on a case the pipeline failed on (case-detail-page-view). */}
-        <div className="mt-2" data-spotlight="reply">
-          <ReplyDraftPanel key={replyDraftKey(report)} report={report} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
  * The discrepancy report — "the screen the whole project exists to produce"
  * (docs/ROADMAP.md 3b). Shared by the run case-detail page and the judge
  * upload page (/compare), since both render the exact same CaseReport shape.
@@ -259,16 +189,11 @@ export function CaseReportView({
   const [showOriginal, setShowOriginal] = useState(false);
   const correction = showOriginal ? null : liveCorrection;
 
-  // Sentinel's review-reason banner, once a reviewer has moved the case off
-  // NEEDS_REVIEW (effective_outcome nulls the reason for any other status).
-  const reasonResolved = Boolean(report.review_reason && correction && correction.review_reason === null);
-
-  // The workspace replaces the banner while the case still genuinely needs a
-  // person: Sentinel escalated it and no reviewer has moved it anywhere
-  // else (a correction *to* NEEDS_REVIEW keeps it). Once corrected to
-  // OK/MISMATCH the muted banner above says so and the workspace would be
-  // stale advice. Under "Sentinel's original" `correction` is null, so the
-  // workspace comes back with the rest of the original view -- consistent.
+  // The case still genuinely needs a person: Sentinel escalated it and no
+  // reviewer has moved it anywhere else (a correction *to* NEEDS_REVIEW
+  // keeps it). The "Suggested action:" note is promoted into the review
+  // box's line then, and on /compare the box is shown without a row. Once
+  // reviewed, the summary's "Sentinel said" carries the reason instead.
   const showWorkspace = report.status === "NEEDS_REVIEW" && (!correction || correction.status === "NEEDS_REVIEW");
 
   // Where re-sent documents can be dropped in: a comparison request whose
@@ -478,6 +403,51 @@ export function CaseReportView({
     .filter((s) => transcripts[s])
     .map((s) => `${transcripts[s]!.legible_count} of ${transcripts[s]!.fields.length} on the ${s.toUpperCase()}`)
     .join(", ");
+  // Why Sentinel could not check this one and what to do about it, as one
+  // or two short lines at the top of the review box -- the same box, the
+  // same shape, as a mismatch case (the user: the old two-box version read
+  // as "twice the text of the mismatch page, and less tidy"). Nothing here
+  // is new data: review_reason, the pipeline's "Suggested action:" note and
+  // the per-field present flags were all already on the page. "Unread on
+  // the BL: …" is named only when it is some of the fields, not all --
+  // when nothing on a document could be read, the reason already says so
+  // -- and only when both documents were actually read: a blank field on a
+  // document that could not be read at all is the unreadability itself.
+  const bothReadable = Boolean(report.documents.si?.readable && report.documents.bl?.readable);
+  const unread = bothReadable
+    ? (["si", "bl"] as const)
+        .map((side) => ({
+          side,
+          fields: report.fields.filter((f) => !f[side].present).map((f) => FIELD_LABELS[f.field] ?? f.field),
+        }))
+        .filter((g) => g.fields.length > 0 && g.fields.length < report.fields.length)
+    : [];
+  const sentence = (s: string) => (/[.!?]$/.test(s) ? s : `${s}.`);
+  const needsReviewHeading = "Sentinel couldn't check this one";
+  const needsReviewLine = (
+    <>
+      {report.review_reason ? REVIEW_REASON_TEXT[report.review_reason] : "Sentinel could not decide this one automatically."}{" "}
+      {suggestedAction ? sentence(suggestedAction) : "Look at the documents, then say what you found."}
+      {unread.length > 0 && (
+        <span className="block">
+          {unread.map((g, i) => (
+            <span key={g.side}>
+              {i > 0 && " · "}
+              Unread on the {g.side.toUpperCase()}: <span className="font-medium text-foreground">{g.fields.join(", ")}</span>
+            </span>
+          ))}
+        </span>
+      )}
+      {hasReadOut && (
+        <span className="block">
+          The model read the scans for you ({legibleSummary})
+          {review
+            ? " — adopt what you have checked against the image and the rules compare the pair."
+            : " — check each value against the image."}
+        </span>
+      )}
+    </>
+  );
   const togglePanel = (which: "picker" | "adopt") => setPanel(panel === which ? null : which);
   const findingButton = (label: string, onClick: () => void, title: string, primary = false, expanded?: boolean) => (
     <Button
@@ -491,7 +461,7 @@ export function CaseReportView({
       {label}
     </Button>
   );
-  const finding: { heading: string; line: string; buttons: ReactNode } | null =
+  const finding: { heading: string; line: ReactNode; buttons: ReactNode } | null =
     !review || !comparison
       ? null
       : report.status === "MISMATCH"
@@ -542,10 +512,8 @@ export function CaseReportView({
             }
           : report.fields.length > 0
             ? {
-                heading: "Decide it yourself",
-                line: hasReadOut
-                  ? `The model read the scans for you (${legibleSummary}). Adopt what you have checked against the image and the rules compare the pair — or decide it below.`
-                  : "Look at the documents, then say what you found. Values can be entered on the cards below.",
+                heading: needsReviewHeading,
+                line: needsReviewLine,
                 buttons: (
                   <>
                     {hasReadOut && (
@@ -574,15 +542,15 @@ export function CaseReportView({
                 ),
               }
             : {
-                heading: "Decide it yourself",
-                line: "Nothing could be compared. Attach the re-sent documents, or leave it in review.",
+                heading: needsReviewHeading,
+                line: needsReviewLine,
                 buttons: findingButton("Still can't tell", cantTell, "Leave it in review: you looked and could not decide either"),
               };
-  const rowEnd = !showWorkspace ? (
+  const rowEnd = (
     <RowEnd>
       <ReplyDraftPanel key={replyDraftKey(report)} report={report} />
     </RowEnd>
-  ) : null;
+  );
   const recheckArea =
     recheckOpen && offerRecheck && onRecheck ? (
       <div data-spotlight="recheck">
@@ -689,40 +657,6 @@ export function CaseReportView({
         <DocumentStatus side="bl" doc={report.documents.bl} caseId={caseId} />
       </motion.div>
 
-      {!showWorkspace && report.review_reason && (
-        <motion.div
-          className={cn(
-            "flex items-start gap-2.5 rounded-md border p-3 text-sm",
-            // Kept, not removed, once a reviewer resolves it: what Sentinel
-            // flagged is still part of the record, it just no longer leads.
-            reasonResolved ? "border-border bg-muted/40 text-muted-foreground" : "border-warn/30 bg-warn-bg text-warn",
-          )}
-          variants={fadeUp}
-        >
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={2} />
-          <div>
-            <div className="font-medium">
-              {reasonResolved && <span className="font-normal">Sentinel had flagged: </span>}
-              {REVIEW_REASON_TEXT[report.review_reason]}
-            </div>
-            {report.defect_fields.length > 0 && (
-              <div className={cn("mt-0.5", !reasonResolved && "text-warn/80")}>
-                Flagged: {report.defect_fields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}
-              </div>
-            )}
-            {reasonResolved && correction && (
-              <div className="mt-0.5">Resolved by a reviewer — corrected to {STATUS_LABELS[correction.status]}.</div>
-            )}
-          </div>
-        </motion.div>
-      )}
-
-      {showWorkspace && (
-        <motion.div variants={fadeUp}>
-          <NeedsReviewWorkspace report={report} suggestedAction={suggestedAction} />
-        </motion.div>
-      )}
-
       {/* A comparison request gets the review box; anything else has no
           documents to compare, and says so in one line instead of offering
           a sign-off with nothing behind it. */}
@@ -732,14 +666,14 @@ export function CaseReportView({
         </motion.p>
       )}
 
-      {/* Right under the "why", not after every field — a reviewer landing
-          here should see what to do before they see the evidence, not after
-          scrolling past all of it. One row holds everything a reviewer can
-          do with the whole case: the findings (Sentinel's own first, so
+      {/* Right under the documents, not after every field — a reviewer
+          landing here should see what to do before they see the evidence,
+          not after scrolling past all of it. One box, the same shape on
+          every status: what Sentinel found (and, escalated, why it stopped
+          and what to do), then one row holding everything a reviewer can do
+          with the whole case: the findings (Sentinel's own first, so
           agreeing is one click), the re-sent SI/BL (the area opens under
-          the row) and, on a case that is not escalated, the reply draft at
-          the row's end. On an escalated case the draft sits in the
-          workspace's "what to do" above -- never in both places. */}
+          the row) and the reply draft at the row's end. */}
       {review && comparison && finding && (
         <motion.div variants={fadeUp} data-spotlight="review">
           {report.review ? (
@@ -757,12 +691,20 @@ export function CaseReportView({
         </motion.div>
       )}
 
-      {/* /compare has no review box to hold it, so there the reply draft
-          stands on its own. */}
-      {!review && !showWorkspace && (
-        <motion.div variants={fadeUp} data-spotlight="reply">
-          <ReplyDraftPanel key={replyDraftKey(report)} report={report} />
-        </motion.div>
+      {/* /compare has no review: an escalated result still gets the box's
+          heading and line (why it stopped, what to do), and the reply draft
+          stands on its own under it. */}
+      {!review && (
+        <>
+          {showWorkspace && (
+            <motion.div variants={fadeUp}>
+              <ReviewBox status="NEEDS_REVIEW" heading={needsReviewHeading} line={needsReviewLine} />
+            </motion.div>
+          )}
+          <motion.div variants={fadeUp} data-spotlight="reply">
+            <ReplyDraftPanel key={replyDraftKey(report)} report={report} />
+          </motion.div>
+        </>
       )}
 
       {(readableNotes.length > 0 ||
