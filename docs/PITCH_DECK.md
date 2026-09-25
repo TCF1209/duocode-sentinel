@@ -41,9 +41,10 @@ only the voice does. The click-by-click script is in `PITCH_DAY.md`.
    Nothing on a slide that cannot be shown or pointed at in the repository.
    Each slide carries a small tag naming the rubric criterion it is evidence
    for; it is never said aloud.
-5. **Claim what is true of us, not "only us".** On 25 Sep the other nine
-   finalists' public repositories were read (organisers' results endpoint for
-   the list; see *What the other finalists changed* below). Several of the
+5. **Claim what is true of us, not "only us".** On 25 Sep eight of the other
+   nine finalists' repositories were read; one was not public (organisers'
+   results endpoint for the list; see *What the other finalists changed*
+   below). Several of the
    mentor's "special features" turned out to exist elsewhere, so the deck says
    what Sentinel does, precisely, and never that nobody else does it.
 
@@ -275,19 +276,14 @@ Enter.
 
 ## What the other finalists changed (25 Sep)
 
-The organisers' public results endpoint lists the ten finalists: Blockeris
-(Ship Happens), Coffee Max (NavisAI), DuoCode (Sentinel), Grabbers
-(DocuVerify), Hokkien Mee is Black (Shiptuationship), Jbisone (DocuMatch), La
-Peace, larpers (ClearDraft), MozartAI (CargoGuard), NJHL (HolyShip). Nine
-public repositories were read (Hokkien Mee's returns 404). What it changed in
-this deck:
+Eight of the other nine finalists' repositories were read; one was not
+public (the list is on the organisers' public results endpoint). No team or product is named here, in
+the deck or on stage. What it changed in this deck:
 
-- **Not claimed as unique, because others have them:** re-check on an
-  amended document (MozartAI), the source line under each value (most),
-  scans transcribed for a reviewer (T4F, MozartAI, ClearDraft), a reply
-  actually sent (Blockeris, NJHL), "rules decide, AI assists, a person
-  confirms" (almost everyone), a near-perfect score on the organisers' data
-  (most).
+- **Not claimed as unique, because other finalists have them too:** re-check
+  on an amended document, the source line under each value, scans
+  transcribed for a reviewer, a reply actually sent, "rules decide, AI
+  assists, a person confirms", a near-perfect score on the organisers' data.
 - **Said precisely instead:** the evidence gate re-checks every compared
   value — rule-read or model-read — before any verdict (others check only the
   model's answers, or only after the fact); the perturbation harness with its

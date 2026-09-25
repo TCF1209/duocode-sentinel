@@ -340,7 +340,7 @@ export function ReviewSummary({ report, control }: { report: CaseReport; control
             ? "cleared — same value, different format"
             : d === "flagged"
               ? "flagged as a discrepancy"
-              : "verified against both documents"}
+              : "checked against both documents — consistent"}
           {sentinel && (
             <span className="text-muted-foreground">
               {" "}

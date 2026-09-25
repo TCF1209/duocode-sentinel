@@ -35,7 +35,7 @@ import pytest
 from conftest import requires_bundle, skip_without_bundle
 from sdoc import evidence_gate as gate
 from sdoc import normalize
-from sdoc.compare import compare_field, ocr_confusable
+from sdoc.compare import _ocr_surface, compare_field, ocr_confusable
 from sdoc.schema import (
     MISMATCH,
     PARTY_FIELDS,
@@ -168,6 +168,12 @@ def test_the_veto_never_clears_a_bad_bl():
     """The point of the whole design: it escalates, it does not absolve."""
     c = _compare("consignee", "MOORIM SP CO., LTD", "M0ORIM SP CO., LTD")
     assert c.verdict != "MATCH"
+    # Nor does it explain a real difference away when the printed texts
+    # happen to be the same length: the printed-text test compares every
+    # character, so another word at equal length stays a discrepancy.
+    assert _compare("port_of_discharge", "MERSIN, TURKEY (TRMER)",
+                    "LONG BEACH, US (TRMER)").verdict == MISMATCH
+    assert _compare("consignee", "MOORIM SP C0., LTD", "MOORIM SQ CO., LTD").verdict == MISMATCH
 
 
 @pytest.mark.parametrize("field, si, bl", [
@@ -305,6 +311,9 @@ def test_no_two_real_entities_in_the_dataset_are_confusable():
     pipeline = Pipeline(PipelineConfig(data_root=root, llm=None))
     parties: set[str] = set()
     ports: set[str] = set()
+    # The veto also reads the printed text (compare._ocr_surface), so the
+    # printed forms of different entities are swept too, each with its key.
+    surfaces: dict[str, set[tuple[str, str]]] = {"parties": set(), "ports": set()}
     for path in sorted((root / "inbox").glob("email_*.json")):
         email = EmailRecord.from_json(json.loads(path.read_text(encoding="utf-8")))
         for c in (pipeline.process(email).comparisons or []):
@@ -314,9 +323,15 @@ def test_no_two_real_entities_in_the_dataset_are_confusable():
             for side in (c.si, c.bl):
                 if side.normalised:
                     pool.add(side.normalised)
+                    if side.raw:
+                        surfaces["parties" if pool is parties else "ports"].add(
+                            (_ocr_surface(side.raw), side.normalised))
 
     assert parties and ports, "the sweep read nothing — the bundle may be empty"
     for name, pool in (("parties", parties), ("ports", ports)):
         confusable = [(a, b) for a, b in itertools.combinations(sorted(pool), 2)
                       if ocr_confusable(a, b)]
         assert not confusable, f"{name}: {confusable[:3]}"
+        printed = [(a, b) for (a, ka), (b, kb) in itertools.combinations(sorted(surfaces[name]), 2)
+                   if ka != kb and ocr_confusable(a, b)]
+        assert not printed, f"{name} (printed text): {printed[:3]}"

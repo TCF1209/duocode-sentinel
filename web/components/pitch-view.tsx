@@ -671,7 +671,7 @@ function Proof() {
 //
 // One isolated number, not four equal ones. Four same-size stat cards read
 // back as "there were some big numbers" -- nobody retells a judge four
-// figures. 11 hours -> 13 seconds is the one worth being able to repeat, so
+// figures. 11 hours -> seconds is the one worth being able to repeat, so
 // it gets the same before/after treatment as slide 4's 168 -> 2 (muted,
 // arrow, coloured) rather than sitting inside a paragraph at the bottom.
 // The other four numbers still say themselves, just smaller.
@@ -708,16 +708,18 @@ function Impact() {
         <div className="flex items-center justify-center gap-3">
           <span className="font-heading text-3xl font-semibold text-muted-foreground tabular-nums">11 hours</span>
           <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
-          <span className="font-heading text-4xl font-semibold text-primary tabular-nums">13 seconds</span>
+          <span className="font-heading text-4xl font-semibold text-primary tabular-nums">~12 seconds</span>
         </div>
-        {/* Labelled as an estimate on purpose. The 13 seconds is measured;
-            the hours are arithmetic on an assumed pace, and a number that
-            looks measured but is not is the easiest thing for a judge to
-            pull on. */}
+        {/* Labelled as an estimate on purpose. The seconds are measured
+            (11.4-12.1 s of work on a warm Render container, rules tier; a
+            cold start adds ~30 s, VIDEO_SCRIPT.md), and the Before view
+            shows each run's own figure; the hours are arithmetic on an
+            assumed pace, and a number that looks measured but is not is the
+            easiest thing for a judge to pull on. */}
         <p className="mt-1 text-xs text-muted-foreground">
           520 emails to triage, 124 document pairs to compare — 11 hours is a conservative
-          estimate of the desk work (20s/email, 4min/pair), <em>not a measurement</em>; 13 seconds
-          is measured, on a free-tier container.
+          estimate of the desk work (20s/email, 4min/pair), <em>not a measurement</em>; about 12 seconds
+          of work is measured on a warm free-tier container, and each run shows its own on the Before view.
         </p>
       </motion.div>
 

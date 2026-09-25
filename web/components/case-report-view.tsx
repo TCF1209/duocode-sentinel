@@ -331,6 +331,9 @@ export function CaseReportView({
     else corrections[field] = sides;
     const decisions = { ...draft.decisions };
     delete decisions[field];
+    // Nothing corrected is left for the "removes the corrected values"
+    // strip to warn about, and the next edit must not flash it up again.
+    if (Object.keys(corrections).length === 0) setPanel((p) => (p === "confirm" ? null : p));
     review.commit({ ...draft, decisions, corrections }, field);
   }
   // The controls sit on the cards only in the live view: "Sentinel
@@ -477,6 +480,16 @@ export function CaseReportView({
     return { field: f.field, si: read("si"), bl: read("bl") };
   });
   const hasReadOut = readOutRows.some((r) => r.si || r.bl);
+  // Values typed in, or "Mark no discrepancy" on fields never compared,
+  // stand in for a document that was read. Where the attachment is missing,
+  // the wrong document, or a file that cannot be opened (corrupt, empty,
+  // unsupported), the suggested action is to ask the sender, and either
+  // would let the reply say "no discrepancy" about a BL nobody received, so
+  // the page offers neither. A scan keeps both: a person can read it.
+  const canEnterValues =
+    report.review_reason !== "wrong_doc_type" &&
+    report.review_reason !== "missing_attachment" &&
+    !Object.values(report.documents).some((d) => d && !d.readable && d.unreadable_reason !== "no_text_layer");
   const readOutModel = Array.from(new Set([transcripts.si?.model, transcripts.bl?.model].filter(Boolean))).join(" / ");
   function adoptReadOut(chosen: string[]) {
     if (!review) return;
@@ -554,7 +567,7 @@ export function CaseReportView({
           lines. Only where a value can be entered (the live view of a
           reviewable case with a field left uncompared), and not beside the
           transcription sentence, which already says so. */}
-      {decideOn && !hasReadOut && report.fields.some((f) => f.verdict === "UNCOMPARABLE") && (
+      {decideOn && canEnterValues && !hasReadOut && report.fields.some((f) => f.verdict === "UNCOMPARABLE") && (
         <span className="block">If you have the correct values, enter them on the fields below.</span>
       )}
     </>
@@ -663,6 +676,7 @@ export function CaseReportView({
                       </Button>
                     )}
                     {!settledOk &&
+                      canEnterValues &&
                       findingButton(
                         "Mark no discrepancy",
                         noMismatch,
@@ -1014,7 +1028,7 @@ export function CaseReportView({
                     // The same word the card's own button shows once the row
                     // is open: only where a value can be entered at all.
                     editCue={
-                      decideOn && f.verdict === "UNCOMPARABLE"
+                      decideOn && canEnterValues && f.verdict === "UNCOMPARABLE"
                         ? f.si.present && f.bl.present
                           ? "Edit"
                           : "Enter value"

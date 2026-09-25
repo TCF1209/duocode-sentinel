@@ -71,7 +71,12 @@ export function MetricsPageView({ runId }: { runId: string }) {
   const categoryData = Object.entries(metrics.by_category).map(([name, value]) => ({ name, value }));
   const statusData = Object.entries(metrics.by_status).map(([name, value]) => ({ name, value }));
   const reasonData = Object.entries(metrics.by_review_reason).map(([name, value]) => ({ name, value }));
-  const costUsd = (metrics.llm?.usage as { cost_usd?: number } | undefined)?.cost_usd ?? 0;
+  const usage = metrics.llm?.usage as { cost_usd?: number; calls?: number; live_calls?: number } | undefined;
+  const costUsd = usage?.cost_usd ?? 0;
+  // Every model answer came from the cache: the $0 is the cache, not the
+  // price, and new mail would not be cached.
+  const cachedOnly = (usage?.calls ?? 0) > 0 && usage?.live_calls === 0;
+  const budgetUsd = typeof metrics.llm?.budget_usd === "number" ? metrics.llm.budget_usd : 2;
   const hasUnresolved = metrics.review?.unresolved !== undefined;
 
   return (
@@ -108,7 +113,13 @@ export function MetricsPageView({ runId }: { runId: string }) {
           value={metrics.documents_unreadable}
           accent={metrics.documents_unreadable > 0 ? "warn" : undefined}
         />
-        {metrics.llm?.available && <Stat label="Model cost" value={costUsd} format={(v) => `$${v.toFixed(4)}`} />}
+        {metrics.llm?.available && (
+          <Stat
+            label={cachedOnly ? "Model cost (answers cached)" : "Model cost"}
+            value={costUsd}
+            format={(v) => `$${v.toFixed(4)}`}
+          />
+        )}
       </motion.div>
 
       {/* Its own row, under its own heading, not more tiles in the
@@ -142,7 +153,7 @@ export function MetricsPageView({ runId }: { runId: string }) {
       )}
 
       <motion.div variants={fadeUp}>
-        <ThroughputProjection metrics={metrics} costUsd={costUsd} />
+        <ThroughputProjection metrics={metrics} costUsd={costUsd} cachedOnly={cachedOnly} budgetUsd={budgetUsd} />
       </motion.div>
 
       <motion.div className="grid gap-4 sm:grid-cols-2" variants={stagger()}>
@@ -279,7 +290,17 @@ function formatDuration(totalSeconds: number): string {
   return `${(totalSeconds / 3600).toFixed(2)} h`;
 }
 
-function ThroughputProjection({ metrics, costUsd }: { metrics: PipelineMetrics; costUsd: number }) {
+function ThroughputProjection({
+  metrics,
+  costUsd,
+  cachedOnly,
+  budgetUsd,
+}: {
+  metrics: PipelineMetrics;
+  costUsd: number;
+  cachedOnly: boolean;
+  budgetUsd: number;
+}) {
   const [volume, setVolume] = useState<number>(5_000);
 
   const totalSeconds = (volume * metrics.mean_ms_per_email) / 1000;
@@ -309,14 +330,19 @@ function ThroughputProjection({ metrics, costUsd }: { metrics: PipelineMetrics; 
           <MiniStat label="Processing time" value={formatDuration(totalSeconds)} />
           <MiniStat
             label={`At today's mix (${ruleSharePct}% by rules)`}
-            value={`$${projectedAtTodaysMix.toFixed(projectedAtTodaysMix < 1 ? 4 : 2)}`}
+            value={cachedOnly ? "—" : `$${projectedAtTodaysMix.toFixed(projectedAtTodaysMix < 1 ? 4 : 2)}`}
           />
-          <MiniStat label="Hardest case measured — every label unfamiliar" value={`$${projectedWorstCase.toFixed(2)}`} accent="warn" />
+          <MiniStat label="Hardest case measured — unfamiliar labels" value={`$${projectedWorstCase.toFixed(2)}`} accent="warn" />
         </div>
         <p className="text-xs text-muted-foreground">
-          Time: this run&apos;s measured {metrics.mean_ms_per_email.toFixed(2)} ms per email. Cost: this run&apos;s
-          measured rate; the hardest case measured is ${WORST_CASE_USD_PER_DOCUMENT} per document with every label
-          unfamiliar, times this run&apos;s {documentsPerEmail.toFixed(2)} documents per email. Each run is capped at $2.
+          Time: this run&apos;s measured {metrics.mean_ms_per_email.toFixed(2)} ms per email. Cost:{" "}
+          {cachedOnly
+            ? "this run's model answers all came from the cache, so its $0 is not a price for new mail; "
+            : "this run's measured rate; "}
+          the hardest case measured is ${WORST_CASE_USD_PER_DOCUMENT} per document with unfamiliar labels, times this
+          run&apos;s {documentsPerEmail.toFixed(2)} documents per email. The model is capped at $
+          {budgetUsd.toFixed(2)} per run: past the cap it is switched off for the rest of the run and nothing more is
+          charged; the rules decide alone, and what they cannot read goes to a person.
         </p>
       </CardContent>
     </Card>

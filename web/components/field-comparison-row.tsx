@@ -304,7 +304,9 @@ export function FieldComparisonRow({
           <span
             title={
               overridden
-                ? `Sentinel result: ${VERDICT_WORD[comparison.verdict]}; the reviewer decision takes precedence`
+                ? decision
+                  ? `Sentinel result: ${VERDICT_WORD[comparison.verdict]}; the reviewer decision takes precedence`
+                  : `Sentinel result: ${VERDICT_WORD[comparison.verdict]}; the corrected values now read ${VERDICT_WORD[standing]}`
                 : undefined
             }
           >

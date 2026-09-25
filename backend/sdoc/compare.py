@@ -374,8 +374,9 @@ def _side_of(doc: Optional[DocFields], field: str) -> FieldValue:
 # test — and none is even within two characters at equal length. The planted
 # defects swap whole entities, so there is no defect in this data that this
 # veto could swallow. `backend/tests/test_ocr_confusion.py` re-runs that sweep
-# over the dev bundle, so a future entity pool that does contain a confusable
-# pair fails the suite instead of quietly losing a defect.
+# over the dev bundle, on the canonical keys and on the printed text (the
+# second half of the veto, `_ocr_surface`), so a future entity pool that does
+# contain a confusable pair fails the suite instead of quietly losing a defect.
 #
 # There is deliberately no cap on how many characters may differ. A cap would
 # add no safety here (nothing is close) and would make the veto miss a badly
