@@ -25,9 +25,11 @@ that commit.
       whole history on 25 Sep found no key, no `.env`, no `.pem`, and no
       `data/` or answer key tracked. Then open the URL in a private window and
       check the README and the CI badge render.
-- [ ] **Merge and deploy.** `main` must contain `865931e` (final wording:
-      "Not compared", no "on hold") and the deck branch
-      `docs/final-pitch-10min`. Vercel builds only the owner's pushes.
+- [ ] **Merge and deploy.** Merge `fix/final-night-found-issues` into
+      `main` — it contains `865931e` (final wording: "Not compared", no "on
+      hold"), the deck branch `docs/final-pitch-10min`, and the evening fixes
+      (OCR check, metrics cost, README counts). Vercel builds only the
+      owner's pushes.
       Afterwards, in a private window: the case page of `email_512` shows
       field badges **Not compared** (not "Unverified").
 - [ ] Submit the deck: `docs/Sentinel-final-pitch.pdf` (16 pages: 7 slides +
@@ -227,11 +229,12 @@ converted between units shows as a discrepancy, and European notation
 
 **"OCR noise — O versus 0?"**
 In party and port names, two readings that differ only in look-alike
-characters (O/0, I/1, S/5, B/8) go to a person, never decided. Honest limit,
-found on 25 Sep: if the damaged character sits in a word we strip before
-comparing — "P0RT", "C0." — the two values end up different lengths and the
-check doesn't apply; that case is reported as a discrepancy. It is written
-down; the fix is not made the night before the final.
+characters (O/0, I/1, S/5, B/8) go to a person, never decided — it can
+only escalate, never clear. We found a gap in it on 25 Sep by checking our
+own claim: a damaged character inside a word we strip before comparing —
+"P0RT KLANG", "C0., LTD" — was reported as a discrepancy. Fixed the same
+evening by running the same test on the printed text too; the scored output
+stayed byte-identical and the damage harness did not move.
 
 **"You drop legal forms — could 'X GmbH' against 'X SpA' clear?"**
 Yes, and it is written down in `EXTERNAL_VALIDATION.md`. The organisers'
@@ -268,9 +271,9 @@ every value shows the line it came from, and a correction is re-checked by the
 same rules in place. Languages and export are not built.
 
 **"Your README says one number in one place and another elsewhere."**
-Answer with the code: 757 tests collected (615 pass and 142 skip without the
+Answer with the code: 763 tests collected (621 pass and 142 skip without the
 organisers' dataset, which is not in the repository). If a stale figure is on
-the page, say "that line is stale — the count is 757" and move on. Never quote
+the page, say "that line is stale — the count is 763" and move on. Never quote
 a route count from memory.
 
 **"What would you do next with a week?"**
@@ -295,12 +298,10 @@ accounts. In that order, because the first two change what a desk gets.
   by a per-document rate — wrong unit). Say "$0.0013 per document".
 - **"It reads any bill of lading"** — it does not yet read real boxed forms.
   **Do not upload a real carrier form live**: it will escalate every field.
-- **"574 / 596 / 646 / 732 / 733 / 756 tests"**, "45 mismatches, 21
-  refused" — stale. It is **757 tests, 0 failing** and **46 / 20**.
+- **"574 / 596 / 646 / 732 / 733 / 756 / 757 tests"**, "45 mismatches, 21
+  refused" — stale. It is **763 tests, 0 failing** and **46 / 20**.
 - **"Eleven hours"** without "at our own estimate".
 - **"The BL never arrived"** for email_506 — both attachments were dropped.
-- **Do not type an O/0 swap inside PORT, CO or LTD** on Compare ("P0RT
-  KLANG", "C0., LTD"): it reports a discrepancy (the known limit above).
 
 ---
 

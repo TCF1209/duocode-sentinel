@@ -4,6 +4,42 @@ Newest entry at the top. Three lines: **Done / Next / Careful.**
 
 ---
 
+## 2026-09-25 (night) — Claude session "演讲策略" · three problems found while checking the deck, fixed
+
+Branch `fix/final-night-found-issues`, on top of `docs/final-pitch-10min`
+(so merging it brings the deck and 865931e too).
+
+**Done**
+- **OCR look-alike veto** (`compare.py`): it compared canonical keys only, so
+  a glyph damaged inside a word canonicalisation drops on one side ("P0RT
+  KLANG" vs "PORT KLANG", "C0., LTD" vs "CO., LTD") left keys of different
+  lengths and the pair was reported as a discrepancy. The same test now also
+  runs on the upper-cased printed text; escalate-only as before (never a
+  MATCH). 6 tests added (`test_ocr_confusion.py`): **763 tests** (621 passed /
+  142 skipped without `data/bundle`). Gates: `submission.json` over
+  `bundle_data` byte-identical (md5 `1c08cd21…`), every report field identical
+  except `duration_ms`, adversarial harness identical in all 16 modes, demo
+  inbox runs; the verifier's four probe pairs all escalate. SCORING.md row
+  added; score not re-run here (no `data/_grader/`), held-out draws not
+  re-generated.
+- **Metrics page worst case** (`metrics-page-view.tsx`): multiplied emails/day
+  by a per-document rate. Now × this run's documents per email (250 / 520 on
+  the graded inbox → $3.13 at 5,000/day, was $6.50), labelled "hardest case
+  measured", not "a ceiling". tsc, eslint, `next build` clean; checked live.
+- **README counts**: 596 → 763 tests, 11 / 13 / 15 → 16 API routes (the
+  table now lists `DELETE /cases/{id}/review`), 7 → 8 dashboard routes; CI
+  "on every push" → "on every push to main and every pull request". Every
+  quoted 757 moved to 763 (README, ADVERSARIAL, VIDEO_*, PITCH_DECK, PITCH_DAY,
+  `/pitch` chip — also "FastAPI · 16 routes" — and the rebuilt deck).
+
+**Next**
+- Owner: repository public; merge this branch into `main`.
+- Session "GitHub 最新内容讨论" is changing the case page (labels, Edit
+  button); when it lands, the case-page captures and PITCH_DAY's click script
+  need re-taking against it.
+
+---
+
 ## 2026-09-25 (evening) — Claude session "演讲策略" · the ten-minute deck, ordered by the rubric
 
 Branch `docs/final-pitch-10min`, cut from origin/main 75c599f and

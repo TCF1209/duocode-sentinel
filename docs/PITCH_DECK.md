@@ -212,7 +212,7 @@ each value came from, and nothing stops it guessing. Chye Fong."
 · *Attacked ourselves* (16 kinds of damage, 3,008 documents, 20,496 reads, 13
 unchanged, 0 invented discrepancies, OCR 982 → 0) · *Outside the organisers'
 data* (real forms, scans, archived BLs, 14,326 emails; most real layouts not
-read yet; 0 wrong automatic decisions) · *Engineering* (757 tests, CI on every
+read yet; 0 wrong automatic decisions) · *Engineering* (763 tests, CI on every
 push to main, no key/no network, $2 cap then escalate, non-root container) —
 and the honest box: `email_145`, the guard that would flag 114 of 124 pairs
 (92%), and what is not built yet.
@@ -225,7 +225,7 @@ documents, no answer key. Thirteen change nothing; under OCR damage, silently
 wrong values went from 982 to zero. Then real documents from outside that
 data — carrier forms, scans, fourteen thousand emails. It can't read most real
 layouts yet, and it made zero wrong automatic decisions: what it couldn't read
-went to a person. 757 tests on every push to main. And the one we haven't
+went to a person. 763 tests on every push to main. And the one we haven't
 fixed is on the slide — a defect we hide is worse than one we miss. Yee
 Teng."
 
@@ -312,7 +312,7 @@ Before/With beat: it is the only live evidence for Effectiveness.
 | 520 emails · 46 / 20 / 454 · 220 comparisons · 5 categories 220/125/75/60/40 · escalations 5/5/5/5 by reason | `backend/run.py --data bundle_data`, commit 865931e; also the deployed API's run |
 | `submission.json` md5 `1c08cd21…` = the scored run | same run; the 1.0000 was measured by the teammate on be55258 with the organisers' `score_cli.py` |
 | 1.0000 × 4; 225 planted; 80/80 escalations | `SCORING.md` §4.1 (dev 520/46, held-out 520/57, 320/31, 820/91) |
-| 757 tests, 0 failing (615 passed / 142 skipped without the dataset) | `pytest --junitxml`, commit 75c599f (865931e changes web only) |
+| 763 tests, 0 failing (621 passed / 142 skipped without the dataset) | `pytest --junitxml`, 25 Sep evening, branch `fix/final-night-found-issues` (757 before the six OCR tests) |
 | 6 model calls, all scan transcriptions; 0 decided by the model | local model-tier run of 865931e: `llm_calls 6`, `decided_by_llm 0`, $0.0086, 36.6 s with an empty cache, 4.9 s with it warm |
 | "under 3 ms per email on one core" | 2.78 ms, the same deterministic run |
 | 16 modes · 3,008 documents · 20,496 reads · 13 unchanged · 0 invented discrepancies · OCR silent wrong 982 → 0 · 1 masked (`email_145`) | `backend/tools/adversarial.py --data bundle_data`, 865931e; 982 is the "before" row of `ADVERSARIAL.md` §4.4 |

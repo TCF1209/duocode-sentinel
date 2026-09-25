@@ -243,7 +243,7 @@ $cards = @(
   @("Not memorised", "1.0000 on the organisers' scorer - and on three more datasets from seeds we never developed against. 225 planted discrepancies, each caught with the exact field set; 80 of 80 escalations correct."),
   @("Attacked ourselves", "16 kinds of damage, 3,008 perturbed documents, 20,496 field reads, no answer key. 13 kinds change nothing; 0 invented discrepancies in any. Under OCR damage, silently wrong values: 982 -> 0."),
   @("Outside the organisers' data", "Real carrier forms, real scans, archived bills of lading, 14,326 real emails. It cannot read most real form layouts yet - and made 0 wrong automatic decisions: every one went to a person."),
-  @("Engineering", "757 tests, 0 failing; CI on every push to main. Runs with no key and no network. A `$2 model cap per run - when it is spent, hard cases escalate. The container runs as a non-root user with no secret inside.")
+  @("Engineering", "763 tests, 0 failing; CI on every push to main. Runs with no key and no network. A `$2 model cap per run - when it is spent, hard cases escalate. The container runs as a non-root user with no secret inside.")
 )
 $cw = 272; $ch = 158
 for ($i = 0; $i -lt 4; $i++) {
@@ -260,7 +260,7 @@ Add-Text $s "A defect we hide is worse than one we miss." ($hx + 14) 262 ($hw - 
 Add-Body $s "Also written down: most real form layouts are not read yet; no database, accounts or mailbox connector yet." ($hx + 14) 330 ($hw - 28) 80 10.5 $C.mfg | Out-Null
 Add-Body $s "A perfect score on the data you were handed proves you didn't memorise it - not that the reader works. So we went looking for the failures ourselves." $M 448 ($W - 2 * $M) 34 11.5 $C.mfg | Out-Null
 Add-Tag $s "Rubric 4 · Engineering quality & robustness · 15" $false | Out-Null
-Set-Notes $s "SPEAKER B (Chye Fong) · 7:55-8:50`r`rWhat a demo can't show: how we know it holds. 1.0000 on the organisers' scorer - and on three more datasets from seeds we never developed against. But a perfect score on the data you were handed doesn't prove the reader works. So we damaged our own documents: sixteen kinds of damage, 3,008 documents, no answer key. Thirteen change nothing; under OCR damage, silently wrong values went from 982 to zero. Then real documents from outside that data - carrier forms, scans, fourteen thousand emails. It can't read most real layouts yet, and it made zero wrong automatic decisions: what it couldn't read went to a person. 757 tests on every push to main. And the one we haven't fixed is on the slide - a defect we hide is worse than one we miss. Yee Teng."
+Set-Notes $s "SPEAKER B (Chye Fong) · 7:55-8:50`r`rWhat a demo can't show: how we know it holds. 1.0000 on the organisers' scorer - and on three more datasets from seeds we never developed against. But a perfect score on the data you were handed doesn't prove the reader works. So we damaged our own documents: sixteen kinds of damage, 3,008 documents, no answer key. Thirteen change nothing; under OCR damage, silently wrong values went from 982 to zero. Then real documents from outside that data - carrier forms, scans, fourteen thousand emails. It can't read most real layouts yet, and it made zero wrong automatic decisions: what it couldn't read went to a person. 763 tests on every push to main. And the one we haven't fixed is on the slide - a defect we hide is worse than one we miss. Yee Teng."
 
 # ============================================================ 6 · impact (A)
 $s = New-Slide $pres $C.bg

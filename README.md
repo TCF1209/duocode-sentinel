@@ -38,7 +38,7 @@ of being reported as a discrepancy.*
 | | |
 |---|---|
 | **Accuracy** | **1.0000** final score on the dev set **and** on three held-out draws, generated from the organisers' own generator with seeds we never developed against — 225 planted defects, every one caught with the **exact** field set, no false alarms, all 80 escalations correct. Not four *independent* tests, and `docs/SCORING.md` §4.1 says why. |
-| **Tests** | **757** — 161 added on 25 Sep: 45 for the reply drafts' wording pass (`backend/tests/test_reply_polish.py`), 6 for the in-place review, its value corrections, the review counts and telling a scanned PDF from a corrupt one (`backend/tests/test_api.py`), and 110 from testing on real external documents (`backend/tests/test_external_validation.py`, see [EXTERNAL_VALIDATION.md](docs/EXTERNAL_VALIDATION.md)); re-run 25 Sep on a checkout with no `data/bundle` as **615 passed, 142 skipped, 0 failed, 0 xfailed**. The one strict `xfail` that used to sit here is gone: it pinned a defect found by review, `docs/ADVERSARIAL.md` §5.4, fixed the same day it was found. The same command runs on every push in [CI](.github/workflows/ci.yml). |
+| **Tests** | **763** — 167 added on 25 Sep: 45 for the reply drafts' wording pass (`backend/tests/test_reply_polish.py`), 6 for the in-place review, its value corrections, the review counts and telling a scanned PDF from a corrupt one (`backend/tests/test_api.py`), 110 from testing on real external documents (`backend/tests/test_external_validation.py`, see [EXTERNAL_VALIDATION.md](docs/EXTERNAL_VALIDATION.md)), and 6 for the OCR look-alike check on a glyph damaged inside a word the comparison drops (`backend/tests/test_ocr_confusion.py`); re-run 25 Sep on a checkout with no `data/bundle` as **621 passed, 142 skipped, 0 failed, 0 xfailed**. The one strict `xfail` that used to sit here is gone: it pinned a defect found by review, `docs/ADVERSARIAL.md` §5.4, fixed the same day it was found. The same command runs on every push to `main` and every pull request in [CI](.github/workflows/ci.yml). |
 | **Speed** | **~3 ms per email**, single-threaded on a laptop: 520 emails end to end in about 1.5 s. |
 | **Cost** | **100% of decisions are made by rules.** `decided_by` is `"rule"` for all 520 emails; no model call decides anything on the graded inbox. |
 
@@ -96,7 +96,7 @@ that brief asks for are listed here with the section that answers each:
 | | Section |
 |---|---|
 | **Technical architecture** | [Technical architecture](#technical-architecture) — the six stages and what each decides, then [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design reasoning and [`docs/DECISIONS.md`](docs/DECISIONS.md) for the alternatives we rejected |
-| **Implementation details** | [Implementation details](#implementation-details) — what was built around the six stages, the 11 API routes and the 7 dashboard routes. Then [Quick start](#quick-start) to run it, [Repository map](#repository-map) for where each file lives, and [Verify it yourself](#verify-it-yourself) for the commands behind every number above |
+| **Implementation details** | [Implementation details](#implementation-details) — what was built around the six stages, the 16 API routes and the 8 dashboard routes. Then [Quick start](#quick-start) to run it, [Repository map](#repository-map) for where each file lives, and [Verify it yourself](#verify-it-yourself) for the commands behind every number above |
 | **Challenges faced** | [Challenges faced](#challenges-faced) — five defects found by measurement, what each cost, and the one still open |
 | **Future roadmap** | [Future roadmap](#future-roadmap) — five items in build order, and the one thing we would deliberately not do |
 
@@ -162,7 +162,7 @@ readings that differ only in characters OCR confuses — each becomes an
 escalation carrying both readings, rather than an answer. `docs/ADVERSARIAL.md`
 §6 measures what that costs and what it buys.
 
-Around the core: **FastAPI** (11 routes over the same pipeline, deployed as a
+Around the core: **FastAPI** (16 routes over the same pipeline, deployed as a
 container on Render) and a **Next.js 16** dashboard on Vercel. The design and
 the reasoning behind each choice is in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the alternatives we rejected,
@@ -192,7 +192,7 @@ are reproducible and not re-billed, per-purpose token metering and a run
 budget. Every path is optional: with no `OPENAI_API_KEY` the pipeline still
 runs end to end and escalates what it cannot read (`CLAUDE.md` rule 5).
 
-**The API — `backend/api/`, FastAPI, 15 routes.** Pydantic models at the
+**The API — `backend/api/`, FastAPI, 16 routes.** Pydantic models at the
 boundary only; `store.py` isolates state so the in-memory store is one file to
 replace, not a rewrite of the routes.
 
@@ -203,7 +203,7 @@ replace, not a rewrite of the routes.
 | `GET /runs/{id}/cases` | case list, filterable by category, status and `decided_by` |
 | `GET /cases/{id}` | one full report — seven fields, both sides, every piece of evidence |
 | `GET /cases/{id}/attachments/{side}` | the SI or BL file itself, inline — the whole document behind the evidence snippet |
-| `POST /cases/{id}/review` | a reviewer confirms or corrects; the report updates |
+| `POST /cases/{id}/review` · `DELETE /cases/{id}/review` | a reviewer confirms or corrects, and the report updates; or withdraws the review |
 | `POST /cases/{id}/retry` | re-process one email in place, re-reading it from disk |
 | `POST /cases/{id}/recheck` | **re-sent documents**: the same check run again on an uploaded SI and/or BL; the answer it replaces, and any review of it, stay readable in the case's history |
 | `POST /compare` | **upload two documents of your own** and get the same report |
@@ -211,10 +211,10 @@ replace, not a rewrite of the routes.
 | `GET /runs/{id}/patterns` | the inbox read sideways: which fields go wrong, and per-sender defect rates with 95% intervals |
 | `GET /metrics` · `GET /submission` | operational counters; the graded artefact |
 
-**The dashboard — `web/`, Next.js 16 App Router, 7 routes.** `/` · `/runs` ·
+**The dashboard — `web/`, Next.js 16 App Router, 8 routes.** `/` · `/runs` ·
 `/runs/[runId]` · `/runs/[runId]/cases/[emailId]` — the side-by-side report
 with the source line under every value, which is the screen the project exists
-to produce · `/runs/[runId]/metrics` · `/compare` · `/pitch`.
+to produce · `/runs/[runId]/metrics` · `/runs/[runId]/patterns` · `/compare` · `/pitch`.
 
 ![The run view: 520 of 520 emails processed, filterable by category and status, each row showing the category, the outcome, which fields are defective and whether a rule or the model decided it](docs/img/inbox.png)
 
@@ -227,8 +227,8 @@ claimed.*
 and `render.yaml` build the API, `web/vercel.json` the frontend. Runbook and
 the failures worth predicting: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
-**Tests — 596**, up from 574 at `4c852a7` (twenty-two new, one former `xfail` now
-a plain pass — see the table two sections up). The skips are guarded in
+**Tests — 763**, up from 574 at `4c852a7` (189 new, the one former `xfail`
+now a plain pass — see the table at the top). The skips are guarded in
 `conftest.py` and print their reason rather than failing on an empty read —
 exact counts and the caveat on which of them are freshly re-run versus
 carried over from before `4c852a7` are in [The test
@@ -280,14 +280,14 @@ the 520-email one, below.
 
 On a fresh clone at `4c852a7`: **431 passed, 142 skipped, 1 xfailed, 0
 errors**. Re-run on 25 Sep on a checkout holding no `data/bundle` — the same
-condition as a clone — the suite is **757 tests: 615 passed, 142 skipped, 0
+condition as a clone — the suite is **763 tests: 621 passed, 142 skipped, 0
 failed, 0 xfailed**, read off pytest's own summary line rather than
-remembered: 183 tests added since `4c852a7` (161 of them on 25 Sep: 45 for
+remembered: 189 tests added since `4c852a7` (167 of them on 25 Sep: 45 for
 the reply drafts' wording pass, 6 for in-place review, value corrections,
-review counts and scan state, 110 from testing on real external documents), and the former
-`xfail` now a plain pass.
+review counts and scan state, 110 from testing on real external documents,
+6 for the OCR look-alike check), and the former `xfail` now a plain pass.
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs this same command
-on every push, on a machine nobody on the team configured — the fresh-clone
+on every push to `main` and every pull request, on a machine nobody on the team configured — the fresh-clone
 check made permanent rather than repeated by hand.
 
 The skips are not a broken checkout. `data/` is git-ignored — it holds the
@@ -297,7 +297,8 @@ full bundle to read. `backend/tests/conftest.py` guards exactly the tests that
 open it and skips them with the reason printed, rather than letting ~100 tests
 fail on an empty read and read as a broken project. With the participant bundle
 at `data/bundle/`, the same command gave **573 passed, 1 xfailed** at
-`4c852a7`, and **757 passed, 0 skipped, 0 xfailed** on 25 Sep.
+`4c852a7`, and **757 passed, 0 skipped, 0 xfailed** on 25 Sep — measured
+before the six OCR tests were added; they do not read the bundle.
 
 ### The full inbox
 
@@ -321,7 +322,7 @@ cp .env.example .env     # then set OPENAI_API_KEY
 ### The API and the dashboard
 
 ```bash
-# API — 11 routes over the same pipeline code the CLI uses
+# API — 16 routes over the same pipeline code the CLI uses
 .venv/Scripts/python.exe -m uvicorn backend.api.main:app --reload --port 8000
 #   SENTINEL_DATA_ROOT=<a bundle>    which inbox POST /runs processes
 #                                    (defaults to data/bundle; demo_data works)
@@ -581,9 +582,9 @@ kept apart on purpose.
 
 ```
 backend/sdoc/          the pipeline — no web, no database, no network imports
-backend/api/           FastAPI surface over it (13 routes, incl. POST /compare)
+backend/api/           FastAPI surface over it (16 routes, incl. POST /compare)
 backend/tools/         adversarial.py, the perturbation harness; smoke_readers.py
-backend/tests/         757 tests over the traps in docs/DATA_NOTES.md
+backend/tests/         763 tests over the traps in docs/DATA_NOTES.md
 backend/run.py         an inbox -> submission.json + report.json + metrics.json
 web/                   Next.js 16 dashboard (App Router, shadcn/ui, Recharts)
 demo_data/             30-email demo inbox — what a clone can run without the bundle

@@ -286,7 +286,11 @@ function ThroughputProjection({ metrics, costUsd }: { metrics: PipelineMetrics; 
   const ruleSharePct = Math.round(metrics.rule_share * 100);
   const measuredUsdPerEmail = metrics.emails > 0 ? costUsd / metrics.emails : 0;
   const projectedAtTodaysMix = volume * measuredUsdPerEmail;
-  const projectedWorstCase = volume * WORST_CASE_USD_PER_DOCUMENT;
+  // The rate is per *document*, and not every email carries one (on the
+  // graded inbox 250 documents across 520 emails), so the projection scales by
+  // this run's own documents per email instead of treating each email as one.
+  const documentsPerEmail = metrics.emails > 0 ? metrics.documents_read / metrics.emails : 0;
+  const projectedWorstCase = volume * documentsPerEmail * WORST_CASE_USD_PER_DOCUMENT;
 
   return (
     <Card>
@@ -307,12 +311,12 @@ function ThroughputProjection({ metrics, costUsd }: { metrics: PipelineMetrics; 
             label={`At today's mix (${ruleSharePct}% by rules)`}
             value={`$${projectedAtTodaysMix.toFixed(projectedAtTodaysMix < 1 ? 4 : 2)}`}
           />
-          <MiniStat label="Worst case — every email unfamiliar" value={`$${projectedWorstCase.toFixed(2)}`} accent="warn" />
+          <MiniStat label="Hardest case measured — every label unfamiliar" value={`$${projectedWorstCase.toFixed(2)}`} accent="warn" />
         </div>
         <p className="text-xs text-muted-foreground">
           Time: this run&apos;s measured {metrics.mean_ms_per_email.toFixed(2)} ms per email. Cost: this run&apos;s
-          measured rate; worst case ${WORST_CASE_USD_PER_DOCUMENT} per document with every field unfamiliar — a
-          ceiling.
+          measured rate; the hardest case measured is ${WORST_CASE_USD_PER_DOCUMENT} per document with every label
+          unfamiliar, times this run&apos;s {documentsPerEmail.toFixed(2)} documents per email. Each run is capped at $2.
         </p>
       </CardContent>
     </Card>

@@ -484,10 +484,10 @@ const MODEL = [
 
 const INFRA = [
   "Python 3.10",
-  "FastAPI · 13 routes",
+  "FastAPI · 16 routes",
   "Docker on Render",
   "Next.js 16 on Vercel",
-  "757 tests · 0 failing",
+  "763 tests · 0 failing",
 ];
 
 function TechStack() {
