@@ -143,14 +143,14 @@ Vercel, the API in a Docker container on Render, the model is OpenAI's
 gpt-5-mini. It's processing the organisers' whole inbox — 520 emails, not a
 sample. Stage one sorts every email into five kinds of mail; for every
 comparison request both attachments are read, compared field by field, and
-checked by the gate. [done] Done in [read the seconds off the screen].
-Forty-six discrepancies, twenty escalated, each with its reason. And six
+checked by the gate. [done] Done. Forty-six discrepancies, twenty escalated, each with its reason. And six
 model calls — all six are scanned pages the rules can't read. That's where
 the model goes."
 
 **B · Before / With (2:40–3:00)** — "The same inbox as a clerk receives it:
 124 document pairs among 520 emails — about eleven hours of work at our own
-estimate. [With Sentinel] What's left for a person is a work list, not an
+estimate. Sentinel: [the seconds shown top right — the run page itself shows
+no time]. [With Sentinel] What's left for a person is a work list, not an
 inbox."
 
 **B · one case through the stages (3:00–3:50)** — "One case, through the
